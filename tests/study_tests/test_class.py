@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 
 
@@ -29,3 +31,13 @@ def test_use_property_as_param() -> None:
 
     c: Parent = Child()
     assert c.prop == "hello"
+
+
+def test_return_self() -> None:
+    class Foo:
+        def bar(self) -> Foo:
+            return self
+
+    foo = Foo()
+    assert foo is foo.bar()
+    assert foo.bar() is foo.bar().bar()
