@@ -1,26 +1,25 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, TypeVar, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, List
-    from .intention import Intention
-    from .context import Context
-    from .operator import Operator
-    from .url import URL
-
-    T_ARG = TypeVar('T_ARG', bound=object)
-    T_DATA = TypeVar('T_DATA', bound=object)
-    T_RESULT = TypeVar('T_RESULT', bound=object)
-    BEHAVE = Callable[[Context], None]
+    from typing import Optional, List, Dict
+    from ghoshell.ghost.intention import Intention
+    from ghoshell.ghost.context import IContext
+    from ghoshell.ghost.operator import IOperator
+    from ghoshell.ghost.uml import UML
 
 
 class This(metaclass=ABCMeta):
-    args: T_ARG
-    data: T_DATA
-    status: int = 0
-    result: Optional[T_RESULT] = None
+    """
+    当前任务的状态
+    """
+    tid: str
+    status: int
+    args: Dict
+    data: Dict
+    result: Optional[Dict]
     priority: float = 0
     overdue: int = -1
 
@@ -32,7 +31,7 @@ class Thinking(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def uml(self) -> URL:
+    def url(self) -> UML:
         """
         用类似 url (uniform resource locator) 的方式定位一个 Thinking
         soul: 对应的 soul, 用 a.b.c 的方式定位
@@ -52,28 +51,28 @@ class Thinking(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def identity(self, ctx: Context, args: T_ARG) -> str:
+    def identity(self, ctx: IContext, args: Dict) -> str:
         """
         结合上下文生成 identity, 用来从 runtime 里查找到 thought
         """
         pass
 
     @abstractmethod
-    def create(self, ctx: Context, args: T_ARG) -> This:
+    def new(self, ctx: IContext, args: Dict) -> This:
         """
         结合上下文, 初始化一个 thought, 以加入 runtime 中运行.
         """
         pass
 
     @abstractmethod
-    def intentions(self, this: This) -> List[Intention]:
+    def intention(self, this: This) -> Intention:
         """
         进入当前状态可以提供的各种意图.
         """
         pass
 
     @abstractmethod
-    def attentions(self, this: This, ctx: Context) -> List[URL]:
+    def attentions(self, this: This, ctx: IContext) -> List[UML]:
         """
         从当前状态进入别的状态的连接点
         attentions with intentions
@@ -81,22 +80,22 @@ class Thinking(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def react(self, this: This, ctx: Context) -> Operator:
+    def react(self, this: This, ctx: IContext) -> IOperator:
         """
         正式进入当前状态后, 会发生的行为.
         """
         pass
 
     @abstractmethod
-    def fallback(self, this: This, ctx: Context) -> Operator:
+    def fallback(self, this: This, ctx: IContext) -> IOperator:
         """
-        如果一个事件没有 intention 去响应
+        如果一个事件没有 attention 去响应
         就会 fallback 到当前状态来尝试兜底响应.
         """
         pass
 
     @abstractmethod
-    def on_event(self, this: This, ctx: Context, op: Operator) -> Operator:
+    def on_event(self, this: This, ctx: IContext, op: IOperator) -> IOperator:
         """
         当一个事件执行到当前位置时, 可以在它执行之前进行拦截
         做必要的动作.
@@ -112,9 +111,9 @@ class Mindset(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def fetch(self, uml: URL) -> Optional[Thinking]:
+    def fetch(self, uml: UML) -> Optional[Thinking]:
         pass
 
     @abstractmethod
-    def register(self, uml: URL, thinking: Thinking) -> None:
+    def register(self, uml: UML, thinking: Thinking) -> None:
         pass

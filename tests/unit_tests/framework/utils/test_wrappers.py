@@ -1,4 +1,4 @@
-from src.utils import dict2object
+from ghost.utils import dict2object
 
 
 def test_dict2object() -> None:

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 FEAT_KEY = TypeVar('FEAT_KEY', bound=str)
 
 
-class Featuring(metaclass=abc.ABCMeta):
+class IFeaturing(metaclass=abc.ABCMeta):
     """
     Ghost 所拥有的所有特征提取能力.
     能够提取出各种和上下文相关的泛化数据. 特征之间可能会有依赖关系

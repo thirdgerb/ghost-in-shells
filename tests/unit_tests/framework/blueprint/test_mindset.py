@@ -1,5 +1,5 @@
-from src.blueprint.mindset import This
-from src.utils import dict2object
+from ghoshell.ghost.blueprint import This
+from ghost.utils import dict2object
 
 
 def test_this() -> None:

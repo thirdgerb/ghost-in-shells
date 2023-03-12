@@ -1,0 +1,2 @@
+class GhostException(Exception):
+    pass

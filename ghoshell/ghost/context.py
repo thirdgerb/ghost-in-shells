@@ -4,22 +4,21 @@ from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, Any
-    from .io import Input, Output, Action
-    from .mindset import Mindset
-    from .runtime import Runtime
-    from .intention import Attentions
-    from features import Featuring
+    from ghoshell.ghost.io import Input, Output, Message
+    from ghoshell.ghost.mindset import Mindset
+    from ghoshell.ghost.runtime import Runtime
+    from ghoshell.ghost.intention import Attentions
+    from ghoshell.ghost.features import IFeaturing
 
 
-class Context(metaclass=ABCMeta):
+class IContext(metaclass=ABCMeta):
     """
     Ghost 运行时的上下文, 努力包含一切核心逻辑与模块
     """
 
     @property
     @abstractmethod
-    def soul(self) -> str:
+    def name(self) -> str:
         """
         机器人的"灵魂"，不同的 Ghost 可能使用同样的灵魂，比如"微软小冰"等
         """
@@ -27,7 +26,7 @@ class Context(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def ghost(self) -> str:
+    def id(self) -> str:
         """
         机器人灵魂的"实例",用来隔离 process 与记忆
         """
@@ -56,7 +55,7 @@ class Context(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def featuring(self) -> Featuring:
+    def featuring(self) -> IFeaturing:
         """
         从上下文中获取特征.
         特征是和上下文相关的任何信息.
@@ -74,7 +73,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def act(self, *actions: Action) -> None:
+    def act(self, *actions: Message) -> None:
         """
         输出各种动作, 实际上输出到 output 里, 给 shell 去处理
         """
@@ -86,22 +85,6 @@ class Context(metaclass=ABCMeta):
         将所有的输出动作组合起来, 输出为 Output
         所有 act 会积累新的 action 到 output
         它应该是幂等的, 可以多次输出.
-        """
-        pass
-
-    @abstractmethod
-    def get(self, key: str, default: Any = None) -> Optional[Any]:
-        """
-        用 context 来获取请求级的变量数据.
-        key 应该是 JSON Pointer 等标准化的路径
-        """
-        pass
-
-    @abstractmethod
-    def set(self, key: str, value: Any) -> None:
-        """
-        用 context 来临时保存请求级的变量数据.
-        key 应该是 JSON Pointer 等标准化的路径
         """
         pass
 
