@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Tuple, Optional, Any, Callable, List
 
 from ghoshell.ghost import Output, Input, IGhost
-from ghoshell.shell import IShell, IContext
+from ghoshell.shell.shell import IShell, IContext
 from ghoshell.utils import create_pipeline
 
 # input 处理管道

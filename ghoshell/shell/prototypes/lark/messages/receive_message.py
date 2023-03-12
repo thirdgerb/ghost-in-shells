@@ -1,23 +1,18 @@
-from dataclasses import dataclass
 from typing import List
 
-from dataclasses_json import dataclass_json
+from pydantic import BaseModel
 
-from .common import UserInfo, Header
+from ghoshell.shell.prototypes.lark.messages.common import UserInfo
 
 
-@dataclass_json
-@dataclass
-class Mention:
+class Mention(BaseModel):
     key: str
     id: UserInfo
     name: str
     tenant_key: str
 
 
-@dataclass_json
-@dataclass
-class Message:
+class Message(BaseModel):
     message_id: str
     root_id: str
     parent_id: str
@@ -29,23 +24,12 @@ class Message:
     mentions: List[Mention]
 
 
-@dataclass_json
-@dataclass
-class Sender:
+class Sender(BaseModel):
     sender_id: UserInfo
     sender_type: str
     tenant_key: str
 
 
-@dataclass_json
-@dataclass
-class ReceiveMessage:
-    @dataclass_json
-    @dataclass
-    class ReceiveMessageEvent:
-        sender: Sender
-        message: Message
-
-    schema: str
-    header: Header
-    event: ReceiveMessageEvent
+class ReceiveMessage(BaseModel):
+    sender: Sender
+    message: Message
