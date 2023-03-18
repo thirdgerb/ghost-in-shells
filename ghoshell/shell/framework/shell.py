@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Tuple, Optional, Any, Callable, List
+from typing import Tuple, Optional, Callable, List, Any
 
-from ghoshell.ghost import Output, Input, IGhost
-from ghoshell.shell.shell import IShell, IContext
+from ghoshell.ghost import Output, Input
+from ghoshell.shell.shell import IShell, IShellContext
 from ghoshell.utils import create_pipeline
 
 # input 处理管道
@@ -14,6 +14,19 @@ INPUT_PIPE = Callable[[Input, INPUT_PIPELINE], Tuple[Input, Optional[Output]]]
 # output 处理管道
 OUTPUT_PIPELINE = Callable[[Output], Output]
 OUTPUT_PIPE = Callable[[Output, OUTPUT_PIPELINE], Output]
+
+EVENT_PIPELINE = Callable[[Any], Optional[Input]]
+EVENT_PIPE = Callable[[Any, EVENT_PIPELINE], Optional[Input]]
+
+
+class EventMiddleware(metaclass=ABCMeta):
+
+    @abstractmethod
+    def new(self, shell: IShell) -> EVENT_PIPE:
+        """
+        初始化一个管道.
+        """
+        pass
 
 
 class InputMiddleware(metaclass=ABCMeta):
@@ -29,7 +42,7 @@ class InputMiddleware(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def new(self, ctx: IContext) -> INPUT_PIPE:
+    def new(self, ctx: IShellContext) -> INPUT_PIPE:
         """
         初始化一个管道.
         """
@@ -49,7 +62,7 @@ class OutputMiddleware(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def new(self, ctx: IContext) -> OUTPUT_PIPE:
+    def new(self, ctx: IShellContext) -> OUTPUT_PIPE:
         """
         初始化一个管道.
         mdw 应该要理解 context 的类型.
@@ -63,31 +76,23 @@ class Bootstrapper(metaclass=ABCMeta):
     """
 
     def bootstrap(self, shell: IShell) -> None:
+        """
+        用来初始化 Shell.
+        """
         pass
 
 
-class ShellFramework(IShell, metaclass=ABCMeta):
+class ShellKernel(IShell, metaclass=ABCMeta):
     # 初始化流程
     bootstrapping: List[Bootstrapper] = []
+
+    # 事件处理中间件.
+    event_middleware: List[EventMiddleware] = []
+
     # 输入处理
     input_middleware: List[InputMiddleware] = []
     # 输出处理
     output_middleware: List[OutputMiddleware] = []
-
-    @abstractmethod
-    def connect(self, inpt: Input) -> IGhost:
-        pass
-
-    @abstractmethod
-    def on_event(self, e: Any) -> Input:
-        """
-        在 shell 接受到事件时, 需要为事件创建 context
-        """
-        pass
-
-    @abstractmethod
-    def context(self, _input: Input) -> IContext:
-        pass
 
     @abstractmethod
     def kind(self) -> str:
@@ -100,7 +105,27 @@ class ShellFramework(IShell, metaclass=ABCMeta):
         """
         pass
 
-    def boostrap(self) -> ShellFramework:
+    def on_event(self, e: Any) -> Optional[Input]:
+        """
+        响应事件, 生成 Context
+        事件通常来自 shell
+        """
+        pipes: List[EVENT_PIPE] = []
+        for mdw in self.event_middleware:
+            pipes.append(mdw.new(self))
+
+        def destination(event) -> Optional[Input]:
+            """
+            默认无法响应.
+            """
+            return None
+
+        pipeline = create_pipeline(pipes, destination)
+        return pipeline(e)
+
+    # ----- implements ----- #
+
+    def bootstrap(self) -> IShell:
         """
         初始化启动
         """
@@ -108,28 +133,13 @@ class ShellFramework(IShell, metaclass=ABCMeta):
             bootstrapper.bootstrap(self)
         return self
 
-    def tick(self, event: Any) -> None:
-        """
-        shell 响应单个事件
-        """
-        try:
-            _input = self.on_event(event)
-            _input, _output = self._on_input(_input)
-            if _output is None:
-                ghost = self.connect(_input)
-                _output = ghost.react(_input)
-            self._on_output(_output)
-        finally:
-            pass
-
     # ----- inner methods ----- #
 
-    def _on_input(self, _input: Input) -> Tuple[Input, Optional[Output]]:
+    def on_input(self, _input: Input) -> Tuple[Input, Optional[Output]]:
         """
         用管道的方式来处理 input
         todo: try catch
         """
-
         ctx = self.context(_input)
         try:
             pipes: List[INPUT_PIPE] = []
@@ -145,7 +155,7 @@ class ShellFramework(IShell, metaclass=ABCMeta):
         finally:
             ctx.destroy()
 
-    def _on_output(self, output: Output) -> None:
+    def on_output(self, output: Output) -> None:
         """
         用管道的形式处理输出
         """
@@ -163,3 +173,21 @@ class ShellFramework(IShell, metaclass=ABCMeta):
             ctx.send(final_output)
         finally:
             ctx.destroy()
+
+    def tick(self, e: Any) -> None:
+        """
+        响应一个普通事件.
+        """
+        try:
+            _input = self.on_event(e)
+            if _input is None:
+                # 默认无法处理的事件. 不做任何响应.
+                return
+            _input, _output = self.on_input(_input)
+            if _output is None:
+                ghost = self.connect(_input)
+                _output = ghost.react(_input)
+            self.on_output(_output)
+        finally:
+            # todo: 异常处理
+            pass

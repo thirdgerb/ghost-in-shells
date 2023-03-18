@@ -1,6 +1,16 @@
 import json
 
-from ghoshell.shell.prototypes.lark import ImMessageReceive
+from ghoshell.shell.prototypes.lark import ImMessageReceive, Message
+
+
+def test_new_message():
+    message = Message(
+        message_id="hello",
+        root_id="root",
+    )
+
+    assert message.message_id == "hello"
+    assert message.root_id == "root"
 
 
 def test_im_receive_message():

@@ -22,7 +22,7 @@ class IGhost(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def react(self, inpt: Input) -> Output:
+    async def react(self, inpt: Input) -> Output:
         """
         核心方法: 处理输入 inpt
         """

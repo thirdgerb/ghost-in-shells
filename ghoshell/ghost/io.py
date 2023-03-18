@@ -30,9 +30,10 @@ class Trace(BaseModel):
     # shell 的类型
     shell_kind: str = ""
     session_id: str = ""
-    sender_id: str = ""
+    # 对话的进程 id. 一个 session 可以同时运行多个进程.
     process_id: str = ""
-    task_id: str = ""
+    # 输入信息的主体
+    subject_id: str = ""
 
 
 class Input(BaseModel):
@@ -44,14 +45,14 @@ class Input(BaseModel):
     message: Message
 
     # 输入的 trace.
-    trace: Trace = Trace()
+    trace: Trace
 
     # 传入 shell 侧携带的上下文信息, shell 侧定义的协议
     # 如果 ghost 希望理解 shell 的话, 可以主动处理这部分上下文
-    shell_env: Dict = {}
+    shell_env: Dict = None
 
     # ghost 约定的上下文协议. 可以传入额外的信息
-    ghost_env: Dict = {}
+    ghost_env: Dict = None
 
     # 请求相关的场景. 如果 ghost 是初始化, 则用 UML 定位场景.
     uml: Optional[UML] = None
