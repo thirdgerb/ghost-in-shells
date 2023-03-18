@@ -25,12 +25,17 @@ class Message(BaseModel):
 
 
 class Trace(BaseModel):
-    # shell 的 id
+    # shell 的 id. 对齐 shell 的 session.
+    # 举个例子, 如果 shell 是一个 IM
+    # 则 shell id 最好就是 IM 的 chat_id
     shell_id: str = ""
     # shell 的类型
     shell_kind: str = ""
+    # session 的唯一 id.
+    # 理论上不同的 shell 之间的 session_id 也不能混合.
+    # 只有在一个 shell 对应唯一的一个 ghost 时, 才可以将两者完全互通.
     session_id: str = ""
-    # 对话的进程 id. 一个 session 可以同时运行多个进程.
+    # 对话的进程 id. 一个 session 可以同时运行多个进程. 默认为空.
     process_id: str = ""
     # 输入信息的主体
     subject_id: str = ""
@@ -76,5 +81,6 @@ class Output(BaseModel):
     # ghost 理解 shell 的情况下, 可以用这种方式去控制 shell
     shell_env: Dict = {}
 
-    # ghost 约定的上下文协议. shell 如果理解 ghost 的话, 可以主动处理这部分信息.
+    # ghost 约定的上下文协议.
+    # shell 如果理解 ghost 的话, 可以主动处理这部分信息.
     ghost_env: Dict = {}

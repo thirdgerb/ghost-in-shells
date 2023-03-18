@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
+from typing import Any, Optional
 
-if TYPE_CHECKING:
-    from ghoshell.ghost.io import Input, Output, Message
-    from ghoshell.ghost.mindset import Mindset
-    from ghoshell.ghost.runtime import Runtime
-    from ghoshell.ghost.intention import Attentions
-    from ghoshell.ghost.features import IFeaturing
+from ghoshell.ghost.features import IFeaturing
+from ghoshell.ghost.intention import Attentions
+from ghoshell.ghost.io import Input, Output, Message
+from ghoshell.ghost.mindset import Mindset
+from ghoshell.ghost.runtime import IRuntime
 
 
 class IContext(metaclass=ABCMeta):
@@ -26,7 +25,7 @@ class IContext(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def id(self) -> str:
+    def session_id(self) -> str:
         """
         机器人灵魂的"实例",用来隔离 process 与记忆
         """
@@ -36,18 +35,21 @@ class IContext(metaclass=ABCMeta):
     @abstractmethod
     def input(self) -> Input:
         """
-        请求的输入消息
+        请求的输入消息, 任何时候都不应该变更.
         """
         pass
 
     @property
     @abstractmethod
     def mind(self) -> Mindset:
+        """
+        用来获取所有的记忆.
+        """
         pass
 
     @property
     @abstractmethod
-    def runtime(self) -> Runtime:
+    def runtime(self) -> IRuntime:
         """
         与 上下文/进程 相关的存储单元, 用来存储各种数据
         """
@@ -85,6 +87,20 @@ class IContext(metaclass=ABCMeta):
         将所有的输出动作组合起来, 输出为 Output
         所有 act 会积累新的 action 到 output
         它应该是幂等的, 可以多次输出.
+        """
+        pass
+
+    @abstractmethod
+    def set(self, key: str, value: Any) -> None:
+        """
+        上下文级别的缓存机制, 用在内存中.
+        """
+        pass
+
+    def get(self, key: str) -> Optional[Any]:
+        """
+        从上下文中获取缓存. 工具机制.
+        可惜没有泛型, python 很麻烦的.
         """
         pass
 

@@ -10,9 +10,13 @@ if TYPE_CHECKING:
 
 class IOperator(metaclass=ABCMeta):
     """
-    runtime 运行时的算子
+    Ghost 运行时的算子
     """
 
     @abstractmethod
     def run(self, ctx: IContext) -> Optional[IOperator]:
+        """
+        每个算子有自己的运行流程, 运行完后生成下一个算子.
+        没有算子的时候, 意味着整个 Runtime 结束了.
+        """
         pass

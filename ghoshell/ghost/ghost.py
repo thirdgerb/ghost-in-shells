@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 
-from ghoshell.ghost.io import Input, Output
+from ghoshell.ghost.io import Input, Output, Trace
+from ghoshell.ghost.mindset import Mindset
 
 
 class IGhost(metaclass=ABCMeta):
@@ -18,6 +19,18 @@ class IGhost(metaclass=ABCMeta):
     def boostrap(self) -> None:
         """
         初始化, 启动
+        """
+        pass
+
+    @abstractmethod
+    def mindset(self, trace: Trace) -> Mindset:
+        """
+        根据 Trace 来生成 Mindset, 可以用来注册 Thinking
+        为什么要根据 Trace 来注册呢?
+        因为这意味着可以定制会话级的能力, 能力之间相互隔离.
+        如果每个用户都有自己的小助手的话, 他们的 mindset 就可以不一样.
+        当然, 全部注册到全局, 用 thinking 的 id 区隔也是一种解法.
+        只不过可理解性会差很多.
         """
         pass
 
