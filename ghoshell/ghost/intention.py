@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, TypeVar, Dict, Tuple
+from typing import TypeVar, Dict, Optional
 
 from pydantic import BaseModel
 
-from ghoshell.ghost.context import IContext
+from ghoshell.ghost.context import Context
 from ghoshell.ghost.uml import UML
 
-if TYPE_CHECKING:
-    from context import Context
-
-    INTENTION_KIND = TypeVar('INTENTION_KIND', bound=str)
-    INTENTION_LEVEL = TypeVar('INTENTION_LEVEL', bound=int)
+# intention 的类型. 任何类型的 intention 都要有输出 args 的能力. 常见类型有:
+# - command : 命令行模式
+# - regex: 正则模式, 不过太 low 了
+# - nlu: nature language understanding 模式, 主要做意图解析, 并解析出必要的实体.
+# - api: 标准的接口调用
+INTENTION_KIND = TypeVar('INTENTION_KIND', bound=str)
 
 
 class IntentionMeta(BaseModel):
+    """
+    Intention 的元数据, 方便将各种元数据汇总, 用来做全局的判断.
+    """
     kind: str
     params: Dict = {}
 
@@ -42,10 +46,10 @@ class Intention(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def match(self, ctx: IContext) -> Tuple[bool, Dict]:
+    def match(self, ctx: Context) -> Optional[Dict]:
         """
         是否匹配上下文.
-        返回值 Tuple 第一个是匹配的结果. 第二个是解析出来的参数. 这个参数不要为 None 了.
+        为 None 表示没有匹配成功. 用任何非 none 值都可以表示匹配成功.
         Intention 实际运行时可以有很多种组合, 但每种组合都需要返回相同的参数结构, 是一种协议.
         """
         pass

@@ -1,23 +1,29 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 from ghoshell.ghost.features import IFeaturing
 from ghoshell.ghost.intention import Attentions
 from ghoshell.ghost.io import Input, Output, Message
 from ghoshell.ghost.mindset import Mindset
-from ghoshell.ghost.runtime import IRuntime
+from ghoshell.ghost.runtime import IRuntime, Task
+from ghoshell.ghost.session import Session
+from ghoshell.ghost.uml import UML
+
+if TYPE_CHECKING:
+    from ghoshell.ghost.mindset import Thought
+    from ghoshell.ghost.operation import Operation, OperatorManager
 
 
-class IContext(metaclass=ABCMeta):
+class Context(metaclass=ABCMeta):
     """
     Ghost 运行时的上下文, 努力包含一切核心逻辑与模块
     """
 
     @property
     @abstractmethod
-    def name(self) -> str:
+    def ghost_name(self) -> str:
         """
         机器人的"灵魂"，不同的 Ghost 可能使用同样的灵魂，比如"微软小冰"等
         """
@@ -25,7 +31,7 @@ class IContext(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def session_id(self) -> str:
+    def session(self) -> Session:
         """
         机器人灵魂的"实例",用来隔离 process 与记忆
         """
@@ -36,6 +42,34 @@ class IContext(metaclass=ABCMeta):
     def input(self) -> Input:
         """
         请求的输入消息, 任何时候都不应该变更.
+        """
+        pass
+
+    @abstractmethod
+    def output(self, *actions: Message) -> None:
+        """
+        输出各种动作, 实际上输出到 output 里, 给 shell 去处理
+        """
+        pass
+
+    @abstractmethod
+    def async_input(self, _input: Input) -> None:
+        """
+        ghost 给 ghost 发送信息时使用
+        """
+        pass
+
+    @abstractmethod
+    def reset_input(self, _input: Input) -> None:
+        """
+        重置上下文的 Input
+        """
+        pass
+
+    @abstractmethod
+    def operate(self, this: "Thought") -> "Operation":
+        """
+        返回上下文的操作工具
         """
         pass
 
@@ -75,19 +109,16 @@ class IContext(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def act(self, *actions: Message) -> None:
-        """
-        输出各种动作, 实际上输出到 output 里, 给 shell 去处理
-        """
-        pass
-
-    @abstractmethod
-    def output(self) -> Output:
+    def gen_output(self) -> Output:
         """
         将所有的输出动作组合起来, 输出为 Output
         所有 act 会积累新的 action 到 output
         它应该是幂等的, 可以多次输出.
         """
+        pass
+
+    @abstractmethod
+    def reset_output(self, output: Output) -> None:
         pass
 
     @abstractmethod
@@ -103,6 +134,30 @@ class IContext(metaclass=ABCMeta):
         可惜没有泛型, python 很麻烦的.
         """
         pass
+
+    @abstractmethod
+    def new_operator_manager(self) -> "OperatorManager":
+        """
+        返回一个 OperatorManager
+        """
+        pass
+
+    def task(self, uml: UML) -> Task:
+        """
+        从上下文中取出一个 task 对象.
+        """
+        think = self.mind.fetch(uml.think)
+        thought = think.thought(self, uml.args)
+        task = self.runtime.get_task(thought.tid)
+        if task is None:
+            task = Task(
+                tid=thought.tid,
+                uml=uml,
+                pid=self.runtime.process_id(),
+            )
+            task = thought.to_task(task)
+            self.runtime.add_task(task)
+        return task
 
     @abstractmethod
     def destroy(self) -> None:

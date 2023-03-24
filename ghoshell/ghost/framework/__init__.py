@@ -1,6 +1,6 @@
-from ghost import Ghost
+from ghost import GhostKernel
 
 __all__ = [
 
-    "Ghost"
+    "GhostKernel"
 ]

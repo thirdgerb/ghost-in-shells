@@ -10,7 +10,7 @@ from larksuiteoapi.event import handle_event, set_event_callback
 from larksuiteoapi.model import OapiRequest, OapiHeader
 from pydantic import BaseModel
 
-from ghoshell.ghost import Input, IGhost, Output
+from ghoshell.ghost import Input, Ghost, Output
 from ghoshell.shell import ShellKernel, IShellContext
 from ghoshell.shell.prototypes.lark.bootstraps import BootLarkShellConfig
 from ghoshell.shell.prototypes.lark.config import LarkShellConfig
@@ -68,7 +68,7 @@ class LarkShell(ShellKernel):
     # 运行 flask app 名字
     app_name: str
     # ghost 的实现.
-    ghost: IGhost = None
+    ghost: Ghost = None
 
     # bootstrap
     lark_config: Config = None
@@ -95,14 +95,14 @@ class LarkShell(ShellKernel):
             self,
             app_name: str,
             pwd: str,
-            ghost: IGhost,
+            ghost: Ghost,
     ):
         self.pwd = pwd
         self.app_name = app_name
         self._ghost = ghost
         # 更多的初始化依赖 bootstrapping 的实现.
 
-    def connect(self, inpt: Input) -> IGhost:
+    def connect(self, inpt: Input) -> Ghost:
         """
         可以重写这个方法, 去定义获取 ghost 的逻辑.
         """

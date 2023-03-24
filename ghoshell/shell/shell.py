@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Tuple, Optional, Any
 
-from ghoshell.ghost import IGhost, Input, Output
+from ghoshell.ghost import Ghost, Input, Output
 
 
 class IShellContext(metaclass=ABCMeta):
@@ -44,7 +44,7 @@ class IShell(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def connect(self, _input: Input) -> IGhost:
+    def connect(self, _input: Input) -> Ghost:
         """
         shell 需要有联系 ghost 的能力
         有可能是一对多的, 简单情况下一个 shell 与一个 ghost 强对应.

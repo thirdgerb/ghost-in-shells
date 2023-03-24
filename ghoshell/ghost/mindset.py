@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, List, Dict
+from typing import Optional, Dict, Callable
 
-from ghoshell.ghost.context import IContext
-from ghoshell.ghost.intention import Intention
-from ghoshell.ghost.operator import IOperator
+from pydantic import BaseModel
+
+from ghoshell.ghost.context import Context
+from ghoshell.ghost.operation import Operator, Event
 from ghoshell.ghost.runtime import Task, TASK_STATUS, TASK_NEW, TASK_FINISHED
 from ghoshell.ghost.uml import UML
 
 
-class This(metaclass=ABCMeta):
+class Thought(metaclass=ABCMeta):
     """
     当前任务的状态.
     可以理解成一个函数的运行栈
@@ -40,15 +41,22 @@ class This(metaclass=ABCMeta):
         self.stage = ""
 
     def from_task(self, task: Task) -> None:
+        """
+        从 task 中重置当前状态.
+        """
         self.status = task.status
-        self.stage = task.stage
+        self.uml = task.uml
         self.set_variables(task.data)
 
     def to_task(self, task: Task) -> Task:
+        """
+        根据当前状态, 重置 task 状态.
+        """
         task.priority = self.priority()
         task.data = self.vars()
         task.overdue = self.overdue()
-        if task.status == TASK_FINISHED:
+        # 设定 task 的返回值. 前提是 task 的返回值一直是 None
+        if task.status == TASK_FINISHED and task.result is None:
             task.result = self.returning()
         return task
 
@@ -73,6 +81,7 @@ class This(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
     def set_variables(self, variables: Dict) -> None:
         """
         设置上下文数据, 通常是一个 dict, 可以用 BaseModel 转成协议.
@@ -94,10 +103,25 @@ class This(metaclass=ABCMeta):
         pass
 
 
-class Thinking(metaclass=ABCMeta):
+class ThinkMeta(BaseModel):
+    uml: UML
+    driver: str
+    config: Dict
+
+
+class Think(BaseModel, metaclass=ABCMeta):
     """
     ghost 拥有的思维模块
     """
+
+    @abstractmethod
+    def to_meta(self) -> ThinkMeta:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def from_meta(cls, meta: ThinkMeta) -> "Think":
+        pass
 
     @property
     @abstractmethod
@@ -108,7 +132,7 @@ class Thinking(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def receiver(self, ctx: IContext, uml: UML) -> This:
+    def thought(self, ctx: Context, args: Dict) -> Thought:
         """
         结合上下文, 初始化一个 Thinking 的状态.
         这个状态用 This 来表示, 可以和 runtime 的 Task 互通.
@@ -131,39 +155,28 @@ class Thinking(metaclass=ABCMeta):
         pass
 
 
+THINK_DRIVER = Callable[[ThinkMeta], Think]
+
+
 class Stage(metaclass=ABCMeta):
     """
     Thinking 的状态位.
+    基本的状态位类型:
+    - 内部计算节点
+    -
     """
 
+    @property
     @abstractmethod
-    def intention(self, this: This) -> Intention:
-        """
-        进入当前状态可以提供的各种意图.
-        """
+    def uml(self) -> UML:
         pass
 
     @abstractmethod
-    def is_staging(self) -> bool:
+    def on_event(self, this: Thought, ctx: Context, e: Event) -> Optional[Operator]:
         """
-        当前节点是有状态的, 还是无状态的.
-        """
-        pass
-
-    @abstractmethod
-    def attentions(self, this: This, ctx: IContext) -> List[UML]:
-        """
-        从当前状态进入别的状态的连接点
-        attentions with intentions
-        """
-        pass
-
-    @abstractmethod
-    def on_event(self, this: This, ctx: IContext, op: IOperator) -> IOperator:
-        """
-        当一个事件执行到当前位置时, 可以在它执行之前进行拦截
-        做必要的动作.
-        常见的事件: 依赖回调, 取消, 退出, 异常等.
+        当一个算子执行到当前位置时, 可以定义事件的响应逻辑.
+        做必要的动作, 或者终止当前算子的执行, 开启一个新流程.
+        常见的事件算子: 依赖回调, 取消, 退出, 异常等.
         """
         pass
 
@@ -175,17 +188,32 @@ class Mindset(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def fetch(self, thinking: str) -> Optional[Thinking]:
+    def fetch(self, thinking: str) -> Optional[Think]:
         """
         获取一个 Thinking
         """
         pass
 
     @abstractmethod
-    def register(self, uml: UML, thinking: Thinking) -> None:
+    def register_driver(self, key: str, driver: THINK_DRIVER) -> None:
+        """
+        注册 think 的驱动.
+        """
+        pass
+
+    @abstractmethod
+    def register_meta(self, meta: ThinkMeta) -> None:
         """
         注册一个 thinking
         当然, Mindset 可以有自己的实现, 从某个配置体系中获取.
         或者合并多个 Mindset.
         """
         pass
+
+    def register_think(self, think: Think) -> None:
+        """
+        用现成的 Think 完成注册.
+        """
+        meta = think.to_meta()
+        self.register_meta(meta)
+        self.register_driver(meta.driver, think.from_meta)

@@ -4,7 +4,7 @@ import abc
 from typing import Optional, Dict
 from typing import TypeVar
 
-from context import IContext
+from context import Context
 
 FEAT_KEY = TypeVar('FEAT_KEY', bound=str)
 
@@ -19,18 +19,18 @@ class IFeaturing(metaclass=abc.ABCMeta):
     特征工程有很多种实现方式, 这个抽象就尽可能简单了.
     """
 
-    def feat(self, ctx: IContext, feature_id: FEAT_KEY) -> Optional[Dict]:
+    def feat(self, ctx: Context, feature_id: FEAT_KEY) -> Optional[Dict]:
         pass
 
 
-class Feature(metaclass=abc.ABCMeta):
+class IFeature(metaclass=abc.ABCMeta):
     """
     特征的语法糖, 用来从上下文中获取强类型约束的特征数据.
     python 弱类型有弱类型的好处, 坏处就是写代码没提示不会写.
     """
     keyword: FEAT_KEY
 
-    def feat(self, ctx: IContext) -> bool:
+    def feat(self, ctx: Context) -> bool:
         """
         如果希望用类的形式来描述一个特征
         则可以实现 feat 方法, 一个简单的语法糖.
@@ -48,7 +48,7 @@ class Feature(metaclass=abc.ABCMeta):
         return True
 
     @abc.abstractmethod
-    def _assign(self, data: Dict) -> "Feature":
+    def _assign(self, data: Dict) -> "IFeature":
         """
         用来分配数据. 通常就从 dict 展开好了.
         这里应该是后期静态绑定, 但暂时还不会

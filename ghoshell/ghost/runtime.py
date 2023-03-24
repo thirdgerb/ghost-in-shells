@@ -1,5 +1,4 @@
 from abc import ABCMeta, abstractmethod
-from dataclasses import field
 from typing import Set, List, Dict, Optional
 from typing import TypeVar
 
@@ -10,12 +9,21 @@ from ghoshell.ghost.uml import UML
 TASK_STATUS = TypeVar('TASK_STATUS', bound=int)
 
 TASK_NEW: TASK_STATUS = 0  # 任务在新建中.
-TASK_AWAIT: TASK_STATUS = 0  # 任务中断, 等待响应下一个 Input 事件.
+TASK_WAIT: TASK_STATUS = 0  # 任务中断, 等待响应下一个 Input 事件.
 TASK_YIELDING: TASK_STATUS = 0  # 异步任务, 等待下一个异步 Input.
 TASK_BLOCKING: TASK_STATUS = 0  # 阻塞, 等待抢占式调度. 一旦任务的优先级低于阻塞中的任务, 就会发生切换事件.
 TASK_DEPENDING: TASK_STATUS = 0  # 等待另一个任务的回调.
 TASK_FINISHED: TASK_STATUS = 0  # 任务已经完成, 但没有被清除.
 TASK_CANCELED: TASK_STATUS = 0  # 任务已经取消
+
+TASK_LEVEL = TypeVar('TASK_LEVEL', bound=int)
+
+# Private, 封闭域, Process 只能专注于当前任务的 attentions
+LEVEL_PRIVATE: TASK_LEVEL = 0
+# Protected, 半封闭域, Process 里 task 链上的 task 都可以作为 attentions.
+LEVEL_PROTECTED: TASK_LEVEL = 1
+# 开放域. 任何全局意图都可以作为 attentions, 反过来说就没有 attentions 了.
+LEVEL_PUBLIC: TASK_LEVEL = 2
 
 
 class Task(BaseModel):
@@ -23,14 +31,14 @@ class Task(BaseModel):
     # 用来作为索引, 在 KV 存储中保存任务体.
     tid: str
 
-    # 任务对应的 resolver
-    url: UML
+    # 任务对应的 resolver, 包含了当前位置
+    uml: UML
+
+    # 任务的开放程度. 决定了任务执行中是否可以响应别的意图.
+    level: TASK_LEVEL = LEVEL_PUBLIC
 
     # 进程 id, 用来记录在哪个进程里生成的.
     pid: str = ""
-
-    # 任务作为有限状态机, 当前的位置.
-    stage: str = ""
 
     # 当前任务的状态.
     status: TASK_STATUS
@@ -45,25 +53,60 @@ class Task(BaseModel):
     # 任务所依赖的 tid
     depending: Optional[str] = None
 
-    # 遗忘的时间戳. 是以秒为单位的 timestamp
-    overdue: int = -1
+    # 遗忘的时间戳. 是以秒为单位的 timestamp.
+    # < 0 表示长期记忆,
+    # 0 表示不记忆, 完全跟随栈走. 栈被回收就清除. 也可能被一个 LRU 机制淘汰掉.
+    # > 1 则是一个 timestamp, 到时间点会遗忘.
+    overdue: int = 0
 
     # forwards 是当前任务的后续状态, 对于 forward 事件生效.
     # 当 forwards 为空时仍然执行 forward 事件, 会转为 finish 事件. 并触发回调.
-    forwards: List[str] = field(default_factory=lambda: [])
+    forwards: List[str] = []
 
     # 需要保存的状态, 类似栈变量
-    data: dict = field(default_factory=lambda: {})
+    data: dict = {}
 
     # 任务被依赖的 tid. 任务完成/取消时会将事件传递过去.
-    depended: Set[str] = field(default_factory=lambda: set())
+    depended_by: Set[str] = set()
+
+    attentions: Dict[str, List[Dict]] = {}
 
     def to_pointer(self) -> "TaskPointer":
         return TaskPointer(
             tid=self.tid,
             status=self.status,
             priority=self.priority,
+            level=self.level,
+            attentions=self.attentions,
         )
+    #
+    # @property
+    # def is_new(self) -> bool:
+    #     return self.status == TASK_NEW
+    #
+    # @property
+    # def is_await(self) -> bool:
+    #     return self.status == TASK_AWAIT
+    #
+    # @property
+    # def is_blocking(self) -> bool:
+    #     return self.status == TASK_BLOCKING
+    #
+    # @property
+    # def is_depending(self) -> bool:
+    #     return self.status == TASK_DEPENDING
+    #
+    # @property
+    # def is_yielding(self) -> bool:
+    #     return self.status == TASK_YIELDING
+    #
+    # @property
+    # def is_finished(self) -> bool:
+    #     return self.status == TASK_FINISHED
+    #
+    # @property
+    # def is_canceled(self) -> bool:
+    #     return self.status == TASK_CANCELED
 
 
 class TaskPointer(BaseModel):
@@ -76,6 +119,10 @@ class TaskPointer(BaseModel):
     status: TASK_STATUS
     # 任务的优先级
     priority: float
+
+    level: TASK_LEVEL
+
+    attentions: Dict[str, List[Dict]]
 
 
 class Process(BaseModel):
@@ -136,10 +183,21 @@ class Process(BaseModel):
 class IRuntime(metaclass=ABCMeta):
     """
     用来保存当前运行时的各种状态, 确保异步唤醒时可以读取到.
+
+    Runtime 是一个 Process 级的实现.
+    对于一个 Ghost 而言, 可能存在多个 Process.
     """
 
     @abstractmethod
     def session_id(self) -> str:
+        """
+        返回当前会话的 ID
+        通常也是根据会话 ID 来获取 Process.
+        """
+        pass
+
+    @abstractmethod
+    def process_id(self) -> str:
         """
         返回当前会话的 ID
         通常也是根据会话 ID 来获取 Process.
@@ -162,16 +220,16 @@ class IRuntime(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def find_process(self) -> Optional[Process]:
+    def current_process(self) -> Process:
         """
         获取当前会话的进程
         """
         pass
 
     @abstractmethod
-    def new_process(self, task: Task) -> Process:
+    def fetch_process(self, pid: str) -> Optional[Process]:
         """
-        生成并一个新的 Process, 主要解决 process id 之类的问题.
+        获取指定的会话进程
         """
         pass
 

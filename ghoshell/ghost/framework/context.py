@@ -3,23 +3,23 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import List
 
-from ghoshell.ghost.context import IContext
+from ghoshell.ghost.context import Context
 from ghoshell.ghost import Output, Attentions, Mindset, Input, Message
 from ghoshell.ghost.runtime import Runtime
 
-from ghoshell.ghost.framework import Ghost
+from ghoshell.ghost.framework import GhostKernel
 
 
-class Context(IContext):
+class Context(Context):
 
     def __init__(
             self,
             ghost_id: str,
             inpt: Input,
-            ghost: Ghost,
+            ghost: GhostKernel,
     ):
         self._ghost_id: str = ghost_id
-        self._ghost: Ghost = ghost
+        self._ghost: GhostKernel = ghost
         self._input: Input = inpt
         self._output_messages: List[Message] = []
 
@@ -62,7 +62,7 @@ class Context(IContext):
         return Output(
             input=self._input,
             messages=self._output_messages.copy(),
-            env=self._ghost.output_env(self),
+            env=self._ghost.ghost_env(self),
         )
 
     def destroy(self) -> None:

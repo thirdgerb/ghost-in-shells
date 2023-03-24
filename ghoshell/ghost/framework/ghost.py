@@ -1,36 +1,24 @@
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
+from typing import Callable, List, Dict, Optional
 
-from ghoshell.ghost import IGhost
+from ghoshell.ghost import Ghost, Input, Output, Context, Operator
+from ghoshell.ghost.framework.middleware import IMiddleware, ExceptionHandlerMiddleware, GHOST_PIPE, GHOST_PIPELINE
+from ghoshell.ghost.framework.runtime import IRuntimeDriver
 from ghoshell.utils import create_pipeline
 
-if TYPE_CHECKING:
-    from typing import Callable, List, Dict
-    from ghoshell.ghost.io import Input, Output
-    from ghoshell.ghost.context import IContext
-    from ghoshell.ghost.operator import IOperator
 
-from ghoshell.ghost.framework.runtime import IRuntimeDriver
-
-GHOST_PIPE = Callable[[Input], Output]
-
-
-class IMiddleware(metaclass=ABCMeta):
+class GhostKernel(Ghost, metaclass=ABCMeta):
     """
-    组件
+    Ghost 框架实现的内核
     """
 
-    @abstractmethod
-    def name(self) -> str:
-        pass
+    # ghost 运行各种中间件.
+    middleware: List[IMiddleware] = [
+        ExceptionHandlerMiddleware(),
+    ]
 
-    @abstractmethod
-    def run(self, inpt: Input, next_fn: GHOST_PIPE) -> Output:
-        pass
+    # --- 以下是各种 driver 的实现 --- #
 
-
-class Ghost(IGhost, metaclass=ABCMeta):
-    middleware: List[IMiddleware]
     runtime_driver: IRuntimeDriver
 
     def react(self, inpt: Input) -> Output:
@@ -38,22 +26,37 @@ class Ghost(IGhost, metaclass=ABCMeta):
         核心方法: 处理输入 inpt
         """
         try:
-            pipeline = self._build_pipeline()
+            ctx = self._new_context(inpt)
+            return self._react(ctx, inpt)
+        finally:
+            # todo: handle exception
+            pass
+
+    def _react(self, ctx: Context, inpt: Input) -> Output:
+        """
+        因为需要两层 try catch, 所以拆分一个内部方法.
+        """
+        try:
+            pipeline = self._build_pipeline(ctx)
             output = pipeline(inpt)
+            # 输出时携带 ghost 的场景协议.
+            # 默认用 {} 来实现就可以了.
+            output.ghost_env = self.ghost_env(ctx)
             return output
         finally:
-            return self._failed(inpt)
+            ctx.destroy()
 
-    def output_env(self, ctx: IContext) -> Dict:
+    @abstractmethod
+    def ghost_env(self, ctx: Context) -> Dict:
         """
-        根据上下文返回 env 协议.
+        根据上下文返回 ghost 定义的 env 协议.
         """
-        return {}
+        pass
 
     # ---- abstract ---- #
 
     @abstractmethod
-    def _new_context(self, inpt: Input) -> IContext:
+    def _new_context(self, inpt: Input) -> Context:
         """
         机器人构建上下文, 最核心的能力
         """
@@ -66,7 +69,7 @@ class Ghost(IGhost, metaclass=ABCMeta):
         """
         pass
 
-    def _init_operator(self, inpt: Input) -> IOperator:
+    def _init_operator(self, inpt: Input) -> Operator:
         """
         初始化算子
         """
@@ -74,31 +77,33 @@ class Ghost(IGhost, metaclass=ABCMeta):
 
     # ---- 内部方法 ---- #
 
-    def _do_handle(self, inpt: Input) -> Output:
-        ctx = self._new_context(inpt)
-        op = self._init_operator(inpt)
-
-        # 伪代码, 真实运行时 op 要做复杂的改造.
-        while op:
-            op = op.run(ctx)
-
-        return ctx.output()
-
-    def _build_pipeline(self) -> Callable[[Input], Output]:
+    def _build_pipeline(self, ctx: Context) -> Callable[[Input], Output]:
         """
         使用中间件实现一个管道
         """
         middleware = self.middleware if self.middleware else []
-        pipes = []
+        pipes: List[GHOST_PIPE] = []
         # 用 run 方法组成 pipes
         for m in middleware:
-            pipe = self._mdw_pipe(m)
+            pipe = m.new(ctx)
             pipes.append(pipe)
-        # 返回
-        return create_pipeline(pipes, self._do_handle)
+        # 返回 pipeline
+        return create_pipeline(pipes, self._build_destination(ctx))
 
-    def _mdw_pipe(self, mdw: IMiddleware) -> GHOST_PIPE:
+    def _build_destination(self, ctx: Context) -> GHOST_PIPELINE:
         """
-        可以再包一层, 方便做日志, 错误捕获的封装.
+        实现管道的最后一环.
+        运行各种算子.
         """
-        return mdw.run
+
+        def destination(_input: Input) -> Optional[Output]:
+            ctx.set_input(_input)
+            # 实例化一个上下文级别的 operator manager.
+            # 用于解决 stack overflow 等问题.
+            manager = ctx.new_operator_manager()
+            manager.run_dominos(ctx, self._init_operator(_input))
+            # 记得随手清空对象, 避免内存泄漏
+            manager.destroy()
+            return ctx.gen_output()
+
+        return destination

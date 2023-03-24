@@ -4,7 +4,7 @@ from ghoshell.ghost.io import Input, Output, Trace
 from ghoshell.ghost.mindset import Mindset
 
 
-class IGhost(metaclass=ABCMeta):
+class Ghost(metaclass=ABCMeta):
 
     @property
     @abstractmethod
@@ -35,7 +35,7 @@ class IGhost(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def react(self, inpt: Input) -> Output:
+    def react(self, inpt: Input) -> Output:
         """
         核心方法: 处理输入 inpt
         """

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Tuple, Optional, Callable, List, Any
+from typing import Tuple, Optional, Callable, List, Any, Dict
 
 from ghoshell.ghost import Output, Input
 from ghoshell.shell.shell import IShell, IShellContext
@@ -20,6 +20,9 @@ EVENT_PIPE = Callable[[Any, EVENT_PIPELINE], Optional[Input]]
 
 
 class EventMiddleware(metaclass=ABCMeta):
+    """
+    shell 响应事件, 生成 Input 的逻辑.
+    """
 
     @abstractmethod
     def new(self, shell: IShell) -> EVENT_PIPE:
@@ -151,9 +154,15 @@ class ShellKernel(IShell, metaclass=ABCMeta):
 
             pipeline = create_pipeline(pipes, destination)
             _input, _output = pipeline(_input)
+            # 解决入参的 shell_env 封装问题.
+            _input.shell_env = self.shell_env(ctx)
             return _input, _output
         finally:
             ctx.destroy()
+
+    @abstractmethod
+    def shell_env(self, ctx: IShellContext) -> Dict:
+        pass
 
     def on_output(self, output: Output) -> None:
         """
