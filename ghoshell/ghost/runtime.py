@@ -7,23 +7,36 @@ from pydantic import BaseModel
 from ghoshell.ghost.uml import UML
 
 TASK_STATUS = TypeVar('TASK_STATUS', bound=int)
-
-TASK_NEW: TASK_STATUS = 0  # 任务在新建中.
-TASK_WAIT: TASK_STATUS = 0  # 任务中断, 等待响应下一个 Input 事件.
-TASK_YIELDING: TASK_STATUS = 0  # 异步任务, 等待下一个异步 Input.
-TASK_BLOCKING: TASK_STATUS = 0  # 阻塞, 等待抢占式调度. 一旦任务的优先级低于阻塞中的任务, 就会发生切换事件.
-TASK_DEPENDING: TASK_STATUS = 0  # 等待另一个任务的回调.
-TASK_FINISHED: TASK_STATUS = 0  # 任务已经完成, 但没有被清除.
-TASK_CANCELED: TASK_STATUS = 0  # 任务已经取消
-
 TASK_LEVEL = TypeVar('TASK_LEVEL', bound=int)
 
-# Private, 封闭域, Process 只能专注于当前任务的 attentions
-LEVEL_PRIVATE: TASK_LEVEL = 0
-# Protected, 半封闭域, Process 里 task 链上的 task 都可以作为 attentions.
-LEVEL_PROTECTED: TASK_LEVEL = 1
-# 开放域. 任何全局意图都可以作为 attentions, 反过来说就没有 attentions 了.
-LEVEL_PUBLIC: TASK_LEVEL = 2
+
+class TaskStatus:
+    TASK_NEW: TASK_STATUS = 0  # 任务在新建中.
+    TASK_AWAIT: TASK_STATUS = 1
+    TASK_WAITING: TASK_STATUS = 2  # 任务中断, 等待响应下一个 Input 事件.
+    TASK_YIELDING: TASK_STATUS = 3  # 异步任务, 等待下一个异步 Input.
+    TASK_BLOCKING: TASK_STATUS = 4  # 阻塞, 等待抢占式调度. 一旦任务的优先级低于阻塞中的任务, 就会发生切换事件.
+    TASK_DEPENDING: TASK_STATUS = 5  # 等待另一个任务的回调.
+    TASK_FINISHED: TASK_STATUS = 6  # 任务已经完成, 但没有被清除.
+    TASK_CANCELED: TASK_STATUS = 7  # 任务已经取消
+
+
+class TaskLevel:
+    # Private, 封闭域, Process 只能专注于当前任务的 attentions
+    LEVEL_PRIVATE: TASK_LEVEL = 0
+    # Protected, 半封闭域, Process 里 task 链上的 task 都可以作为 attentions.
+    LEVEL_PROTECTED: TASK_LEVEL = 1
+    # 开放域. 任何全局意图都可以作为 attentions, 反过来说就没有 attentions 了.
+    LEVEL_PUBLIC: TASK_LEVEL = 2
+
+
+class TaskPtr(BaseModel):
+    tid: str
+    level: TASK_LEVEL = TaskLevel.LEVEL_PUBLIC
+    status: TASK_STATUS = TaskStatus.TASK_NEW
+    priority: float
+    overdue: int
+    attentions: Optional[List[UML]] = None
 
 
 class Task(BaseModel):
@@ -35,13 +48,13 @@ class Task(BaseModel):
     uml: UML
 
     # 任务的开放程度. 决定了任务执行中是否可以响应别的意图.
-    level: TASK_LEVEL = LEVEL_PUBLIC
+    level: TASK_LEVEL = TaskLevel.LEVEL_PUBLIC
 
     # 进程 id, 用来记录在哪个进程里生成的.
     pid: str = ""
 
     # 当前任务的状态.
-    status: TASK_STATUS
+    status: TASK_STATUS = TaskStatus.TASK_NEW
 
     # 当前任务的优先级, 用来抢占式调度.
     # 优先级相同, 则按时间顺序排列.
@@ -69,16 +82,39 @@ class Task(BaseModel):
     # 任务被依赖的 tid. 任务完成/取消时会将事件传递过去.
     depended_by: Set[str] = set()
 
-    attentions: Dict[str, List[Dict]] = {}
+    attentions: Optional[List[UML]] = None
 
-    def to_pointer(self) -> "TaskPointer":
-        return TaskPointer(
-            tid=self.tid,
-            status=self.status,
-            priority=self.priority,
-            level=self.level,
-            attentions=self.attentions,
-        )
+    def to_ptr(self) -> TaskPtr:
+        return TaskPtr.parse_obj(self)
+
+    @property
+    def is_long_term(self) -> bool:
+        """
+        长程记忆
+        """
+        return self.overdue < 0
+
+    @property
+    def is_forgettable(self) -> bool:
+        """
+        一旦话题切换就可以被遗忘的.
+        """
+        return self.priority < 0
+
+    def add_stages(self, *stages: str) -> None:
+        # 将 stages 推入当前的任务中
+        stack = list(stages)
+        if self.forwards:
+            stack.append(*self.forwards)
+        self.forwards = stack
+
+    def forward(self) -> bool:
+        if len(self.forwards) <= 0:
+            return False
+        _next = self.forwards[0]
+        self.uml = self.uml.to_stage(_next)
+        self.forwards = self.forwards[1:]
+
     #
     # @property
     # def is_new(self) -> bool:
@@ -109,22 +145,6 @@ class Task(BaseModel):
     #     return self.status == TASK_CANCELED
 
 
-class TaskPointer(BaseModel):
-    """
-    相当于任务的指针, 主要提供给 Process 来调度.
-    """
-    # 任务 id
-    tid: str
-    # 任务状态
-    status: TASK_STATUS
-    # 任务的优先级
-    priority: float
-
-    level: TASK_LEVEL
-
-    attentions: Dict[str, List[Dict]]
-
-
 class Process(BaseModel):
     """
     Ghost 实例中运行中的进程.
@@ -137,10 +157,10 @@ class Process(BaseModel):
     Process 用来调度运行上下文中的各种 Task.
     不同的 Runtime 算子会使用不同的链来遍历 Process 持有的 Task.
 
-    举例:
-    - receive 链: root -> awaits -> blocking -> sleeping
-    - fallback 链: awaits -> sleeping
     """
+    # session id
+    sid: str
+
     # 任务 id
     pid: str
 
@@ -158,17 +178,24 @@ class Process(BaseModel):
     # 当前进行中的任务, 用来响应 Ghost 的 Input
     current: str
 
+    # process 第多少轮次
+    # 每接受一次 input 都是一个新的轮次.
+    round: int = 0
+
+    # 洋葱状包装意图
+    waiting: List[str] = []
+
     # 抢占中的任务, 每个会话结束时都会重新排序
-    blocking: List[str]
+    blocking: List[str] = []
 
     # 等待回调的任务, 依赖另一个任务的完成.
     # 如果上下文命中了一个等待任务, 应该进入到它依赖的对象.
-    depending: Set[str]
+    depending: Set[str] = set()
 
     # 等待异步回调的任务.
     # 异步回调是一个 Input 事件
     # 所有输入 Input 会优先匹配 yielding 事件.
-    yielding: Set[str]
+    yielding: Set[str] = set()
 
     # 已经完成的任务. 等待垃圾回收.
     finished: List[str] = []
@@ -177,10 +204,23 @@ class Process(BaseModel):
 
     # 保存所有的任务指针, 用来做排序等.
     # 避免每个任务读取时的成本.
-    tasks: List[TaskPointer]
+    task_ptrs: Dict[str, TaskPtr]
+
+    @classmethod
+    def new_process(cls, session_id: str, process_id: str, task: Task) -> "Process":
+        """
+        初始化一个新的
+        """
+        return cls(
+            sid=session_id,
+            pid=process_id,
+            root=task.tid,
+            current=task.tid,
+            task_ptrs={task.tid: task.to_ptr()}
+        )
 
 
-class IRuntime(metaclass=ABCMeta):
+class Runtime(metaclass=ABCMeta):
     """
     用来保存当前运行时的各种状态, 确保异步唤醒时可以读取到.
 
@@ -189,6 +229,17 @@ class IRuntime(metaclass=ABCMeta):
     """
 
     @abstractmethod
+    def lock_process(self, process_id: Optional[str]) -> bool:
+        """
+        锁一个进程, 避免裂脑.
+        由于一个 Session 可能会有一个主进程和多个异步进程
+        所以当有明确进程标记时, 可以去命中子进程.
+        任何进程处理 input 都是阻塞的.
+        """
+        pass
+
+    @property
+    @abstractmethod
     def session_id(self) -> str:
         """
         返回当前会话的 ID
@@ -196,8 +247,9 @@ class IRuntime(metaclass=ABCMeta):
         """
         pass
 
+    @property
     @abstractmethod
-    def process_id(self) -> str:
+    def current_process_id(self) -> str:
         """
         返回当前会话的 ID
         通常也是根据会话 ID 来获取 Process.
@@ -205,7 +257,7 @@ class IRuntime(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_task(self, tid) -> Optional[Task]:
+    def fetch_task(self, tid) -> Optional[Task]:
         """
         根据 TaskID 取出一个 Task.
         取不到的话, 说明协议上存在问题.
@@ -213,10 +265,14 @@ class IRuntime(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def add_task(self, task: Task) -> None:
+    def store_task(self, *task: Task) -> None:
         """
         添加一个 Task, 在 destroy 的时候才会保存.
         """
+        pass
+
+    @abstractmethod
+    def store_task_ptrs(self, *task_pointers: Task) -> None:
         pass
 
     @abstractmethod
@@ -227,11 +283,17 @@ class IRuntime(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def fetch_process(self, pid: str) -> Optional[Process]:
+    def store_process(self, process: Process) -> None:
         """
-        获取指定的会话进程
+        标记 Process 的状态需要被保存.
         """
         pass
+
+    @abstractmethod
+    def rewind(self) -> None:
+        """
+        当前变更不做保存
+        """
 
     @abstractmethod
     def quit_process(self) -> None:

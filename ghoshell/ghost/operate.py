@@ -13,31 +13,8 @@ class Operator(metaclass=ABCMeta):
     Ghost 运行时的算子
     """
 
-    @staticmethod
-    def fire(ctx: Context, e: Event) -> Optional[Operator]:
-        """
-        触发一个 stage 可以理解的事件.
-        """
-        think = ctx.mind.fetch(e.current.think)
-        # stage 的实例化.
-        current_stage = e.current.stage
-        if current_stage:
-            stage = think.all_stages().get(e.current.stage)
-        else:
-            stage = think.default_stage()
-
-        if stage is None:
-            # todo: 实现 exception
-            raise Exception()
-        this = think.thought(ctx, e.current.args)
-        task = ctx.task(e.current)
-        # 进行对象化的封装.
-        this.from_task(task)
-        # 出发 operator 事件
-        return stage.on_event(this, ctx, e)
-
     @abstractmethod
-    def forward(self, ctx: "Context") -> Optional[Operator]:
+    def run(self, ctx: "Context") -> Optional[Operator]:
         """
         继续下一个任务.
         """
@@ -51,14 +28,7 @@ class Operator(metaclass=ABCMeta):
         pass
 
 
-class Event(metaclass=ABCMeta):
-    @property
-    @abstractmethod
-    def current(self) -> UML:
-        pass
-
-
-class Operation(metaclass=ABCMeta):
+class Operate(metaclass=ABCMeta):
     """
     调度工具, 由 Ghost 侧 `主动` 调度上下文状态.
     """
@@ -91,21 +61,14 @@ class Operation(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def rewind(self) -> Operator:
-        """
-        重置本轮交互所有的状态变更.(其实就是不保存)
-        """
-        pass
-
-    @abstractmethod
-    def sleep(self) -> Operator:
+    def wait(self) -> Operator:
         """
         ghost 上下文同步休眠, 等待下一次 input 的唤醒.
         """
         pass
 
     @abstractmethod
-    def forward(self, *stages: str) -> Operator:
+    def forward(self) -> Operator:
         """
         如果状态机仍然有栈, 则向前走. 没有的话调用 finish
         """
@@ -133,7 +96,10 @@ class Operation(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def destroy(self) -> None:
+    def fail(self, reason: Optional[Any]) -> Operator:
+        """
+        退出整个进程.
+        """
         pass
 
 
@@ -177,13 +143,13 @@ class OperatorManager(metaclass=ABCMeta):
                 self.is_stackoverflow(op, count)
                 self.trace(op)
                 count += 1
-                intercepted = op.intercept(ctx)
-                if intercepted is not None and intercepted is not op:
-                    op.destroy()
-                    op = intercepted
-                    continue
-                after = op.forward(ctx)
+                after = op.run(ctx)
                 op.destroy()
+                if after is None:
+                    # after 为 none 有两种情况:
+                    # 1. 逻辑本身不合法
+                    # 2.
+                    pass
                 op = after
         # todo: catch
         finally:

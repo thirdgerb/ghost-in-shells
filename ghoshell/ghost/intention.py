@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TypeVar, Dict, Optional
+from typing import TypeVar, Dict, Optional, List, Tuple
 
 from pydantic import BaseModel
 
@@ -21,6 +21,7 @@ class IntentionMeta(BaseModel):
     Intention 的元数据, 方便将各种元数据汇总, 用来做全局的判断.
     """
     kind: str
+    uml: UML
     params: Dict = {}
 
 
@@ -55,7 +56,7 @@ class Intention(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def metas(self) -> Dict[str, IntentionMeta]:
+    def metas(self) -> List[IntentionMeta]:
         """
         intention 返回 metas, 可以放入 output 中, 方便做分析.
         举个例子, intention 中包含 choice 类型
@@ -72,5 +73,14 @@ class Attentions(metaclass=ABCMeta):
     通过 attentions 机制可以快速定位事件的处理者(reaction)
     """
 
-    def match(self, ctx: Context) -> bool:
+    @abstractmethod
+    def intention_kinds(self) -> List[str]:
+        pass
+
+    @abstractmethod
+    def match(self, ctx: Context, meta: IntentionMeta) -> Tuple[bool, Optional[Dict]]:
+        pass
+
+    @abstractmethod
+    def wildcard_match(self, ctx: Context) -> Optional[UML]:
         pass

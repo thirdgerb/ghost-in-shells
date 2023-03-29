@@ -6,8 +6,9 @@ from typing import Optional, Dict, Callable
 from pydantic import BaseModel
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.operation import Operator, Event
-from ghoshell.ghost.runtime import Task, TASK_STATUS, TASK_NEW, TASK_FINISHED
+from ghoshell.ghost.intention import Intention
+from ghoshell.ghost.operate import Operator
+from ghoshell.ghost.runtime import Task, TASK_STATUS, TASK_LEVEL, TaskStatus, TaskLevel
 from ghoshell.ghost.uml import UML
 
 
@@ -33,20 +34,23 @@ class Thought(metaclass=ABCMeta):
     # 当前任务所在的 stage 状态位.
     stage: str = ""
 
+    level: TASK_LEVEL = TaskLevel.LEVEL_PUBLIC
+
     def __init__(self, task_id: str, uml: UML):
         self.tid = task_id
-        self.status = TASK_NEW
+        self.status = TaskStatus.TASK_NEW
         self.uml = uml
-        self.prepare(uml.args)
         self.stage = ""
+        self.prepare(self.uml.args)
 
-    def from_task(self, task: Task) -> None:
+    def from_task(self, task: Task) -> Thought:
         """
         从 task 中重置当前状态.
         """
         self.status = task.status
         self.uml = task.uml
         self.set_variables(task.data)
+        return self
 
     def to_task(self, task: Task) -> Task:
         """
@@ -55,8 +59,9 @@ class Thought(metaclass=ABCMeta):
         task.priority = self.priority()
         task.data = self.vars()
         task.overdue = self.overdue()
+        task.level = self.level
         # 设定 task 的返回值. 前提是 task 的返回值一直是 None
-        if task.status == TASK_FINISHED and task.result is None:
+        if task.status == TaskStatus.TASK_FINISHED and task.result is None:
             task.result = self.returning()
         return task
 
@@ -103,6 +108,24 @@ class Thought(metaclass=ABCMeta):
         pass
 
 
+class Event(metaclass=ABCMeta):
+    """
+    事件机制
+    """
+
+    this: Thought
+    kind: str
+
+    @abstractmethod
+    def destroy(self):
+        """
+        为了方便 python 的 gc
+        主动删除掉一些持有元素
+        避免循环依赖.
+        """
+        pass
+
+
 class ThinkMeta(BaseModel):
     uml: UML
     driver: str
@@ -132,7 +155,7 @@ class Think(BaseModel, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def thought(self, ctx: Context, args: Dict) -> Thought:
+    def new_thought(self, ctx: Context, args: Dict) -> Thought:
         """
         结合上下文, 初始化一个 Thinking 的状态.
         这个状态用 This 来表示, 可以和 runtime 的 Task 互通.
@@ -172,7 +195,15 @@ class Stage(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def on_event(self, this: Thought, ctx: Context, e: Event) -> Optional[Operator]:
+    def level(self, this: Thought) -> int:
+        pass
+
+    @abstractmethod
+    def intention(self, ctx: Context) -> Optional[Intention]:
+        pass
+
+    @abstractmethod
+    def on_event(self, ctx: Context, e: "Event") -> Optional[Operator]:
         """
         当一个算子执行到当前位置时, 可以定义事件的响应逻辑.
         做必要的动作, 或者终止当前算子的执行, 开启一个新流程.

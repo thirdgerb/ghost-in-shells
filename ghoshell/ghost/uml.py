@@ -23,5 +23,26 @@ class UniformMindLocator(BaseModel):
     # def is_same(self, uml: "UniformMindLocator") -> bool:
     #     return (self.ghost == uml.ghost or uml.ghost == "") and self.think == uml.think
 
+    def to_stage(self, stage: str) -> "UniformMindLocator":
+        return UniformMindLocator(
+            ghost=self.ghost,
+            think=self.think,
+            stage=stage,
+            args=self.args.copy()
+        )
+
+    def new_args(self, args: Dict) -> "UniformMindLocator":
+        return UniformMindLocator(
+            ghost=self.ghost,
+            think=self.think,
+            stage=self.stage,
+            args=args.copy()
+        )
+
+    # def is_same(self, other: "UML") -> bool:
+    #     return (other.ghost == "" or self.ghost == "" or self.ghost == other.ghost) \
+    #         and self.think == other.think \
+    #         and self.stage == other.stage
+
 
 UML = UniformMindLocator

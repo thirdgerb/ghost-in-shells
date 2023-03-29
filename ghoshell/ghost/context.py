@@ -3,17 +3,18 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Any, Optional, TYPE_CHECKING
 
+from ghoshell.ghost.exceptions import MindsetNotFoundException, RuntimeException
 from ghoshell.ghost.features import IFeaturing
 from ghoshell.ghost.intention import Attentions
 from ghoshell.ghost.io import Input, Output, Message
 from ghoshell.ghost.mindset import Mindset
-from ghoshell.ghost.runtime import IRuntime, Task
+from ghoshell.ghost.runtime import Runtime, Task
 from ghoshell.ghost.session import Session
 from ghoshell.ghost.uml import UML
 
 if TYPE_CHECKING:
-    from ghoshell.ghost.mindset import Thought
-    from ghoshell.ghost.operation import Operation, OperatorManager
+    from ghoshell.ghost.mindset import Thought, Stage
+    from ghoshell.ghost.operate import Operate, OperatorManager
 
 
 class Context(metaclass=ABCMeta):
@@ -35,6 +36,10 @@ class Context(metaclass=ABCMeta):
         """
         机器人灵魂的"实例",用来隔离 process 与记忆
         """
+        pass
+
+    @abstractmethod
+    def root(self) -> UML:
         pass
 
     @property
@@ -67,7 +72,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def operate(self, this: "Thought") -> "Operation":
+    def operate(self, this: "Thought") -> "Operate":
         """
         返回上下文的操作工具
         """
@@ -83,7 +88,7 @@ class Context(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def runtime(self) -> IRuntime:
+    def runtime(self) -> Runtime:
         """
         与 上下文/进程 相关的存储单元, 用来存储各种数据
         """
@@ -142,26 +147,59 @@ class Context(metaclass=ABCMeta):
         """
         pass
 
-    def task(self, uml: UML) -> Task:
-        """
-        从上下文中取出一个 task 对象.
-        """
-        think = self.mind.fetch(uml.think)
-        thought = think.thought(self, uml.args)
-        task = self.runtime.get_task(thought.tid)
-        if task is None:
-            task = Task(
-                tid=thought.tid,
-                uml=uml,
-                pid=self.runtime.process_id(),
-            )
-            task = thought.to_task(task)
-            self.runtime.add_task(task)
-        return task
-
     @abstractmethod
     def destroy(self) -> None:
         """
         上下文运行完成后, 需要考虑 python 的特点, 要主动清理记忆
         """
         pass
+
+
+class CtxTool:
+
+    @staticmethod
+    def task_to_thought(ctx: Context, task: Task) -> Thought:
+        think = ctx.mind.fetch(task.uml.think)
+        thought = think.new_thought(ctx, task.uml.args)
+        if thought.tid != task.tid:
+            # todo
+            raise RuntimeException("不兼容的问题")
+        return thought.from_task(task)
+
+    @staticmethod
+    def thought_to_task(ctx: Context, thought: Thought) -> Task:
+        task = ctx.runtime.fetch_task(thought.tid)
+        if task is None:
+            task = Task(
+                tid=thought.tid,
+                uml=thought.uml,
+                pid=ctx.runtime.current_process_id,
+            )
+            task = thought.to_task(task)
+        return task
+
+    @staticmethod
+    def thought(ctx: Context, uml: UML) -> "Thought":
+        """
+        语法糖
+        """
+        think = ctx.mind.fetch(uml.think)
+        stage = think.all_stages().get(uml.stage, None)
+        if stage is None:
+            # todo
+            raise MindsetNotFoundException("")
+        thought = think.new_thought(ctx, uml.args)
+        thought.level = stage.level(thought)
+        # 获取一个 task 实例
+        task = CtxTool.thought_to_task(thought)
+        thought.from_task(task)
+        # 根据 stage 的实现来提供 level
+        return thought
+
+    @staticmethod
+    def stage(ctx, uml: UML) -> "Stage":
+        """
+        语法糖
+        """
+        think = ctx.mind.fetch(uml.think)
+        return think.all_stages().get(uml.stage)

@@ -1,7 +1,8 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Dict
 
-from ghoshell.ghost import IRuntime, Process
+from ghoshell.ghost import Runtime, Process
+from ghoshell.ghost import UML
 
 
 class IRuntimeDriver(metaclass=ABCMeta):
@@ -11,11 +12,13 @@ class IRuntimeDriver(metaclass=ABCMeta):
         pass
 
 
-class Runtime(IRuntime):
+class IRuntime(Runtime):
     _process: Process = None
 
-    def __init__(self, driver: IRuntimeDriver, process_id: str):
+    def __init__(self, driver: IRuntimeDriver, session_id: str, root: UML, process_id: str):
+        self._session_id: str = session_id
         self._process_id: str = process_id
+        self._root_uml: UML = root
         self._driver: IRuntimeDriver = driver
 
     def process(self) -> Process:
