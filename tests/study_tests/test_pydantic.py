@@ -26,3 +26,40 @@ def test_typing_dict() -> None:
     foo2 = Foo()
     assert len(foo2.bar) == 0
     assert len(foo.bar) == 1
+
+
+def test_children_model_init() -> None:
+    class Parent(BaseModel):
+        class Child(BaseModel):
+            foo: str
+            bar: int
+
+        child: Child
+
+    # 可以通过字典给子实体赋值.
+    p = Parent(child={"foo": "foo", "bar": 123})
+    assert p.child.foo == "foo"
+    assert p.child.bar == 123
+
+
+def test_children_copy() -> None:
+    class Parent(BaseModel):
+        class Child(BaseModel):
+            foo: str
+            bar: int
+
+        child: Child
+
+    # 可以通过字典给子实体赋值.
+    p = Parent(child={"foo": "foo", "bar": 123})
+
+    copied = p.copy()
+    copied.child.foo = "bar"
+    assert copied.child.foo == "bar"
+    # copy 不是深拷贝
+    assert p.child.foo == "bar"
+
+    copied = Parent(**p.dict())
+    copied.child.foo = "foo"
+    assert copied.child.foo == "foo"
+    assert p.child.foo == "bar"

@@ -49,14 +49,22 @@ class Operate(metaclass=ABCMeta):
     @abstractmethod
     def repeat(self) -> Operator:
         """
-        回到上一轮交互的终点状态.
+        重复上一轮交互的终点状态.
         """
         pass
 
     @abstractmethod
-    def restart(self) -> Operator:
+    def rewind(self, repeat: bool = False) -> Operator:
         """
-        当前任务回到起点.
+        重置当前对话状态.
+        忽略本轮对话内容.
+        """
+        pass
+
+    @abstractmethod
+    def reset(self) -> Operator:
+        """
+        清空上下文, 回到起点.
         """
         pass
 

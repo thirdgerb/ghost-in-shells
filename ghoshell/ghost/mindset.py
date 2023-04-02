@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.intention import Intention
 from ghoshell.ghost.operate import Operator
-from ghoshell.ghost.runtime import Task, TASK_STATUS, TASK_LEVEL, TaskStatus, TaskLevel
+from ghoshell.ghost.runtime import Task, TASK_STATUS, TASK_LEVEL, TaskStatus, TaskLevel, TaskPtr
 from ghoshell.ghost.uml import UML
 
 
@@ -38,31 +38,42 @@ class Thought(metaclass=ABCMeta):
 
     def __init__(self, task_id: str, uml: UML):
         self.tid = task_id
-        self.status = TaskStatus.TASK_NEW
+        self.status = TaskStatus.NEW
         self.uml = uml
         self.stage = ""
         self.prepare(self.uml.args)
 
-    def from_task(self, task: Task) -> Thought:
+    def merge_from_task(self, task: Task) -> Thought:
         """
         从 task 中重置当前状态.
         """
-        self.status = task.status
-        self.uml = task.uml
-        self.set_variables(task.data)
+        self.status = task.ptr.status
+        self.uml = self.uml.to_stage(task.ptr.stage)
+        self.set_variables(task.data.vars)
         return self
 
-    def to_task(self, task: Task) -> Task:
+    def join_to_task_ptr(self, ptr: TaskPtr) -> TaskPtr:
+        ptr.priority = self.priority()
+        ptr.overdue_at = self.overdue()
+        ptr.level = self.level
+        return ptr
+
+    def join_to_task(self, task: Task) -> Task:
         """
         根据当前状态, 重置 task 状态.
         """
-        task.priority = self.priority()
-        task.data = self.vars()
-        task.overdue = self.overdue()
-        task.level = self.level
+        # ptr 复制.
+        ptr = self.join_to_task_ptr(task.ptr)
+
+        # data 赋值.
+        data = task.data
+        data.vars = self.vars()
         # 设定 task 的返回值. 前提是 task 的返回值一直是 None
-        if task.status == TaskStatus.TASK_FINISHED and task.result is None:
-            task.result = self.returning()
+        if ptr.status == TaskStatus.FINISHED:
+            data.result = self.result()
+        # 多余地赋值一下
+        task.ptr = ptr
+        task.data = data
         return task
 
     def priority(self) -> float:
@@ -101,7 +112,7 @@ class Thought(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def returning(self) -> Optional[Dict]:
+    def result(self) -> Optional[Dict]:
         """
         从当前状态中返回一个结果.
         """

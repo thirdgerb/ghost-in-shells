@@ -30,4 +30,4 @@ def test_this() -> None:
         this,
     )
     assert this.args.foo == "hello"
-    assert this.data.bar == "world"
+    assert this.vars.bar == "world"

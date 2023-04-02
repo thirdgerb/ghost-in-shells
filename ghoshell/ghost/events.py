@@ -5,7 +5,7 @@ from ghoshell.ghost.mindset import Event, Thought
 from ghoshell.ghost.uml import UML
 
 
-class Activate(Event, metaclass=ABCMeta):
+class OnActivate(Event, metaclass=ABCMeta):
     """
     从一个节点主动进入到当前节点.
     """
@@ -19,7 +19,7 @@ class Activate(Event, metaclass=ABCMeta):
         del self.fr
 
 
-class Intercept(Event, metaclass=ABCMeta):
+class OnIntercept(Event, metaclass=ABCMeta):
     """
     当前对话状态被打断, 跳转到另一个任务.
     先不实现
@@ -34,7 +34,7 @@ class Intercept(Event, metaclass=ABCMeta):
         del self.args
 
 
-class Receive(Event, metaclass=ABCMeta):
+class OnReceive(Event, metaclass=ABCMeta):
     """
     响应 Ghost 的 Input 信息.
     """
@@ -46,15 +46,15 @@ class Receive(Event, metaclass=ABCMeta):
         del self.this
 
 
-class Withdraw(Event, metaclass=ABCMeta):
+class OnWithdraw(Event, metaclass=ABCMeta):
     """
     从别的节点退回到当前节点.
     """
 
-    def __init__(self, this: Thought, fr: Thought, reason: Optional[Any] = None):
-        self.this = this
-        self.fr: Thought = fr
-        self.reason = reason
+    def __init__(self, this: Thought, fr: Optional[UML] = None, reason: Optional[Any] = None):
+        self.this: Thought = this
+        self.fr: UML = fr
+        self.reason: Any = reason
 
     def destroy(self):
         del self.this
@@ -64,46 +64,46 @@ class Withdraw(Event, metaclass=ABCMeta):
 
 # --- activate events --- #
 
-class OnStart(Activate):
+class OnStart(OnActivate):
     pass
 
 
-class OnRepeat(Activate):
+class OnRepeat(OnActivate):
     pass
 
 
-class OnRedirect(Activate):
+class OnRedirect(OnActivate):
     pass
 
 
-class OnDepend(Activate):
+class OnDepend(OnActivate):
     pass
 
 
 # --- interceptor --- #
 
-class OnAttend(Activate):
+class OnAttend(OnActivate):
     """
     命中了一个上下文中关注的意图.
     """
     pass
 
 
-class OnPreempt(Activate):
+class OnPreempt(OnActivate):
     """
     blocking 状态的任务, 重新获得主动权.
     """
     pass
 
 
-class OnIntend(Activate):
+class OnIntend(OnActivate):
     """
     命中了一个全局意图.
     """
     pass
 
 
-class OnAsync(Activate):
+class OnAsync(OnActivate):
     """
     接受到异步回调消息, 以及数据.
     """
@@ -113,7 +113,7 @@ class OnAsync(Activate):
 # --- receive events --- #
 
 
-class OnFallback(Receive):
+class OnFallback(OnReceive):
     """
     输入消息无法处理.
     """
@@ -122,7 +122,7 @@ class OnFallback(Receive):
 
 # --- withdraw events --- #
 
-class OnFinish(Withdraw):
+class OnFinish(OnWithdraw):
     """
     被依赖的任务完成了, 回调当前任务.
     可以拿到
@@ -130,13 +130,13 @@ class OnFinish(Withdraw):
     pass
 
 
-class OnCancel(Withdraw):
+class OnCancel(OnWithdraw):
     pass
 
 
-class OnQuit(Withdraw):
+class OnQuit(OnWithdraw):
     pass
 
 
-class OnFailed(Withdraw):
+class OnFailed(OnWithdraw):
     pass

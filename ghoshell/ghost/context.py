@@ -8,7 +8,7 @@ from ghoshell.ghost.features import IFeaturing
 from ghoshell.ghost.intention import Attentions
 from ghoshell.ghost.io import Input, Output, Message
 from ghoshell.ghost.mindset import Mindset
-from ghoshell.ghost.runtime import Runtime, Task
+from ghoshell.ghost.runtime import Runtime, Task, TaskPtr, TaskData
 from ghoshell.ghost.session import Session
 from ghoshell.ghost.uml import UML
 
@@ -158,31 +158,33 @@ class Context(metaclass=ABCMeta):
 class CtxTool:
 
     @staticmethod
-    def task_to_thought(ctx: Context, task: Task) -> Thought:
-        think = ctx.mind.fetch(task.uml.think)
-        thought = think.new_thought(ctx, task.uml.args)
-        if thought.tid != task.tid:
+    def fetch_thought_by_task(ctx: Context, task: Task) -> Thought:
+        think = ctx.mind.fetch(task.ptr.resolver)
+        thought = think.new_thought(ctx, task.data.args)
+        if thought.tid != task.ptr.tid:
             # todo
             raise RuntimeException("不兼容的问题")
-        return thought.from_task(task)
+        return thought.merge_from_task(task)
 
     @staticmethod
-    def thought_to_task(ctx: Context, thought: Thought) -> Task:
+    def fetch_task_by_thought(ctx: Context, thought: Thought) -> Task:
         task = ctx.runtime.fetch_task(thought.tid)
         if task is None:
             task = Task(
-                tid=thought.tid,
-                uml=thought.uml,
-                pid=ctx.runtime.current_process_id,
+                ptr=TaskPtr(
+                    tid=thought.tid,
+                    resolver=thought.uml.think,
+                    stage=thought.uml.stage,
+                ),
+                data=TaskData(
+                    args=thought.uml.args.copy(),
+                )
             )
-            task = thought.to_task(task)
+            task = thought.join_to_task(task)
         return task
 
     @staticmethod
-    def thought(ctx: Context, uml: UML) -> "Thought":
-        """
-        语法糖
-        """
+    def new_thought(ctx: Context, uml: UML) -> "Thought":
         think = ctx.mind.fetch(uml.think)
         stage = think.all_stages().get(uml.stage, None)
         if stage is None:
@@ -190,14 +192,22 @@ class CtxTool:
             raise MindsetNotFoundException("")
         thought = think.new_thought(ctx, uml.args)
         thought.level = stage.level(thought)
+        return thought
+
+    @classmethod
+    def fetch_thought(cls, ctx: Context, uml: UML) -> "Thought":
+        """
+        语法糖
+        """
+        thought = cls.new_thought(ctx, uml)
         # 获取一个 task 实例
-        task = CtxTool.thought_to_task(thought)
-        thought.from_task(task)
+        task = CtxTool.fetch_task_by_thought(ctx, thought)
+        thought.merge_from_task(task)
         # 根据 stage 的实现来提供 level
         return thought
 
     @staticmethod
-    def stage(ctx, uml: UML) -> "Stage":
+    def fetch_stage(ctx, uml: UML) -> "Stage":
         """
         语法糖
         """
