@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import abc
-from typing import Optional, Dict
-from typing import TypeVar
+from typing import Optional, Dict, AnyStr, TYPE_CHECKING
 
-from context import Context
+from pydantic import BaseModel
 
-FEAT_KEY = TypeVar('FEAT_KEY', bound=str)
+if TYPE_CHECKING:
+    from ghoshell.ghost.context import Context
+
+FEAT_KEY = AnyStr
 
 
-class IFeaturing(metaclass=abc.ABCMeta):
+class Featuring(metaclass=abc.ABCMeta):
     """
     Ghost 所拥有的所有特征提取能力.
     能够提取出各种和 `当前上下文` 相关的泛化数据. 特征之间可能会有依赖关系
@@ -19,38 +21,29 @@ class IFeaturing(metaclass=abc.ABCMeta):
     特征工程有很多种实现方式, 这个抽象就尽可能简单了.
     """
 
-    def feat(self, ctx: Context, feature_id: FEAT_KEY) -> Optional[Dict]:
+    def feat(self, ctx: "Context", feature_id: FEAT_KEY) -> Optional[Dict]:
         pass
 
 
-class IFeature(metaclass=abc.ABCMeta):
+class Feature(BaseModel, metaclass=abc.ABCMeta):
     """
     特征的语法糖, 用来从上下文中获取强类型约束的特征数据.
     python 弱类型有弱类型的好处, 坏处就是写代码没提示不会写.
     """
     keyword: FEAT_KEY
 
-    def feat(self, ctx: Context) -> bool:
+    @classmethod
+    def feat(cls, ctx: "Context") -> Optional["Feature"]:
         """
         如果希望用类的形式来描述一个特征
         则可以实现 feat 方法, 一个简单的语法糖.
         """
-        feat_key = f"__feat_{self.keyword}"
+        feat_key = f"__feat_{cls.keyword}"
         value = ctx.get(feat_key)
         if value is not None:
-            self._assign(value)
-            return True
-        data = ctx.featuring.feat(self.keyword)
+            return cls(**value)
+        data = ctx.clone.featuring.feat(cls.keyword)
         if data is None:
-            return False
+            return None
         ctx.set(feat_key, data)
-        self._assign(data)
-        return True
-
-    @abc.abstractmethod
-    def _assign(self, data: Dict) -> "IFeature":
-        """
-        用来分配数据. 通常就从 dict 展开好了.
-        这里应该是后期静态绑定, 但暂时还不会
-        """
-        pass
+        return cls(**data)

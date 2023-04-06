@@ -25,13 +25,13 @@ class OnIntercept(Event, metaclass=ABCMeta):
     先不实现
     """
 
-    def __init__(self, this: Thought, args: Optional[Dict] = None):
+    def __init__(self, this: Thought, fr: Optional[UML] = None):
         self.this = this
-        self.args = args
+        self.fr = fr
 
     def destroy(self):
         del self.this
-        del self.args
+        del self.fr
 
 
 class OnReceive(Event, metaclass=ABCMeta):
@@ -39,11 +39,23 @@ class OnReceive(Event, metaclass=ABCMeta):
     响应 Ghost 的 Input 信息.
     """
 
-    def __init__(self, this: Thought):
+    def __init__(self, this: Thought, params: Optional[Dict]):
         self.this = this
+        self.params = params
 
     def destroy(self):
         del self.this
+
+
+class OnCallback(Event):
+
+    def __init__(self, this: Thought, result: Dict):
+        self.this = this
+        self.result = result
+
+    def destroy(self):
+        del self.this
+        del self.result
 
 
 class OnWithdraw(Event, metaclass=ABCMeta):
@@ -65,26 +77,15 @@ class OnWithdraw(Event, metaclass=ABCMeta):
 # --- activate events --- #
 
 class OnStart(OnActivate):
+    """
+    正常启动一个事件.
+    """
     pass
 
 
 class OnRepeat(OnActivate):
-    pass
-
-
-class OnRedirect(OnActivate):
-    pass
-
-
-class OnDepend(OnActivate):
-    pass
-
-
-# --- interceptor --- #
-
-class OnAttend(OnActivate):
     """
-    命中了一个上下文中关注的意图.
+    重复当前对话
     """
     pass
 
@@ -96,21 +97,30 @@ class OnPreempt(OnActivate):
     pass
 
 
-class OnIntend(OnActivate):
-    """
-    命中了一个全局意图.
-    """
+# --- interceptor --- #
+
+class OnDepended(OnIntercept):
     pass
 
 
-class OnAsync(OnActivate):
-    """
-    接受到异步回调消息, 以及数据.
-    """
+class OnRedirect(OnIntercept):
     pass
 
 
 # --- receive events --- #
+
+class OnAttend(OnReceive):
+    """
+    命中了一个上下文中关注的意图.
+    """
+    pass
+
+
+class OnIntend(OnReceive):
+    """
+    命中了一个全局意图.
+    """
+    pass
 
 
 class OnFallback(OnReceive):
@@ -122,21 +132,22 @@ class OnFallback(OnReceive):
 
 # --- withdraw events --- #
 
-class OnFinish(OnWithdraw):
-    """
-    被依赖的任务完成了, 回调当前任务.
-    可以拿到
-    """
-    pass
-
-
 class OnCancel(OnWithdraw):
+    """
+    任务取消
+    """
     pass
 
 
 class OnQuit(OnWithdraw):
+    """
+    对话退出
+    """
     pass
 
 
 class OnFailed(OnWithdraw):
+    """
+    任务失败.
+    """
     pass

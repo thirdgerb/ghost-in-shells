@@ -58,15 +58,15 @@ class IRuntime(Runtime):
         ptr = self.current_process().tasks.get(tid)
         if ptr is None:
             return None
-        data = self._driver.fetch_task_data(tid, ptr.is_long_term)
+        data = self._driver.fetch_task_data(tid, ptr.long_term)
         return Task(ptr=ptr, data=data)
 
     def store_task(self, *tasks: Task) -> None:
         process = self.current_process()
         for task in tasks:
             # 临时保存，等待收尾阶段处理.
-            process.store_task_ptr(task.ptr)
-            self._storing_task_data[task.ptr.tid] = task.data
+            process.store_task(task.ptr)
+            self._storing_task_data[task.tid] = task.data
 
     def store_task_ptrs(self, *task_pointers: Task) -> None:
         pass

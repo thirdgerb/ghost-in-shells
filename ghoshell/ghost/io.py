@@ -26,6 +26,7 @@ class Message(BaseModel):
 
 
 class Trace(BaseModel):
+    clone_id: str = ""
     # shell 的 id. 对齐 shell 的 session.
     # 举个例子, 如果 shell 是一个 IM
     # 则 shell id 最好就是 IM 的 chat_id

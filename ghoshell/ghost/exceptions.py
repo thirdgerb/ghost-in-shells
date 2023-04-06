@@ -20,3 +20,7 @@ class MindsetNotFoundException(GhostException):
 
 class RuntimeException(GhostException):
     CODE: int = 503
+
+
+class BusyException(GhostException):
+    CODE: int = 409

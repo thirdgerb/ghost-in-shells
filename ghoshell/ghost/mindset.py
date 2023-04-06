@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Dict, Callable
+from typing import Optional, Dict, Callable, List
 
 from pydantic import BaseModel
 
+from ghoshell.ghost.attention import Intention
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.intention import Intention
-from ghoshell.ghost.operate import Operator
-from ghoshell.ghost.runtime import Task, TASK_STATUS, TASK_LEVEL, TaskStatus, TaskLevel, TaskPtr
+from ghoshell.ghost.exceptions import MindsetNotFoundException
+from ghoshell.ghost.operator import Operator
 from ghoshell.ghost.uml import UML
 
 
@@ -26,72 +26,22 @@ class Thought(metaclass=ABCMeta):
     # 任务的唯一 ID
     tid: str
 
-    uml: UML
+    args: Dict
 
-    # 任务的状态. 对齐 runtime 的状态.
-    status: TASK_STATUS
+    think: str
 
-    # 当前任务所在的 stage 状态位.
-    stage: str = ""
+    stage: str
 
-    level: TASK_LEVEL = TaskLevel.LEVEL_PUBLIC
-
-    def __init__(self, task_id: str, uml: UML):
+    def __init__(self, task_id: str, think: str, args: Dict):
         self.tid = task_id
-        self.status = TaskStatus.NEW
-        self.uml = uml
+        self.think = think
+        self.args = args
         self.stage = ""
-        self.prepare(self.uml.args)
-
-    def merge_from_task(self, task: Task) -> Thought:
-        """
-        从 task 中重置当前状态.
-        """
-        self.status = task.ptr.status
-        self.uml = self.uml.to_stage(task.ptr.stage)
-        self.set_variables(task.data.vars)
-        return self
-
-    def join_to_task_ptr(self, ptr: TaskPtr) -> TaskPtr:
-        ptr.priority = self.priority()
-        ptr.overdue_at = self.overdue()
-        ptr.level = self.level
-        return ptr
-
-    def join_to_task(self, task: Task) -> Task:
-        """
-        根据当前状态, 重置 task 状态.
-        """
-        # ptr 复制.
-        ptr = self.join_to_task_ptr(task.ptr)
-
-        # data 赋值.
-        data = task.data
-        data.vars = self.vars()
-        # 设定 task 的返回值. 前提是 task 的返回值一直是 None
-        if ptr.status == TaskStatus.FINISHED:
-            data.result = self.result()
-        # 多余地赋值一下
-        task.ptr = ptr
-        task.data = data
-        return task
-
-    def priority(self) -> float:
-        """
-        当前任务的状态.
-        """
-        return 0
-
-    def overdue(self) -> int:
-        """
-        任务过期时间. 过期后的任务会被 GC
-        为 -1 表示没有过期.
-        """
-        return -1
+        self.create(args)
 
     # ---- 抽象方法 ---- #
     @abstractmethod
-    def prepare(self, args: Dict) -> None:
+    def create(self, args: Dict) -> None:
         """
         初始化
         """
@@ -166,6 +116,10 @@ class Think(BaseModel, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def new_task_id(self, ctx: Context, arg: Dict) -> str:
+        pass
+
+    @abstractmethod
     def new_thought(self, ctx: Context, args: Dict) -> Thought:
         """
         结合上下文, 初始化一个 Thinking 的状态.
@@ -175,17 +129,23 @@ class Think(BaseModel, metaclass=ABCMeta):
         """
         pass
 
-    def default_stage(self) -> Stage:
-        """
-        返回默认的 state
-        """
+    @abstractmethod
+    def overdue(self) -> int:
         pass
 
-    def all_stages(self) -> Dict[str, Stage]:
+    def is_long_term(self) -> bool:
+        return self.overdue != 0
+
+    @abstractmethod
+    def all_stages(self) -> List[str]:
         """
         返回所有可能的状态.
         可能只有一个状态.
         """
+        pass
+
+    @abstractmethod
+    def fetch_stage(self, stage_name: str = "") -> Optional[Stage]:
         pass
 
 
@@ -202,11 +162,16 @@ class Stage(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def uml(self) -> UML:
+    def think(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
         pass
 
     @abstractmethod
-    def level(self, this: Thought) -> int:
+    def level(self) -> int:
         pass
 
     @abstractmethod
@@ -235,6 +200,12 @@ class Mindset(metaclass=ABCMeta):
         获取一个 Thinking
         """
         pass
+
+    def force_fetch(self, thinking: str) -> Think:
+        fetched = self.fetch(thinking)
+        if fetched is None:
+            raise MindsetNotFoundException("todo message")
+        return fetched
 
     @abstractmethod
     def register_driver(self, key: str, driver: THINK_DRIVER) -> None:

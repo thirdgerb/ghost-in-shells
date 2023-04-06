@@ -70,7 +70,7 @@ class Attentions(metaclass=ABCMeta):
     """
     工程化的注意力机制
     在运行中接受到各种事件, 比如 api/command/设备事件等等
-    通过 attentions 机制可以快速定位事件的处理者(reaction)
+    通过 attentions 机制可以快速定位事件的处理者(task resolver => Thinking)
     """
 
     @abstractmethod
@@ -83,4 +83,11 @@ class Attentions(metaclass=ABCMeta):
 
     @abstractmethod
     def wildcard_match(self, ctx: Context) -> Optional[UML]:
+        pass
+
+    @abstractmethod
+    def destroy(self) -> None:
+        """
+        提醒记得清除垃圾.
+        """
         pass

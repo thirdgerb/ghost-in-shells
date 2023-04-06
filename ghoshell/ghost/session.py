@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from pydantic import BaseModel
 
@@ -19,6 +19,14 @@ class Session(metaclass=ABCMeta):
     @property
     @abstractmethod
     def session_id(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def env(self) -> Dict:
+        """
+        根据协议定义的环境信息.
+        """
         pass
 
     @abstractmethod
