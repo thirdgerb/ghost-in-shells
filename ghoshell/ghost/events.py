@@ -39,7 +39,7 @@ class OnReceive(Event, metaclass=ABCMeta):
     响应 Ghost 的 Input 信息.
     """
 
-    def __init__(self, this: Thought, params: Optional[Dict]):
+    def __init__(self, this: Thought, params: Optional[Dict], fr: UML | None = None):
         self.this = this
         self.params = params
 

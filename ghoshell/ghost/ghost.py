@@ -1,8 +1,12 @@
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Optional, Tuple, List, Iterator
+from typing import TYPE_CHECKING, Optional
+
+from pydantic import BaseModel
+
+from ghoshell.contracts import Container
+from ghoshell.ghost.io import Input, Output, Message
 
 if TYPE_CHECKING:
-    from ghoshell.ghost.io import Input, Output
     from ghoshell.ghost.context import Context
     from ghoshell.ghost.operator import OperationManager, OperationKernel
     from ghoshell.ghost.mindset import Mindset, Thought
@@ -11,7 +15,6 @@ if TYPE_CHECKING:
     from ghoshell.ghost.attention import Attentions
     from ghoshell.ghost.uml import UML
     from ghoshell.ghost.runtime import Runtime
-    from ghoshell.ghost.exceptions import BusyException, GhostException
 
 
 class Ghost(metaclass=ABCMeta):
@@ -29,9 +32,14 @@ class Ghost(metaclass=ABCMeta):
         """
         pass
 
-    @property
+    #
+    # @property
+    # @abstractmethod
+    # def knowledge(self) -> "Memory":
+    #     pass
+
     @abstractmethod
-    def knowledge(self) -> "Memory":
+    def container(self) -> Container:
         pass
 
     @abstractmethod
@@ -46,7 +54,7 @@ class Ghost(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def clone(self, clone_id: str) -> "Clone":
+    def new_clone(self, clone_id: str) -> "Clone":
         """
         从 ghost 实例化一个副本.
         """
@@ -64,40 +72,41 @@ class Ghost(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def pop_input(self) -> Input:
+    async def await_async_input(self) -> "Input":
         pass
+
+    async def async_output(self) -> "Output":
+        _input = await self.await_async_input()
+        output = self.react(_input)
+        return output
 
     @abstractmethod
-    def push_input(self, _input: "Input") -> None:
+    def async_input(self, _input: "Input") -> None:
         pass
-
-    async def run(self) -> Iterator[Output]:
-        while True:
-            _input = await self.pop_input()
-            try:
-                yield self.react(_input)
-            except BusyException:
-                self.push_input(_input)
-            except GhostException:
-                pass
 
     @abstractmethod
     def new_operation_kernel(self) -> "OperationKernel":
         pass
 
 
-class Memory(metaclass=ABCMeta):
-    """
-    实例级别的记忆, 长期存在.
-    """
+# class Memory(metaclass=ABCMeta):
+#     """
+#     实例级别的记忆, 长期存在.
+#     """
+#
+#     @abstractmethod
+#     def memorize(self, index: str, info: str) -> None:
+#         pass
+#
+#     @abstractmethod
+#     def recall(self, index: str, temperature: float = 0, top_k: int = 1) -> List[Tuple[str, float]]:
+#         pass
 
-    @abstractmethod
-    def memorize(self, index: str, info: str) -> None:
-        pass
 
-    @abstractmethod
-    def recall(self, index: str, temperature: float = 0, top_k: int = 1) -> List[Tuple[str, float]]:
-        pass
+class Config(BaseModel):
+    process_max_tasks: int = 20
+    process_default_overdue: int = 1800
+    process_lock_overdue: int = 30
 
 
 class Clone(metaclass=ABCMeta):
@@ -126,6 +135,11 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
+    def config(self) -> Config:
+        pass
+
+    @property
+    @abstractmethod
     def root(self) -> "UML":
         pass
 
@@ -134,18 +148,17 @@ class Clone(metaclass=ABCMeta):
     def session(self) -> "Session":
         pass
 
-    @property
-    @abstractmethod
-    def memory(self) -> "Memory":
-        pass
-
-    @property
-    @abstractmethod
-    def knowledge(self) -> "Memory":
-        """
-        ghost knowledge
-        """
-        pass
+        # @property
+        # @abstractmethod
+        # def memory(self) -> "Memory":
+        #     pass
+        #
+        # @property
+        # @abstractmethod
+        # def knowledge(self) -> "Memory":
+        #     """
+        #     ghost knowledge
+        #     """
 
     @property
     @abstractmethod
@@ -187,7 +200,8 @@ class Clone(metaclass=ABCMeta):
         """
         pass
 
-    def async_input(self, _input: Input) -> None:
+    @abstractmethod
+    def async_input(self, message: Message, process_id: str) -> None:
         pass
 
     @abstractmethod
@@ -198,5 +212,5 @@ class Clone(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def destroy(self) -> None:
+    def finish(self) -> None:
         pass

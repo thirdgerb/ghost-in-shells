@@ -41,3 +41,18 @@ def test_return_self() -> None:
     foo = Foo()
     assert foo is foo.bar()
     assert foo.bar() is foo.bar().bar()
+
+
+def test_class_name() -> None:
+    class Parent:
+        @classmethod
+        def name(cls) -> str:
+            return cls.__name__
+
+    class Child(Parent):
+        pass
+
+    c = Child()
+    assert c.name() == Child.__name__
+    assert c.name() != Parent.__name__
+    assert Parent.__name__ != Child.__name__

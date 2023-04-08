@@ -46,7 +46,7 @@ class LarkContext(IShellContext):
         self.ctx = Context()
 
     def send(self, _output: Output) -> None:
-        for msg in _output.messages:
+        for msg in _output.payloads:
             pass
 
     def destroy(self) -> None:

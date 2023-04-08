@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Optional, Dict
 
+from ghoshell.ghost.attention import Intention
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.exceptions import MindsetNotFoundException, RuntimeException
+from ghoshell.ghost.io import State
 from ghoshell.ghost.mindset import Thought, Stage, Event
 from ghoshell.ghost.runtime import Task
 from ghoshell.ghost.uml import UML
@@ -12,9 +14,10 @@ from ghoshell.ghost.uml import UML
 class CtxTool:
 
     @classmethod
-    def match_intention(cls, ctx: "Context", think: str, stage: str) -> Optional[Dict]:
+    def match_intention(cls, ctx: "Context", think: str, stage: str) -> Optional[Intention]:
         stage = cls.fetch_stage(ctx, think, stage)
-        return stage.intention(ctx).match(ctx)
+        metas = stage.intentions(ctx)
+        return ctx.clone.attentions.match(ctx, *metas)
 
     @classmethod
     def instance_thought(cls, ctx: "Context", thought: Thought) -> "Thought":
@@ -61,14 +64,19 @@ class CtxTool:
         return task
 
     @classmethod
-    def new_task_by_thought(cls, thought: Thought) -> Task:
-        task = Task(
-            tid=thought.tid,
-            resolver=thought.think,
-            stage="",
-            args=thought.args.copy(),
-        )
-        return cls.join_thought_to_task(thought, task)
+    def task_result(cls, ctx: Context, task: Task) -> Optional[Dict]:
+        thought = cls.fetch_thought_by_task(ctx, task)
+        return cls.thought_result(ctx, thought)
+
+    @classmethod
+    def thought_result(cls, ctx: Context, thought: Thought) -> Optional[Dict]:
+        think = ctx.clone.mind.force_fetch(thought.think)
+        return think.result(thought)
+
+    @classmethod
+    def new_task_by_thought(cls, ctx: Context, thought: Thought) -> Task:
+        uml = cls.thought_to_uml(thought)
+        return cls.new_task_from_uml(ctx, uml)
 
     @classmethod
     def new_tid(cls, ctx: Context, uml: UML) -> str:
@@ -140,10 +148,10 @@ class CtxTool:
         if task is None:
             if not or_create:
                 return None
-            return cls.new_task_by_thought(thought)
+            return cls.new_task_by_thought(ctx, thought)
 
         task = cls.join_thought_to_task(thought, task)
-        return task
+        return cls.complete_task(ctx, task)
 
     @classmethod
     def fetch_thought(cls, ctx: Context, uml: UML) -> "Thought":
@@ -164,3 +172,32 @@ class CtxTool:
         if stage is None:
             raise MindsetNotFoundException("todo")
         return stage
+
+    @classmethod
+    def state_msg_to_task(cls, ctx: Context, state: State) -> Task:
+        task = CtxTool.fetch_task(ctx, state.uml, or_create=True)
+        task.vars = state.vars
+        return task
+
+    @classmethod
+    def task_to_state_msg(cls, task: Task, action: str) -> State:
+        return State(
+            uml=cls.task_to_uml(task),
+            vars=task.vars,
+            action=action,
+        )
+
+    @classmethod
+    def new_task_from_uml(cls, ctx: Context, uml: UML) -> Task:
+        think = ctx.clone.mind.force_fetch(uml.think)
+        # 根据任务初始化
+        task = Task(
+            tid=think.new_task_id(ctx, uml.args),
+            resolver=uml.think,
+            stage="",
+            is_long_term=think.is_long_term(),
+            args=uml.args.copy(),
+        )
+        thought = think.new_thought(ctx, uml.args)
+        task = cls.join_thought_to_task(thought, task)
+        return cls.complete_task(task)

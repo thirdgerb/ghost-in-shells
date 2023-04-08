@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Dict, Callable, List
+from typing import Optional, Dict, List, Iterator
 
 from pydantic import BaseModel
 
@@ -102,11 +102,6 @@ class Think(BaseModel, metaclass=ABCMeta):
     def to_meta(self) -> ThinkMeta:
         pass
 
-    @classmethod
-    @abstractmethod
-    def from_meta(cls, meta: ThinkMeta) -> "Think":
-        pass
-
     @property
     @abstractmethod
     def uml(self) -> UML:
@@ -137,6 +132,10 @@ class Think(BaseModel, metaclass=ABCMeta):
         return self.overdue != 0
 
     @abstractmethod
+    def result(self, this: Thought) -> Optional[Dict]:
+        pass
+
+    @abstractmethod
     def all_stages(self) -> List[str]:
         """
         返回所有可能的状态.
@@ -149,7 +148,11 @@ class Think(BaseModel, metaclass=ABCMeta):
         pass
 
 
-THINK_DRIVER = Callable[[ThinkMeta], Think]
+class ThinkDriver(metaclass=ABCMeta):
+
+    @abstractmethod
+    def from_meta(self, meta: ThinkMeta) -> "Think":
+        pass
 
 
 class Stage(metaclass=ABCMeta):
@@ -175,7 +178,7 @@ class Stage(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def intention(self, ctx: Context) -> Optional[Intention]:
+    def intentions(self, ctx: Context) -> Optional[List[Intention]]:
         pass
 
     @abstractmethod
@@ -208,7 +211,7 @@ class Mindset(metaclass=ABCMeta):
         return fetched
 
     @abstractmethod
-    def register_driver(self, key: str, driver: THINK_DRIVER) -> None:
+    def register_driver(self, key: str, driver: ThinkDriver) -> None:
         """
         注册 think 的驱动.
         """
@@ -229,4 +232,9 @@ class Mindset(metaclass=ABCMeta):
         """
         meta = think.to_meta()
         self.register_meta(meta)
-        self.register_driver(meta.driver, think.from_meta)
+        if isinstance(think, ThinkDriver):
+            self.register_driver(meta.driver, think)
+
+    @abstractmethod
+    def foreach_think(self) -> Iterator[Think]:
+        pass

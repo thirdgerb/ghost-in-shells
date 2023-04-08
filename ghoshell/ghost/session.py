@@ -3,7 +3,7 @@ from typing import List, Optional, Dict
 
 from pydantic import BaseModel
 
-from ghoshell.ghost.io import Input, Output, Trace, Message
+from ghoshell.ghost.io import Input, Output, Trace, Payload
 
 
 class Searcher(BaseModel):
@@ -38,9 +38,9 @@ class Session(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def search_messages(self, searcher: Searcher) -> List[Message]:
+    def search_messages(self, searcher: Searcher) -> List[Payload]:
         pass
 
     @abstractmethod
-    def fetch_message(self, msg_id: str) -> Optional[Message]:
+    def fetch_message(self, msg_id: str) -> Optional[Payload]:
         pass

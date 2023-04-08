@@ -1,9 +1,11 @@
+import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Set, List, Dict, Optional
 from typing import TypeVar
 
 from pydantic import BaseModel
 
+from ghoshell.ghost.exceptions import RuntimeException
 from ghoshell.ghost.uml import UML
 
 TASK_STATUS = TypeVar('TASK_STATUS', bound=int)
@@ -57,7 +59,7 @@ class Task(BaseModel):
     # 优先级相同, 则按时间顺序排列.
     priority: float = 0
     # 遗忘的时间戳. 是以秒为单位的 timestamp.
-    # < 0 表示长期记忆,
+    # < 0 表示不被遗忘的长期记忆.
     # 0 表示不记忆, 完全跟随栈走. 栈被回收就清除. 也可能被一个 LRU 机制淘汰掉.
     # > 1 则是一个 timestamp, 到时间点会遗忘.
     overdue: int = 0
@@ -95,8 +97,11 @@ class Task(BaseModel):
         if len(self.forwards) <= 0:
             return False
         _next = self.forwards[0]
-        self.stage = _next
         self.forwards = self.forwards[1:]
+        self.depending = None
+        if _next == self.stage:
+            return self.forward()
+        self.stage = _next
 
     def done(self, status: TASK_STATUS) -> None:
         self.status = status
@@ -146,11 +151,13 @@ class Process(BaseModel):
     # 每接受一次 input 都是一个新的轮次.
     round: int = 0
 
+    parent_id: Optional[str] = None
+
     # 保存所有的任务指针, 用来做排序等.
     # 避免每个任务读取时的成本.
     tasks: List[Task] = []
 
-    __indexes: Dict[str, int] = {}
+    __indexes: Optional[Dict[str, int]] = None
 
     @property
     def depending(self) -> List[str]:
@@ -212,12 +219,6 @@ class Process(BaseModel):
         return result
 
     @property
-    def indexes(self) -> Dict[str, int]:
-        if len(self.__indexes) != len(self.tasks):
-            self._reset_indexes()
-        return self.__indexes
-
-    @property
     def is_quiting(self) -> bool:
         return self.round < 0
 
@@ -229,9 +230,9 @@ class Process(BaseModel):
         self.round = -1
 
     def get_task(self, tid: str) -> Optional[Task]:
-        if len(self.indexes) == 0:
+        if self.__indexes is None or len(self.__indexes) == 0:
             self._reset_indexes()
-        indexes = self.indexes
+        indexes = self.__indexes
         if tid not in indexes:
             return None
         idx = indexes[tid]
@@ -271,7 +272,7 @@ class Process(BaseModel):
             idx += 1
         self.__indexes = indexes
 
-    def gc(self, max_stack_depth: int = 30) -> List[Task]:
+    def gc(self, max_tasks: int = 30) -> List[Task]:
         """
         垃圾回收.
         """
@@ -282,7 +283,7 @@ class Process(BaseModel):
         # 检查基本状态.
         for ptr in reversed_tasks:
             tid = ptr.tid
-            if tid == self.root or tid == self.awaiting:
+            if self._is_not_able_to_gc(tid):
                 alive.append(ptr)
             if ptr.status == TaskStatus.DEPENDING and ptr.depending not in depended_by:
                 # 依赖一个任务, 但任务并不存在.
@@ -302,7 +303,7 @@ class Process(BaseModel):
                 alive.append(ptr)
 
         # 如果没有超过栈深, 直接返回.
-        if len(alive) < max_stack_depth:
+        if len(alive) < max_tasks:
             self.tasks = alive
             self._reset_indexes()
             return gc
@@ -312,9 +313,10 @@ class Process(BaseModel):
         result = []
         for task in alive:
             count += 1
-            if not self._is_able_to_gc(task.tid):
+            tid = task.tid
+            if self._is_not_able_to_gc(tid):
                 result.append(task)
-            elif count > max_stack_depth:
+            elif count > max_tasks:
                 continue
             else:
                 result.append(task)
@@ -324,25 +326,29 @@ class Process(BaseModel):
 
         # 二次清洗.
         # 再检查一次关联性的遗忘.
-        more = self.gc(max_stack_depth)
+        more = self.gc(max_tasks)
         gc.append(*more)
+        self.__indexes = None
         return gc
 
-    def _is_able_to_gc(self, tid: str):
+    def _is_not_able_to_gc(self, tid: str):
         return tid != self.root and tid != self.awaiting
 
     @classmethod
-    def new_process(cls, session_id: str, process_id: str, task: Task) -> "Process":
+    def new_process(cls, sid: str, task: Task, pid: str | None = None, parent_id: str | None = None) -> "Process":
         """
         初始化一个新的
         """
-        tid = task.tid
-        return cls(
-            sid=session_id,
-            pid=process_id,
-            root=tid,
-            current=tid,
-            tasks=[Task],
+        if pid is None:
+            pid = uuid.uuid4()
+
+        return Process(
+            sid=sid,
+            pid=pid,
+            root=task.tid,
+            awaiting=task.tid,
+            parent_id=parent_id,
+            tasks=[task],
         )
 
     def new_round(self) -> "Process":
@@ -360,13 +366,17 @@ class Runtime(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def lock_process(self, process_id: str) -> bool:
+    def lock_process(self, process_id: str | None = None) -> bool:
         """
         锁一个进程, 避免裂脑.
         由于一个 Session 可能会有一个主进程和多个异步进程
         所以当有明确进程标记时, 可以去命中子进程.
         任何进程处理 input 都是阻塞的.
         """
+        pass
+
+    @abstractmethod
+    def unlock_process(self, process_id: str | None = None) -> bool:
         pass
 
     @property
@@ -387,14 +397,7 @@ class Runtime(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
-    def new_process_id(self) -> str:
-        """
-        生成一个新的 process id
-        """
-        pass
-
-    def fetch_task(self, tid: str, is_long_term: bool) -> Optional[Task]:
+    def fetch_task(self, tid: str, is_long_term: bool, pid: str | None = None) -> Optional[Task]:
         """
         根据 TaskID 取出一个 Task.
         取不到的话, 说明协议上存在问题.
@@ -411,13 +414,14 @@ class Runtime(metaclass=ABCMeta):
         return None
 
     @abstractmethod
-    def fetch_long_term_task(self, tid: str) -> Optional[Task]:
+    def fetch_long_term_task(self, tid: str, pid: str | None = None) -> Optional[Task]:
         pass
 
-    def store_task(self, *tasks: Task) -> None:
+    def store_task(self, *tasks: Task, pid: str | None = None) -> None:
         """
         添加一个 Task, 在 destroy 的时候才会保存.
         """
+        pid = pid if pid else self.current_process_id
         stack = []
         for task in tasks:
             # 保存结束状态的话, 需要清空状态栈
@@ -427,26 +431,34 @@ class Runtime(metaclass=ABCMeta):
                 self.store_long_term_task(task)
             stack.append(task)
 
-        process = self.current_process()
-        process.store_task(*stack)
-        self.store_process(process)
+        process = self.get_process(pid)
+        if process is not None:
+            process.store_task(*stack)
+            self.store_process(process)
         return
 
     @abstractmethod
-    def store_long_term_task(self, task: Task) -> None:
+    def store_long_term_task(self, task: Task, pid: str | None = None) -> None:
         pass
 
     @abstractmethod
+    def get_process(self, pid: str | None = None) -> Optional[Process]:
+        pass
+
     def current_process(self) -> Process:
         """
         获取当前会话的进程
         """
-        pass
+        process = self.get_process(self.current_process_id)
+        if process is None:
+            raise RuntimeException(f"current process {self.current_process_id} not found, runtime initialize failed")
+        return process
 
     @abstractmethod
-    def rewind(self) -> Process:
+    def rewind(self, pid: str | None = None) -> Process:
         """
         将当前对话的进程和状态全部重置
+        None 默认就是当前任务.
         """
         pass
 
@@ -458,13 +470,7 @@ class Runtime(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def save(self) -> None:
-        """
-        当前变更不做保存
-        """
-
-    @abstractmethod
-    def destroy(self) -> None:
+    def finish(self, failed: bool = False) -> None:
         """
         清空持有内容, 需要做的事情:
         1. process 内部的 gc

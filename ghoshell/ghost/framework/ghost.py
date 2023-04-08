@@ -44,7 +44,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             output.ghost_env = self.ghost_env(ctx)
             return output
         finally:
-            ctx.destroy()
+            ctx.finish()
 
     @abstractmethod
     def ghost_env(self, ctx: Context) -> Dict:
@@ -103,7 +103,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             manager = ctx.new_operator_manager()
             manager.run_dominos(ctx, self._init_operator(_input))
             # 记得随手清空对象, 避免内存泄漏
-            manager.destroy()
+            manager.finish()
             return ctx.gen_output()
 
         return destination

@@ -1,71 +1,82 @@
-from typing import TYPE_CHECKING
+import logging
+from logging import LoggerAdapter
+from typing import List, Dict, Any, Optional
 
-if TYPE_CHECKING:
-    from typing import List
-
-from ghoshell.ghost.context import Context
-from ghoshell.ghost import Output, Attentions, Mindset, Input, Message
-from ghoshell.ghost.runtime import Runtime
-
-from ghoshell.ghost.framework import GhostKernel
+from ghoshell import contracts
+from ghoshell.ghost import *
+from ghoshell.ghost.context import Messenger
 
 
-class Context(Context):
+class IContext(Context):
 
     def __init__(
             self,
-            ghost_id: str,
             inpt: Input,
-            ghost: GhostKernel,
+            clone: Clone
     ):
-        self._ghost_id: str = ghost_id
-        self._ghost: GhostKernel = ghost
-        self._input: Input = inpt
-        self._output_messages: List[Message] = []
+        self._clone = clone
+        self._origin_input = inpt
+        self._input = Input(**inpt.dict())
+        self._logger = self._prepare_log()
+        self._outputs: List[Output] = []
+        self._failed: bool = False
+        self._cache: Dict[str, Any] = {}
+        self._async_inputs: List[Input] = []
+
+    def _prepare_log(self) -> logging.LoggerAdapter:
+        container = self.clone.ghost.container()
+        log = contracts.LogManager.fetch(container)
+        adapter = log.new_adapter(self._input.trace.dict())
+        return adapter
 
     @property
-    def name(self) -> str:
-        return self._ghost.name
+    def clone(self) -> Clone:
+        return self._clone
+
+    def send(self, _with: "Thought") -> Messenger:
+        # todo
+        pass
 
     @property
-    def id(self) -> str:
-        return self._ghost_id
-
-    @property
-    def input(self) -> Input:
+    def input(self) -> "Input":
         return self._input
 
-    @property
-    def mind(self) -> Mindset:
-        pass
+    def logger(self) -> LoggerAdapter:
+        return self._logger
 
-    @property
-    def runtime(self) -> Runtime:
-        pass
+    def set_input(self, _input: "Input") -> None:
+        self._input = _input
 
-    @property
-    def featuring(self) -> Featuring:
-        pass
+    def async_input(self, _input: "Input") -> None:
+        _input.is_async = True
+        self._async_inputs.append(_input)
 
-    @property
-    def attentions(self) -> Attentions:
-        pass
+    def output(self, _output: "Output") -> None:
+        self._outputs.append(_output)
 
-    def act(self, *messages: Message) -> None:
-        tid = self.runtime.current_task().tid
-        # 添加消息产生时的 tid
-        for m in messages:
-            m.tid = tid
-        self._output_messages.append(*messages)
+    def get_outputs(self) -> List["Output"]:
+        return self._outputs
 
-    def output(self) -> Output:
-        return Output(
-            input=self._input,
-            messages=self._output_messages.copy(),
-            env=self._ghost.ghost_env(self),
-        )
+    def get_async_inputs(self) -> List["Input"]:
+        return self._async_inputs
 
-    def destroy(self) -> None:
-        del self._ghost
+    def set(self, key: str, value: Any) -> None:
+        self._cache[key] = value
+
+    def get(self, key: str) -> Optional[Any]:
+        return self._cache.get(key, None)
+
+    def finish(self, failed: bool = False) -> None:
+        self.clone.runtime.finish(failed)
+        # clone 也需要回收.
+        self.clone.finish()
+
+        # del
+        del self._clone
+        del self._origin_input
         del self._input
-        del self._output_messages
+        del self._logger
+        del self._outputs
+        del self._async_inputs
+        del self._failed
+        del self._cache

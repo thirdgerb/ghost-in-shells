@@ -29,5 +29,5 @@ def test_this() -> None:
         },
         this,
     )
-    assert this.args.foo == "hello"
+    assert this.config.foo == "hello"
     assert this.vars.bar == "world"

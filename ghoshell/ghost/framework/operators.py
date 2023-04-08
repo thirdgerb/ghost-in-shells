@@ -1,14 +1,15 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Dict, List, Any, Tuple
 
-from ghoshell.ghost import Context, CtxTool, UML, Process, IntentionMeta, Event
+from ghoshell.ghost import Context, CtxTool, UML, Process, Intention, Event
 from ghoshell.ghost import MissUnderstoodException, RuntimeException
 from ghoshell.ghost import OnCallback
 from ghoshell.ghost import OnCancel, OnFailed, OnQuit
 from ghoshell.ghost import OnDepended, OnRedirect
-from ghoshell.ghost import OnFallback, OnIntend, OnRepeat
+from ghoshell.ghost import OnFallback, OnIntend, OnRepeat, OnAttend
 from ghoshell.ghost import OnPreempt, OnStart
 from ghoshell.ghost import Operator, OperationManager
+from ghoshell.ghost import Payload, State
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
 from ghoshell.ghost import Thought
 
@@ -24,6 +25,9 @@ class AbsOperator(Operator, metaclass=ABCMeta):
         if event_op is not None:
             return event_op
         return self._next(ctx)
+
+    def enqueue(self, ctx: "Context") -> Optional[List["Operator"]]:
+        return None
 
     @abstractmethod
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
@@ -42,152 +46,242 @@ class AbsOperator(Operator, metaclass=ABCMeta):
         pass
 
 
-class OpReceiveInput(Operator):
-    """
-    todo: ??
-    接受到一个 Input, 启动默认的处理流程.
-    会根据 root -> current 任务生成一个意图树
-    """
+class OpReceive(AbsOperator):
 
-    def run(self, ctx: "Context") -> Optional[Operator]:
-        runtime = ctx.clone.runtime
-        _input = ctx.input
-        process = runtime.current_process()
-        # tid 不为空的情况:
-        if _input.message.tid:
-            exists = runtime.fetch_task(_input.message.tid)
-            if exists is not None:
-                return OpIntentTo(exists)
-
-        # 判断是不是一个异步回调消息.
-        callback_task_id = self.is_async_callback(ctx)
-        if callback_task_id is not None:
-            # 处理异步回调任务消息
-            return OpAsyncCallback(callback_task_id)
-
-        # 检查是否匹配到某个 attentions
-        matched = self.match_attentions(ctx, process)
-        if matched is not None:
-            return OpAttendTo(matched.uml, matched.args)
-
-        # 检查是否匹配了全局的 intentions
-        matched = self.match_intention(ctx, process)
-        if matched is not None:
-            return OpIntentTo(matched.uml, matched.args)
-
-        # 没有匹配到任何意图, 则走 fallback 流程.
-        return OpFallback()
+    def __init__(self):
+        self.enqueued = False
 
     class Matched:
         def __init__(self, matched: UML, args: Optional[Dict]):
             self.uml = matched
             self.args = args
 
-    def is_async_callback(self, ctx: "Context") -> Optional[str]:
-        # todo
-        # 判断是否是异步回调消息
-        return None
+    def enqueue(self, ctx: "Context") -> Optional[List["Operator"]]:
+        if self.enqueued:
+            return None
+        self.enqueued = True
+
+        enqueue: List[Operator] = []
+        runtime = ctx.clone.runtime
+        process = runtime.current_process()
+        if process.is_new:
+            root = process.root_task
+            root_thought = CtxTool.fetch_thought_by_task(ctx, root)
+            enqueue.append(OpStart(root_thought))
+            process.round += 1
+            runtime.store_process(process)
+
+        # 检查 payload 的 tid
+        _input = ctx.input
+        payload = _input.payload
+        op = self._payload_tid_op(ctx, payload)
+        if op is not None:
+            enqueue.append(op)
+
+        # 继续检查 payload action
+        op = self._payload_state_op(ctx, payload)
+        if op is not None:
+            enqueue.append(op)
+        return enqueue
 
     @classmethod
-    def match_attentions(cls, ctx: "Context", process: Process) -> Optional[Matched]:
+    def _payload_tid_op(cls, ctx: Context, payload: Payload) -> Optional[Operator]:
+        if not payload.tid:
+            return None
+        payload_task = CtxTool.fetch_task_by_tid(ctx, payload.tid)
+        if payload_task is None:
+            return None
+        if payload_task.status != TaskStatus.RUNNING:
+            return None
+        payload_thought = CtxTool.fetch_thought_by_task(ctx, payload_task)
+        return OpAwait(payload_thought)
+
+    @classmethod
+    def _payload_state_op(cls, ctx: Context, payload: Payload) -> Optional[Operator]:
+        if payload.state is None:
+            return None
+        state = payload.state
+        state_task = CtxTool.fetch_task(ctx, state.uml, or_create=True)
+        if state.vars is not None:
+            state_task.vars = state.vars
+        ctx.clone.runtime.store_task(state_task)
+        # 匹配动作.
+        action = state.action
+        if action == "":
+            return None
+
+        thought = CtxTool.fetch_thought_by_task(ctx, state_task)
+        match state.action:
+            case State.ON_START:
+                return OpStart(thought)
+            case State.ON_QUIT:
+                return OpQuit(thought, "state action")
+            case State.ON_RESET:
+                return OpReset()
+            case State.ON_CANCEL:
+                return OpCancel(thought, "state action")
+            case State.ON_FINISH:
+                return OpFinish(thought)
+            case _:
+                return None
+
+    def _intercept(self, ctx: "Context") -> Optional["Operator"]:
+        # 检查是否匹配到某个 attentions
+        matched = self.match_attentions(ctx)
+        if matched is not None:
+            return OpIntendTo(matched.uml, matched.matched, attend=True)
+
+        # 检查是否匹配了全局的 intentions
+        matched = self.match_intentions(ctx)
+        if matched is not None:
+            return OpIntendTo(matched.uml, matched.matched, attend=False)
+        return None
+
+    def _save_change(self, ctx: "Context") -> None:
+        pass
+
+    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+        pass
+
+    def _next(self, ctx: "Context") -> Optional["Operator"]:
+        return OpFallback()
+
+    @classmethod
+    def match_attentions(cls, ctx: "Context") -> Optional[Intention]:
         """
         将进程的 attentions 生成出来
         用来从 ctx 中匹配一个目标意图.
         """
         # 添加 current
-        current_task = process.tasks.get(process.awaiting)
-        attention_metas = cls.attention_metas(ctx, process, current_task)
-        attentions = ctx.attentions
+        attention_metas = cls.attention_metas(ctx)
+        attentions = ctx.clone.attentions
         predefined_kinds = attentions.intention_kinds()
+        # 只能匹配已有的.
         for kind in predefined_kinds:
             if kind not in attention_metas:
                 continue
+            # 匹配所有的 metas
             metas = attention_metas[kind]
-            for meta in metas:
-                matched, args = attentions.match(ctx, meta)
-                matched: Optional[UML] = None
-                if matched:
-                    return OpReceiveInput.Matched(matched, args)
+            matched = attentions.match(ctx, *metas)
+            if matched is not None:
+                return matched
         return None
 
     @classmethod
-    def match_intention(cls, ctx: "Context", process: Process) -> Optional[Matched]:
+    def match_intentions(cls, ctx: "Context") -> Optional[Intention]:
         # 如果当前任务是 public 级别的任务, 则允许做意图的模糊匹配.
         # 意图的模糊匹配并不精确到参数上. 需要二次加工.
-        current_task = process.tasks.get(process.awaiting)
-        if current_task.level != TaskLevel.LEVEL_PUBLIC:
+        process = ctx.clone.runtime.current_process()
+        attentions = ctx.clone.attentions
+        awaiting_task = process.awaiting_task
+
+        intention_metas = cls.intention_metas(ctx)
+        predefined_kinds = attentions.intention_kinds()
+        for kind in predefined_kinds:
+            if kind not in intention_metas:
+                continue
+            # 匹配所有的 metas
+            metas = intention_metas[kind]
+            matched = attentions.match(ctx, *metas)
+            if matched is not None:
+                return matched
+
+        if awaiting_task.level < TaskLevel.LEVEL_PUBLIC:
             return None
-        attentions = ctx.attentions
-        matched = attentions.wildcard_match(ctx)
-        if matched is not None:
-            return OpReceiveInput.Matched(matched, None)
-        return None
+
+        # 模糊匹配.
+        return attentions.wildcard_match(ctx)
 
     @classmethod
-    def attention_metas(cls, ctx: "Context", process: Process, current_task: Task) -> Dict[str, List[IntentionMeta]]:
+    def intention_metas(cls, ctx: "Context") -> Dict[str, List[Intention]]:
+        runtime = ctx.clone.runtime
+        process = runtime.current_process()
+        awaiting_task = process.awaiting_task
+        result: Dict[str, List[Intention]] = {}
+
+        # protected 才允许回溯匹配.
+        if awaiting_task.level < TaskLevel.LEVEL_PROTECTED:
+            return result
+
+        blocking = process.blocking
+        for tid in blocking:
+            blocking_task = process.get_task(tid)
+            result = cls._add_task_intention_to_attentions(ctx, result, blocking_task, attentions=False)
+
+        # 检查 waiting.
+        waiting = process.waiting
+        for tid in waiting:
+            waiting_task = process.get_task(tid)
+            result = cls._add_task_intention_to_attentions(ctx, result, waiting_task, attentions=False)
+
+        # 添加 awaiting
+        if process.awaiting != process.root:
+            root_task = process.root_task
+            result = cls._add_task_intention_to_attentions(ctx, result, root_task, attentions=False)
+
+        return result
+
+    @classmethod
+    def attention_metas(cls, ctx: "Context") -> Dict[str, List[Intention]]:
         """
         从进程中获取当前匹配的意图.
         """
-        result: Dict[str, List[IntentionMeta]] = {}
-        # 第一步, 添加 root
-        root_ptr = process.tasks.get(process.root)
-        cls._add_intention_meta_to_attentions(ctx, result, root_ptr)
+        runtime = ctx.clone.runtime
+        process = runtime.current_process()
+        result: Dict[str, List[Intention]] = {}
 
-        if process.awaiting != root_ptr:
-            cls._add_intention_meta_to_attentions(ctx, result, current_task)
+        # 第一步, 添加 root
+        root_task = process.root_task
+        result = cls._add_task_intention_to_attentions(ctx, result, root_task)
+
+        awaiting_task = process.awaiting_task
+        # 添加 awaiting
+        if process.awaiting != process.root:
+            result = cls._add_task_intention_to_attentions(ctx, result, awaiting_task)
 
         # 封闭域任务, 不再继续增加注意目标.
-        if current_task.level <= TaskLevel.LEVEL_PRIVATE:
+        if awaiting_task.level < TaskLevel.LEVEL_PROTECTED:
             return result
 
         # 第三步, 添加 waiting 中的节点的意图.
         for tid in process.waiting:
-            blocking = process.tasks.get(tid)
-            cls._add_intention_meta_to_attentions(ctx, result, blocking)
+            waiting = process.get_task(tid)
+            result = cls._add_task_intention_to_attentions(ctx, result, waiting)
         return result
 
     @classmethod
-    def _add_intention_meta_to_attentions(
+    def _add_task_intention_to_attentions(
             cls,
             ctx: Context,
-            result: Dict[str, List[IntentionMeta]],
-            task_ptr: Task,
-    ) -> Dict[str, List[IntentionMeta]]:
+            result: Dict[str, List[Intention]],
+            task: Task,
+            attentions: bool = True,
+    ) -> Dict[str, List[Intention]]:
         # 初始化
         # 上下文中生成意图树.
-        for uml in task_ptr.attentions:
-            stage = CtxTool.fetch_stage(ctx, uml)
+        if attentions:
+            uml_list = task.attentions
+        else:
+            uml_list = CtxTool.task_to_uml(task)
+
+        for uml in uml_list:
+            stage = CtxTool.fetch_stage(ctx, uml.think, uml.stage)
+            if stage is None:
+                continue
             # 从 stage 里生成 intention
-            intention = stage.intention(ctx)
-            if not intention:
+            intentions = stage.intentions(ctx)
+            if not intentions:
                 continue
             # 从 intention 里拿到 metas
-            metas = intention.metas()
-            for meta in metas:
-                kind = meta.kind
+            for meta in intentions:
+                kind = meta.KIND
                 if kind not in result:
                     result[kind] = []
                 result[kind].append(meta)
         return result
 
     def destroy(self) -> None:
-        pass
-
-
-class OpAsyncCallback(Operator):
-    """
-    todo: 接受到了一个异步的回调.
-    """
-
-    def __init__(self, callback_task_id: str):
-        self.callback_task_id = callback_task_id
-        super().__init__()
-
-    def run(self, ctx: "Context") -> Optional[Operator]:
-        return None
-
-    def destroy(self) -> None:
-        del self.callback_task_id
+        del self.enqueued
 
 
 class OpFallback(AbsOperator):
@@ -229,71 +323,48 @@ class OpFallback(AbsOperator):
         pass
 
 
-class OpAttendTo(Operator):
-    """
-    todo: ???
-    """
-
-    def __init__(self, to: UML, args: Optional[Dict]):
-        self.to = to
-        self.args = args
-        super().__init__()
-
-    def run(self, ctx: "Context") -> Optional[Operator]:
-        pass
-
-    def destroy(self) -> None:
-        del self.to
-        del self.args
-
-
-class OpIntentTo(Operator):
+class OpIntendTo(AbsOperator):
     """
     todo: ???
     命中了一个意图, 前往目标任务.
     过程中生产一个事件, 如果没问题的话就正式激活目标任务.
     """
 
-    def __init__(self, to: Task, args: Optional[Dict] = None):
+    def __init__(self, to: UML, params: Optional[Dict] = None, fr: UML | None = None, attend: bool = False):
         # 匹配的目标
-        self.to: Task = to
+        self.to: UML = to
         # 匹配的参数, 如果为 none 的话还需要二次检查.
-        self.args: Optional[Dict] = args
-        super().__init__()
+        self.fr = fr
+        self.params: Optional[Dict] = params
+        self.attend = attend
 
-    def run(self, ctx: "Context") -> Optional[Operator]:
-        process = ctx.clone.runtime.current_process()
-        current_task = process.current_task()
-        to_thought = ctx.thought(self.to)
+    def _intercept(self, ctx: "Context") -> Optional["Operator"]:
+        return None
 
-        if self.args is None:
-            # 用 intention 重新匹配一次.
-            stage = CtxTool.fetch_stage(ctx, to_thought.uml)
-            self.args = stage.intention(ctx).match(ctx)
+    def _save_change(self, ctx: "Context") -> None:
+        return
 
-        # 意图命中了自身.
-        event = OnIntend(to_thought, self.args, current_task.uml)
-        return fire_event(ctx, event)
+    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+        this = CtxTool.fetch_thought(ctx, self.to)
+        params = self.params
+        if params is None:
+            stage = CtxTool.fetch_stage(ctx, self.to.think, self.to.think)
+            intentions = stage.intentions()
+            if intentions is not None:
+                matched = ctx.clone.attentions.match(ctx, *intentions)
+                params = matched.matched
+        wrapper = OnAttend if self.attend else OnIntend
+        event = wrapper(this, params, self.fr)
+        return CtxTool.fire_event(ctx, event)
 
-        # 如果不是新建的任务
-        if to_thought.status != TaskStatus.NEW:
-            event = OnIntend(to_thought)
-            # 是否任务被拦截.
-            interceptor = CtxTool.fire_event(ctx, event)
-            if interceptor is not None:
-                return interceptor
-
-    @staticmethod
-    def on_intercept(ctx: "Context", process: Process) -> Optional[Operator]:
-        current_task_ptr = process.tasks.get(process.awaiting)
-        current_thought = ctx.thought(current_task_ptr.uml)
-        event = Event(current_thought, Event.ON_INTERCEPT)
-
-    def on_intend_to(self):
-        pass
+    def _next(self, ctx: "Context") -> Optional["Operator"]:
+        return None
 
     def destroy(self) -> None:
-        pass
+        del self.params
+        del self.fr
+        del self.to
+        del self.attend
 
 
 class OpGoStage(AbsOperator):
@@ -340,19 +411,15 @@ class OpForwardStage(AbsOperator):
         self.fr: UML = CtxTool.thought_to_uml(this)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
-        this = self.this
-        process = ctx.clone.runtime.current_process()
-        ptr = process.get_task(this.tid)
-        if ptr is not None and len(ptr.forwards) == 0:
+        task = CtxTool.fetch_task_by_thought(ctx, self.this, or_create=True)
+        if not task.forward():
             return OpFinish(self.this)
+        ctx.clone.runtime.store_task(task)
+        self.this = CtxTool.merge_thought_from_task(self.this, task)
         return None
 
     def _save_change(self, ctx: "Context") -> None:
-        task = CtxTool.fetch_task_by_thought(ctx, self.this)
-        task.forward()
-        ctx.clone.runtime.store_task(task)
-        self.this = CtxTool.merge_thought_from_task(self.this, task)
-        return
+        return None
 
     def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -414,6 +481,9 @@ class OpFinish(AbsOperator):
         runtime.store_task(task)
 
         process = runtime.current_process()
+        if task.tid == process.root:
+            # 根节点结束.
+            return
         depended_by_map = process.depended_by_map
         if tid not in depended_by_map:
             # 没有依赖当前任务的.
@@ -439,10 +509,27 @@ class OpFinish(AbsOperator):
         return None
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
+        clone = ctx.clone
+        runtime = clone.runtime
+        process = runtime.current_process()
+        if process.root == self.this.tid:
+            return self._finish_root(ctx)
+
         # 让调度来解决后续问题.
         # 回调到 blocking, 然后是 waiting.
         this_uml = CtxTool.thought_to_uml(self.this)
         return OpSchedule(this_uml)
+
+    def _finish_root(self, ctx: Context):
+        clone = ctx.clone
+        runtime = clone.runtime
+        process = runtime.current_process()
+        process.quit()
+        runtime.store_process(process)
+        if process.parent_id:
+            result = CtxTool.task_result(ctx, process.root_task)
+            clone.async_input(result, )
+        return None
 
     def destroy(self) -> None:
         del self.this
@@ -603,7 +690,7 @@ class OpCancel(AbsOperator):
     """
     status = TaskStatus.CANCELED
 
-    def __init__(self, this: Thought, reason: Any, fr: Optional[UML] = None):
+    def __init__(self, this: Thought, reason: Any | None, fr: Optional[UML] = None):
         self.this = this
         self.reason = reason
         self.fr = fr
@@ -643,7 +730,7 @@ class OpCancel(AbsOperator):
         self.withdraw_list = self.withdraw_list[1:]
 
         # 进入下一个 cancel 任务.
-        task = ctx.clone.runtime.fetch_task(canceling_id)
+        task = ctx.clone.runtime.fetch_task(canceling_id, False)
         _next = CtxTool.fetch_thought_by_task(ctx, task)
         self.this = _next
         self.fr = fr
@@ -886,20 +973,88 @@ class OpCallback(AbsOperator):
         del self.fr
 
 
-class OpReset(Operator):
+class OpReset(AbsOperator):
     """
     重置进程
     """
 
-    def run(self, ctx: "Context") -> Optional[Operator]:
+    def _intercept(self, ctx: "Context") -> Optional["Operator"]:
+        return None
+
+    def _save_change(self, ctx: "Context") -> None:
         runtime = ctx.clone.runtime
         process = runtime.current_process()
         process.reset()
         runtime.store_process(process)
         return None
 
+    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+        process = ctx.clone.runtime.current_process()
+        task = process.root_task
+        thought = CtxTool.fetch_thought_by_task(ctx, task)
+        event = OnStart(thought)
+        return CtxTool.fire_event(ctx, event)
+
+    def _next(self, ctx: "Context") -> Optional["Operator"]:
+        return None
+
     def destroy(self) -> None:
         pass
+
+
+class OpYieldTo(AbsOperator):
+
+    def __init__(self, this: Thought, to: UML, pid: str | None):
+        self.this = this
+        self.to = to
+        self.pid = pid
+
+    def _intercept(self, ctx: "Context") -> Optional["Operator"]:
+        """
+        depend 事件可以被终止.
+        """
+        target_task = CtxTool.fetch_task(ctx, self.to, or_create=False)
+        if not target_task:
+            return None
+
+        # 目标任务已经完成的情况.
+        if target_task.status == TaskStatus.FINISHED:
+            #  目标任务已经完成的话, 直接回调.
+            target = CtxTool.fetch_thought_by_task(ctx, target_task)
+            return OpCallback(self.this, target)
+        return None
+
+    def _save_change(self, ctx: "Context") -> None:
+        task = CtxTool.fetch_task_by_thought(ctx, self.this)
+        task.status = TaskStatus.YIELDING
+        target_id = CtxTool.new_tid(ctx, self.to)
+        task.depending = target_id
+        runtime = ctx.clone.runtime
+        runtime.store_task(task)
+        process = runtime.current_process()
+
+        # 创建并保存异步进程.
+        target_task = CtxTool.fetch_task(ctx, self.to, or_create=True)
+        sub_process = process.new_process(process.sid, target_task, self.pid, process.pid)
+        runtime.store_process(sub_process)
+
+        # 发送异步消息.
+        ctx.send(self.this).async_input(
+            Payload.Action("start"),
+            sub_process.pid
+        )
+        return
+
+    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+        return None
+
+    def _next(self, ctx: "Context") -> Optional["Operator"]:
+        uml = CtxTool.thought_to_uml(self.this)
+        return OpSchedule(uml)
+
+    def destroy(self) -> None:
+        del self.this
+        del self.to
 
 
 class IOperatorManager(OperationManager):
@@ -964,6 +1119,14 @@ class IOperatorManager(OperationManager):
         finally:
             self.destroy()
 
+    @abstractmethod
+    def intend_to(self, uml: UML, params: Dict | None = None) -> "Operator":
+        try:
+            this_uml = CtxTool.thought_to_uml(self.this)
+            return OpIntendTo(uml, params, this_uml, attend=False)
+        finally:
+            self.destroy()
+
     def reset(self) -> Operator:
         try:
             return OpReset()
@@ -995,4 +1158,7 @@ class IOperatorManager(OperationManager):
             self.destroy()
 
     def yield_to(self, to: UML, pid: Optional[str] = None) -> Operator:
-        pass
+        try:
+            return OpYieldTo(self.this, to, pid)
+        finally:
+            self.destroy()

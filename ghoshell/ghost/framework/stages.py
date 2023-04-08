@@ -12,7 +12,7 @@ class AttentionStage(Stage, metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def intention(self, this: Thought) -> Intention:
+    def intentions(self, this: Thought) -> Intention:
         """
         进入当前状态可以提供的各种意图.
         """

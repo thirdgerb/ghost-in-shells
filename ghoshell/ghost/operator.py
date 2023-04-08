@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, TYPE_CHECKING, Any
+from typing import Optional, TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
@@ -14,6 +14,10 @@ class Operator(metaclass=ABCMeta):
     之所以将逻辑拆成算子, 是为了实现可追溯, 可 debug
     自动暴露思维链条.
     """
+
+    @abstractmethod
+    def enqueue(self, ctx: "Context") -> Optional[List["Operator"]]:
+        pass
 
     @abstractmethod
     def run(self, ctx: "Context") -> Optional["Operator"]:
@@ -36,14 +40,14 @@ class OperationKernel(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def trace(self, op: Operator) -> None:
+    def record(self, op: Operator) -> None:
         """
         记录一个 op 的信息. 用于 debug.
         """
         pass
 
     @abstractmethod
-    def save_trace(self) -> None:
+    def save_records(self) -> None:
         """
         将运行轨迹保存下来, 用于 debug.
         里面的逻辑可以自定义, 比如 debug 模式才去 save.
@@ -64,23 +68,38 @@ class OperationKernel(metaclass=ABCMeta):
         像推倒多米诺骨牌一样, 运行各种算子.
         """
         op = initial_op
+
+        queue: List[Operator] = []
         try:
             count = 0
             while op is not None:
                 self.is_stackoverflow(op, count)
-                self.trace(op)
+                self.record(op)
                 count += 1
+
+                # 检查是否要插入队列.
+                inserts = op.enqueue(ctx)
+                if inserts:
+                    queue.append(*inserts)
+                    queue.append(op)
+                    op = queue[0]
+                    queue = queue[1:]
+                    continue
+
                 after = op.run(ctx)
                 op.destroy()
-                if after is None:
-                    # after 为 none 有两种情况:
-                    # 1. 逻辑本身不合法
-                    # 2.
-                    pass
-                op = after
+
+                if after is not None:
+                    op = after
+                    continue
+                # 入队的出栈.
+                if len(queue) > 0:
+                    op = queue[0]
+                    queue = queue[1:]
+                    continue
         # todo: catch
         finally:
-            self.save_trace()
+            self.save_records()
 
     @abstractmethod
     def destroy(self) -> None:
@@ -99,6 +118,7 @@ class OperationManager(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
     def redirect_to(self, to: "UML") -> "Operator":
         """
         从当前对话任务, 进入一个目标对话任务.
@@ -125,6 +145,10 @@ class OperationManager(metaclass=ABCMeta):
         """
         清空上下文, 回到起点.
         """
+        pass
+
+    @abstractmethod
+    def intend_to(self, uml: UML, params: Dict | None = None) -> "Operator":
         pass
 
     @abstractmethod

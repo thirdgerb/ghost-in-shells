@@ -2,7 +2,7 @@ from typing import List
 
 from larksuiteoapi import Config
 
-from ghoshell.ghost import Message
+from ghoshell.ghost import Payload
 
 
 class LarkSuite:
@@ -10,7 +10,7 @@ class LarkSuite:
     def __init__(self, config: Config):
         self.config = config
 
-    def send_message(self, receive_id: str, msg: Message) -> None:
+    def send_message(self, receive_id: str, msg: Payload) -> None:
         replies: List[Messenger] = []
         if msg.text:
             replies.append(Messenger(

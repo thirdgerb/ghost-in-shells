@@ -1,6 +1,6 @@
 from typing import List
 
-from ghoshell.ghost import Input, Message
+from ghoshell.ghost import Input, Payload
 
 
 def test_basic_text():
@@ -11,7 +11,7 @@ def test_basic_text():
     }
 
     _input = Input(**example)
-    assert _input.message.text == "hello world!"
+    assert _input.payload.text == "hello world!"
 
 
 def test_extend_input():
@@ -20,12 +20,14 @@ def test_extend_input():
     """
 
     class TestInput(Input):
-        class Msg(Message):
+        class Msg(Payload):
+            text: str
             images: List[str] = []
 
-        message: Msg
+        payload: Msg
 
     example = {
+        "trace": {},
         "message": {
             "text": "hello world!",
             "images": ["image_url"]

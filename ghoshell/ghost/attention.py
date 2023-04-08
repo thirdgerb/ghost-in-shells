@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TypeVar, Dict, Optional, List, Tuple
+from typing import TypeVar, Optional, List, Any, ClassVar
 
 from pydantic import BaseModel
 
@@ -16,16 +16,7 @@ from ghoshell.ghost.uml import UML
 INTENTION_KIND = TypeVar('INTENTION_KIND', bound=str)
 
 
-class IntentionMeta(BaseModel):
-    """
-    Intention 的元数据, 方便将各种元数据汇总, 用来做全局的判断.
-    """
-    kind: str
-    uml: UML
-    params: Dict = {}
-
-
-class Intention(metaclass=ABCMeta):
+class Intention(BaseModel, metaclass=ABCMeta):
     """
     对上下文进行意图解析.
     比如:
@@ -37,33 +28,16 @@ class Intention(metaclass=ABCMeta):
 
     解析的结果应该包含参数.
     """
+    KIND: ClassVar[str] = ""
 
-    @property
-    @abstractmethod
-    def uml(self) -> UML:
-        """
-        如果 intention 命中了, 会路由到一个 uml 中.
-        """
-        pass
+    uml: UML
+    config: Any
+    matched: Any | None = None
 
-    @abstractmethod
-    def match(self, ctx: Context) -> Optional[Dict]:
-        """
-        是否匹配上下文.
-        为 None 表示没有匹配成功. 用任何非 none 值都可以表示匹配成功.
-        Intention 实际运行时可以有很多种组合, 但每种组合都需要返回相同的参数结构, 是一种协议.
-        """
-        pass
-
-    @abstractmethod
-    def metas(self) -> List[IntentionMeta]:
-        """
-        intention 返回 metas, 可以放入 output 中, 方便做分析.
-        举个例子, intention 中包含 choice 类型
-        则多个 Intention 可以组装合并到一个 Choose 问题中.
-        又比如说 intention 可以使用 Command 命令模式, 则用户调用 /help 时, 应该返回所有的命令介绍.
-        """
-        pass
+    def with_matched(self, matched: Any) -> "Intention":
+        data = self.dict()
+        data["matched"] = matched
+        return self.__class__(**data)
 
 
 class Attentions(metaclass=ABCMeta):
@@ -78,11 +52,11 @@ class Attentions(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def match(self, ctx: Context, meta: IntentionMeta) -> Tuple[bool, Optional[Dict]]:
+    def match(self, ctx: Context, *metas: Intention) -> Optional[Intention]:
         pass
 
     @abstractmethod
-    def wildcard_match(self, ctx: Context) -> Optional[UML]:
+    def wildcard_match(self, ctx: Context) -> Optional[Intention]:
         pass
 
     @abstractmethod

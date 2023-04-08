@@ -1,10 +1,10 @@
-from ghoshell.ghost.attention import Attentions, Intention, IntentionMeta
+from ghoshell.ghost.attention import Attentions, Intention
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.events import *
 from ghoshell.ghost.exceptions import *
 from ghoshell.ghost.features import Featuring, Feature, FEAT_KEY
 from ghoshell.ghost.ghost import Ghost, Clone, Memory
-from ghoshell.ghost.io import Input, Output, Message, Trace
+from ghoshell.ghost.io import *
 from ghoshell.ghost.mindset import Mindset, Think, Thought, Stage, Event
 from ghoshell.ghost.operator import Operator, OperationKernel, OperationManager
 from ghoshell.ghost.runtime import *
@@ -19,9 +19,10 @@ __all__ = [
     # features
     "Featuring", "Feature", "FEAT_KEY",
     # intentions
-    "Attentions", "Intention", "IntentionMeta",
+    "Attentions", "Intention",
     # io
-    "Input", "Output", "Message", "Trace",
+    "Input", "Output", "Payload", "Trace", "Message",
+    "State", "Text",
     # mindset
     "Mindset", "Thought", "Think", "Stage", "Event",
     # operator

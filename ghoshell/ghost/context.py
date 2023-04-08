@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Any, Optional, TYPE_CHECKING
+from logging import LoggerAdapter
+from typing import Any, Optional, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from ghoshell.ghost.ghost import Clone
     from ghoshell.ghost.mindset import Thought
     from ghoshell.ghost.io import Input, Output, Message
     from ghoshell.ghost.operator import OperationManager
+
+
+class Messenger(metaclass=ABCMeta):
+
+    @abstractmethod
+    def output(self, *messages: "Message") -> "Messenger":
+        pass
+
+    @abstractmethod
+    def async_input(self, message: "Message", pid: str) -> "Messenger":
+        pass
 
 
 class Context(metaclass=ABCMeta):
@@ -23,12 +35,24 @@ class Context(metaclass=ABCMeta):
     def manage(self, this: "Thought") -> "OperationManager":
         return self.clone.manage(this)
 
+    @abstractmethod
+    def send(self, _with: "Thought") -> Messenger:
+        pass
+
     @property
     @abstractmethod
     def input(self) -> "Input":
         """
         请求的输入消息, 任何时候都不应该变更.
         """
+        pass
+
+    @abstractmethod
+    def logger(self) -> LoggerAdapter:
+        pass
+
+    @abstractmethod
+    def set_input(self, _input: "Input") -> None:
         pass
 
     @abstractmethod
@@ -39,21 +63,14 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def output(self, *actions: "Message") -> None:
+    def output(self, _output: "Output") -> None:
         """
         输出各种动作, 实际上输出到 output 里, 给 shell 去处理
         """
         pass
 
     @abstractmethod
-    def reset_input(self, _input: "Input") -> None:
-        """
-        重置上下文的 Input
-        """
-        pass
-
-    @abstractmethod
-    def gen_output(self) -> "Output":
+    def get_outputs(self) -> List["Output"]:
         """
         将所有的输出动作组合起来, 输出为 Output
         所有 act 会积累新的 action 到 output
@@ -62,7 +79,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def reset_output(self, output: "Output") -> None:
+    def get_async_inputs(self) -> List["Input"]:
         pass
 
     @abstractmethod
@@ -72,6 +89,7 @@ class Context(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
     def get(self, key: str) -> Optional[Any]:
         """
         从上下文中获取缓存. 工具机制.
@@ -80,7 +98,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def destroy(self) -> None:
+    def finish(self, failed: bool = False) -> None:
         """
         上下文运行完成后, 需要考虑 python 的特点, 要主动清理记忆
         """

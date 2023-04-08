@@ -1,13 +1,41 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, List
+from abc import ABCMeta
+from typing import Dict, Optional, List, ClassVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ghoshell.ghost.uml import UML
 
 
-class Message(BaseModel):
+class Message(BaseModel, metaclass=ABCMeta):
+    KIND: ClassVar[str] = ""
+
+    def join_payload(self, payload: Payload) -> Payload:
+        setattr(payload, self.KIND.lower(), self)
+        return payload
+
+
+class Text(Message):
+    KIND: ClassVar[str] = "text"
+    string: str
+
+
+class State(Message):
+    KIND: ClassVar[str] = "state"
+    # constants
+    ON_START: ClassVar[str] = "start"
+    ON_FINISH: ClassVar[str] = "finish"
+    ON_CANCEL: ClassVar[str] = "cancel"
+    ON_QUIT: ClassVar[str] = "quit"
+    ON_RESET: ClassVar[str] = "reset"
+
+    uml: UML | None = None
+    vars: Dict | None = None
+    action: str = ""
+
+
+class Payload(BaseModel):
     """
     归一化的消息体.
     ghost 应该定义出自己的消息体系.
@@ -21,8 +49,13 @@ class Message(BaseModel):
     # 输出消息对标的是生成的场景.
     tid: str = ""
 
-    # 如果是个消息
-    text: str = ""
+    text: Optional[Text] = None
+
+    state: Optional[State] = None
+
+    def is_empty(self) -> bool:
+        return self.text is None \
+            and self.state is None
 
 
 class Trace(BaseModel):
@@ -49,10 +82,10 @@ class Input(BaseModel):
     """
 
     # 传入的事件数据. 应该需要做归一化处理.
-    message: Message
+    payload: Payload
 
     # 输入的 trace.
-    trace: Trace
+    trace: Trace = Field(default_factory=lambda: Trace())
 
     # 传入 shell 侧携带的上下文信息, shell 侧定义的协议
     # 如果 ghost 希望理解 shell 的话, 可以主动处理这部分上下文
@@ -77,7 +110,7 @@ class Output(BaseModel):
     # 关联到的输入
     input: Input
     # 运行时拿到的各种动作.
-    messages: List[Message] = []
+    payloads: List[Payload] = []
 
     # 传给 shell 的上下文信息, shell 侧定义的协议
     # ghost 理解 shell 的情况下, 可以用这种方式去控制 shell

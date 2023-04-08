@@ -1,6 +1,7 @@
+from typing import ClassVar
 from typing import Dict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 def test_typing_dict() -> None:
@@ -63,3 +64,37 @@ def test_children_copy() -> None:
     copied.child.foo = "foo"
     assert copied.child.foo == "foo"
     assert p.child.foo == "bar"
+
+
+def test_class_var_constant() -> None:
+    class Tester(BaseModel):
+        foo: str
+        BAR: ClassVar[str] = "bar"
+
+    t = Tester(foo="foo")
+    assert t.foo == "foo"
+    assert t.BAR == "bar"
+    assert t.dict().get("BAR") is None
+
+    class Child(Tester):
+        BAR = "zoo"
+
+    c = Child(foo="foo")
+    assert c.BAR == "zoo"
+    assert c.dict().get("BAR") is None
+
+
+def test_default_value_is_copy() -> None:
+    class Parent(BaseModel):
+        val: Dict = {}
+        field: Dict = Field(default_factory=lambda: {})
+
+    p = Parent()
+    p.val["foo"] = "bar"
+    p.field["foo"] = "bar"
+    assert p.val.get("foo") == "bar"
+    assert p.field.get("foo") == "bar"
+
+    p2 = Parent()
+    assert p2.val.get("foo") is None
+    assert len(p2.field) == 0

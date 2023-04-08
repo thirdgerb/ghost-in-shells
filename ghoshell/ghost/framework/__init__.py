@@ -1,6 +1,6 @@
-from ghost import GhostKernel
+from ghoshell.ghost.framework.context import IContext
 
 __all__ = [
+    "IContext",
 
-    "GhostKernel"
 ]
