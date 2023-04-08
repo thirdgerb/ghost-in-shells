@@ -56,7 +56,7 @@ class WaitStage(Stage, metaclass=ABCMeta):
         从当前状态进入别的状态的连接点.
         可进入的状态, 与自身的开放性有关.
 
-        attentions with intentions
+        attentions with attentions
         """
         pass
 

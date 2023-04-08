@@ -7,11 +7,12 @@ class UniformMindLocator(BaseModel):
     """
     思维座标, 用类似 URL 的方式来定义.
     """
-    # 对应的 ghost 名, 对标 url 的 host. 为空则与上下文一致.
-    ghost: str = ""
 
     # 对应的 Think 名, 对标 url 的 path. 用来标记一个 Think, 本质上是一个有限状态机.
-    think: str = ""
+    think: str
+
+    # 对应的 ghost 名, 对标 url 的 host. 为空则与上下文一致.
+    ghost: str = ""
 
     # Think 的一个状态，对标 url 的 fragment。
     stage: str = ""

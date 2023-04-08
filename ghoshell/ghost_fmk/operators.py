@@ -129,12 +129,12 @@ class OpReceive(AbsOperator):
         # 检查是否匹配到某个 attentions
         matched = self.match_attentions(ctx)
         if matched is not None:
-            return OpIntendTo(matched.uml, matched.matched, attend=True)
+            return OpIntendTo(matched.uml, matched.result, attend=True)
 
-        # 检查是否匹配了全局的 intentions
+        # 检查是否匹配了全局的 attentions
         matched = self.match_intentions(ctx)
         if matched is not None:
-            return OpIntendTo(matched.uml, matched.matched, attend=False)
+            return OpIntendTo(matched.uml, matched.result, attend=False)
         return None
 
     def _save_change(self, ctx: "Context") -> None:
@@ -155,7 +155,7 @@ class OpReceive(AbsOperator):
         # 添加 current
         attention_metas = cls.attention_metas(ctx)
         attentions = ctx.clone.attentions
-        predefined_kinds = attentions.intention_kinds()
+        predefined_kinds = attentions.kinds()
         # 只能匹配已有的.
         for kind in predefined_kinds:
             if kind not in attention_metas:
@@ -176,7 +176,7 @@ class OpReceive(AbsOperator):
         awaiting_task = process.awaiting_task
 
         intention_metas = cls.intention_metas(ctx)
-        predefined_kinds = attentions.intention_kinds()
+        predefined_kinds = attentions.kinds()
         for kind in predefined_kinds:
             if kind not in intention_metas:
                 continue
@@ -352,7 +352,7 @@ class OpIntendTo(AbsOperator):
             intentions = stage.intentions()
             if intentions is not None:
                 matched = ctx.clone.attentions.match(ctx, *intentions)
-                params = matched.matched
+                params = matched.result
         wrapper = OnAttend if self.attend else OnIntend
         event = wrapper(this, params, self.fr)
         return CtxTool.fire_event(ctx, event)

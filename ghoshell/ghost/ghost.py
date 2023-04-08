@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from ghoshell.ghost.operator import OperationManager, OperationKernel
     from ghoshell.ghost.mindset import Mindset, Thought
     from ghoshell.ghost.session import Session
-    from ghoshell.ghost.features import Featuring
     from ghoshell.ghost.attention import Attentions
     from ghoshell.ghost.uml import UML
     from ghoshell.ghost.runtime import Runtime
@@ -168,15 +167,15 @@ class Clone(metaclass=ABCMeta):
         """
         pass
 
-    @property
-    @abstractmethod
-    def featuring(self) -> "Featuring":
-        """
-        从上下文中获取特征.
-        特征是和上下文相关的任何信息.
-        通常不包含记忆.
-        """
-        pass
+    # @property
+    # @abstractmethod
+    # def featuring(self) -> "Featuring":
+    #     """
+    #     从上下文中获取特征.
+    #     特征是和上下文相关的任何信息.
+    #     通常不包含记忆.
+    #     """
+    #     pass
 
     @property
     @abstractmethod

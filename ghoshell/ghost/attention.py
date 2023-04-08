@@ -32,7 +32,7 @@ class Intention(BaseModel, metaclass=ABCMeta):
 
     uml: UML
     config: Any
-    matched: Any | None = None
+    result: Any | None = None
 
     def with_matched(self, matched: Any) -> "Intention":
         data = self.dict()
@@ -48,7 +48,7 @@ class Attentions(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def intention_kinds(self) -> List[str]:
+    def kinds(self) -> List[str]:
         pass
 
     @abstractmethod
@@ -57,6 +57,10 @@ class Attentions(metaclass=ABCMeta):
 
     @abstractmethod
     def wildcard_match(self, ctx: Context) -> Optional[Intention]:
+        pass
+
+    @abstractmethod
+    def register(self, *intentions: Intention) -> None:
         pass
 
     @abstractmethod

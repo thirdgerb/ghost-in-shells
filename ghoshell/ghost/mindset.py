@@ -204,11 +204,22 @@ class Mindset(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def fetch_meta(self, thinking: str) -> Optional[ThinkMeta]:
+        """
+        获取一个 Thinking
+        """
+        pass
+
     def force_fetch(self, thinking: str) -> Think:
         fetched = self.fetch(thinking)
         if fetched is None:
             raise MindsetNotFoundException("todo message")
         return fetched
+
+    @abstractmethod
+    def register_sub_mindset(self, mindset: Mindset) -> None:
+        pass
 
     @abstractmethod
     def register_driver(self, key: str, driver: ThinkDriver) -> None:

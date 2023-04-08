@@ -2,8 +2,7 @@ from ghoshell.ghost.attention import Attentions, Intention
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.events import *
 from ghoshell.ghost.exceptions import *
-from ghoshell.ghost.features import Featuring, Feature, FEAT_KEY
-from ghoshell.ghost.ghost import Ghost, Clone, Memory
+from ghoshell.ghost.ghost import Ghost, Clone
 from ghoshell.ghost.io import *
 from ghoshell.ghost.mindset import Mindset, Think, Thought, Stage, Event
 from ghoshell.ghost.operator import Operator, OperationKernel, OperationManager
@@ -13,12 +12,13 @@ from ghoshell.ghost.utils import CtxTool
 
 __all__ = [
     # ghost
-    "Ghost", "Clone", "Memory",
+    "Ghost", "Clone",
+    # "Memory",
     # context
     "Context", "CtxTool",
     # features
-    "Featuring", "Feature", "FEAT_KEY",
-    # intentions
+    # "Featuring", "Feature", "FEAT_KEY",
+    # attentions
     "Attentions", "Intention",
     # io
     "Input", "Output", "Payload", "Trace", "Message",
