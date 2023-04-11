@@ -5,7 +5,7 @@ from typing import Optional, Dict
 from ghoshell.ghost.attention import Intention
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.exceptions import MindsetNotFoundException, RuntimeException
-from ghoshell.ghost.io import State
+from ghoshell.ghost.io import StateMsg
 from ghoshell.ghost.mindset import Thought, Stage, Event
 from ghoshell.ghost.runtime import Task
 from ghoshell.ghost.uml import UML
@@ -174,14 +174,14 @@ class CtxTool:
         return stage
 
     @classmethod
-    def state_msg_to_task(cls, ctx: Context, state: State) -> Task:
+    def state_msg_to_task(cls, ctx: Context, state: StateMsg) -> Task:
         task = CtxTool.fetch_task(ctx, state.uml, or_create=True)
         task.vars = state.vars
         return task
 
     @classmethod
-    def task_to_state_msg(cls, task: Task, action: str) -> State:
-        return State(
+    def task_to_state_msg(cls, task: Task, action: str) -> StateMsg:
+        return StateMsg(
             uml=cls.task_to_uml(task),
             vars=task.vars,
             action=action,

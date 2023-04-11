@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import uuid
 from abc import ABCMeta
-from typing import Dict, Optional, List, ClassVar
+from typing import Dict, Optional, List, ClassVar, Callable
 
 from pydantic import BaseModel, Field
 
@@ -15,13 +16,29 @@ class Message(BaseModel, metaclass=ABCMeta):
         setattr(payload, self.KIND.lower(), self)
         return payload
 
+    def new_payload(self, new_id: Optional[Callable[[], str]] = None) -> Payload:
+        if new_id is None:
+            def new_uuid4() -> str:
+                return str(uuid.uuid4())
 
-class Text(Message):
+            new_id = new_uuid4
+        payload = Payload(id=new_id())
+        return self.join_payload(payload)
+
+
+class TextMsg(Message):
     KIND: ClassVar[str] = "text"
-    string: str
+    raw: str
+
+    @classmethod
+    def new(cls, raw: str) -> TextMsg:
+        return TextMsg(raw=raw)
+
+    def __str__(self):
+        return self.raw
 
 
-class State(Message):
+class StateMsg(Message):
     KIND: ClassVar[str] = "state"
     # constants
     ON_START: ClassVar[str] = "start"
@@ -49,9 +66,9 @@ class Payload(BaseModel):
     # 输出消息对标的是生成的场景.
     tid: str = ""
 
-    text: Optional[Text] = None
+    text: Optional[TextMsg] = None
 
-    state: Optional[State] = None
+    state: Optional[StateMsg] = None
 
     def is_empty(self) -> bool:
         return self.text is None \
@@ -110,12 +127,18 @@ class Output(BaseModel):
     # 关联到的输入
     input: Input
     # 运行时拿到的各种动作.
-    payloads: List[Payload] = []
+    payloads: List[Payload] = Field(default_factory=lambda: [])
 
     # 传给 shell 的上下文信息, shell 侧定义的协议
     # ghost 理解 shell 的情况下, 可以用这种方式去控制 shell
-    shell_env: Dict = {}
+    shell_env: Dict = Field(default_factory=lambda: {})
 
     # ghost 约定的上下文协议.
     # shell 如果理解 ghost 的话, 可以主动处理这部分信息.
-    ghost_env: Dict = {}
+    ghost_env: Dict = Field(default_factory=lambda: {})
+
+    @classmethod
+    def new(cls, _input: Input) -> Output:
+        return Output(
+            input=Input(**_input.dict()),
+        )

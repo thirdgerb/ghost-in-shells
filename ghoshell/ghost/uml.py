@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 
 from pydantic import BaseModel
 
@@ -12,7 +12,7 @@ class UniformMindLocator(BaseModel):
     think: str
 
     # 对应的 ghost 名, 对标 url 的 host. 为空则与上下文一致.
-    ghost: str = ""
+    ghost: Optional[str] = None
 
     # Think 的一个状态，对标 url 的 fragment。
     stage: str = ""

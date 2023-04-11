@@ -11,13 +11,12 @@ def test_ghost_uml():
     cases = [
         {
             "think": "a/b/c",
-            "state": "",
+            "stage": "",
             "args": {"e": 123}
         },
-        Test().dict(),
+        Test().dict(exclude_none=True),
     ]
 
     for case in cases:
         uml = UML(**case)
-        assert uml.dict() == case
-        print(uml.dict())
+        assert uml.dict(exclude_none=True) == case

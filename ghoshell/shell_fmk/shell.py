@@ -4,32 +4,16 @@ from abc import ABCMeta, abstractmethod
 from typing import Tuple, Optional, Callable, List, Any, Dict
 
 from ghoshell.ghost import Output, Input
-from ghoshell.shell.shell import IShell, IShellContext
+from ghoshell.shell.shell import Shell, ShellContext
 from ghoshell.utils import create_pipeline
 
 # input 处理管道
-INPUT_PIPELINE = Callable[[Input], Tuple[Input, Optional[Output]]]
-INPUT_PIPE = Callable[[Input, INPUT_PIPELINE], Tuple[Input, Optional[Output]]]
+InputPipeline = Callable[[Input], Tuple[Input, Optional[Output]]]
+InputPipe = Callable[[Input, InputPipeline], Tuple[Input, Optional[Output]]]
 
 # output 处理管道
-OUTPUT_PIPELINE = Callable[[Output], Output]
-OUTPUT_PIPE = Callable[[Output, OUTPUT_PIPELINE], Output]
-
-EVENT_PIPELINE = Callable[[Any], Optional[Input]]
-EVENT_PIPE = Callable[[Any, EVENT_PIPELINE], Optional[Input]]
-
-
-class EventMiddleware(metaclass=ABCMeta):
-    """
-    shell 响应事件, 生成 Input 的逻辑.
-    """
-
-    @abstractmethod
-    def new(self, shell: IShell) -> EVENT_PIPE:
-        """
-        初始化一个管道.
-        """
-        pass
+OutputPipeline = Callable[[Output], Output]
+OutputPipe = Callable[[Output, OutputPipeline], Output]
 
 
 class InputMiddleware(metaclass=ABCMeta):
@@ -37,15 +21,12 @@ class InputMiddleware(metaclass=ABCMeta):
     shell 的输入中间件
     """
 
-    @abstractmethod
-    def name(self) -> str:
-        """
-        中间件的名字, 用来做记录?
-        """
-        pass
+    @classmethod
+    def name(cls) -> str:
+        return cls.__name__
 
     @abstractmethod
-    def new(self, ctx: IShellContext) -> INPUT_PIPE:
+    def new(self, ctx: ShellContext) -> InputPipe:
         """
         初始化一个管道.
         """
@@ -65,7 +46,7 @@ class OutputMiddleware(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def new(self, ctx: IShellContext) -> OUTPUT_PIPE:
+    def new(self, ctx: ShellContext) -> OutputPipe:
         """
         初始化一个管道.
         mdw 应该要理解 context 的类型.
@@ -78,19 +59,16 @@ class Bootstrapper(metaclass=ABCMeta):
     用来自定义初始化逻辑.
     """
 
-    def bootstrap(self, shell: IShell) -> None:
+    def bootstrap(self, shell: Shell) -> None:
         """
         用来初始化 Shell.
         """
         pass
 
 
-class ShellKernel(IShell, metaclass=ABCMeta):
+class ShellKernel(Shell, metaclass=ABCMeta):
     # 初始化流程
     bootstrapping: List[Bootstrapper] = []
-
-    # 事件处理中间件.
-    event_middleware: List[EventMiddleware] = []
 
     # 输入处理
     input_middleware: List[InputMiddleware] = []
@@ -108,27 +86,13 @@ class ShellKernel(IShell, metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
     def on_event(self, e: Any) -> Optional[Input]:
-        """
-        响应事件, 生成 Context
-        事件通常来自 shell
-        """
-        pipes: List[EVENT_PIPE] = []
-        for mdw in self.event_middleware:
-            pipes.append(mdw.new(self))
-
-        def destination(event) -> Optional[Input]:
-            """
-            默认无法响应.
-            """
-            return None
-
-        pipeline = create_pipeline(pipes, destination)
-        return pipeline(e)
+        pass
 
     # ----- implements ----- #
 
-    def bootstrap(self) -> IShell:
+    def bootstrap(self) -> Shell:
         """
         初始化启动
         """
@@ -145,7 +109,7 @@ class ShellKernel(IShell, metaclass=ABCMeta):
         """
         ctx = self.context(_input)
         try:
-            pipes: List[INPUT_PIPE] = []
+            pipes: List[InputPipe] = []
             for mdw in self.input_middleware:
                 pipes.append(mdw.new(ctx))
 
@@ -158,10 +122,10 @@ class ShellKernel(IShell, metaclass=ABCMeta):
             _input.shell_env = self.shell_env(ctx)
             return _input, _output
         finally:
-            ctx.destroy()
+            ctx.finish()
 
     @abstractmethod
-    def shell_env(self, ctx: IShellContext) -> Dict:
+    def shell_env(self, ctx: ShellContext) -> Dict:
         pass
 
     def on_output(self, output: Output) -> None:
@@ -170,7 +134,7 @@ class ShellKernel(IShell, metaclass=ABCMeta):
         """
         ctx = self.context(output.input)
         try:
-            pipes: List[OUTPUT_PIPE] = []
+            pipes: List[OutputPipe] = []
             for mdw in self.output_middleware:
                 pipes.append(mdw.new(ctx))
 
@@ -181,7 +145,7 @@ class ShellKernel(IShell, metaclass=ABCMeta):
             final_output = pipeline(output)
             ctx.send(final_output)
         finally:
-            ctx.destroy()
+            ctx.finish()
 
     def tick(self, e: Any) -> None:
         """
@@ -200,3 +164,9 @@ class ShellKernel(IShell, metaclass=ABCMeta):
         finally:
             # todo: 异常处理
             pass
+
+    async def async_ghost_output(self):
+        ghost = self.connect(None)
+        while True:
+            _output = await ghost.async_output()
+            self.on_output(_output)

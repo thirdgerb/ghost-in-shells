@@ -1,10 +1,11 @@
 from typing import Optional
 
+from ghoshell.shell.prototypes.lark.events import LarkEventCaller, Event, ImMessageReceive
+
 from ghoshell.ghost import Input
 from ghoshell.shell import IShell
-from ghoshell.shell.framework import EventMiddleware
-from ghoshell.shell.framework.shell import EVENT_PIPE, EVENT_PIPELINE
-from ghoshell.shell.prototypes.lark.events import LarkEventCaller, Event, ImMessageReceive
+from ghoshell.shell_fmk import EventMiddleware
+from ghoshell.shell_fmk.shell import EventPipe, EventPipeline
 
 
 class ParseLarkEventToInputPipe(EventMiddleware):
@@ -12,8 +13,8 @@ class ParseLarkEventToInputPipe(EventMiddleware):
     将 Lark 的消息事件包装成 Ghost 的 Input
     """
 
-    def new(self, shell: IShell) -> EVENT_PIPE:
-        def as_input(caller: LarkEventCaller, after: EVENT_PIPELINE) -> Optional[Input]:
+    def new(self, shell: IShell) -> EventPipe:
+        def as_input(caller: LarkEventCaller, after: EventPipeline) -> Optional[Input]:
             match caller.event_type:
                 case ImMessageReceive.event_type():
                     event = ImMessageReceive(**caller.event)

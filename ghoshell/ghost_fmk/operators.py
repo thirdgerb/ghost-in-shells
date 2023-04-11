@@ -9,7 +9,7 @@ from ghoshell.ghost import OnDepended, OnRedirect
 from ghoshell.ghost import OnFallback, OnIntend, OnRepeat, OnAttend
 from ghoshell.ghost import OnPreempt, OnStart
 from ghoshell.ghost import Operator, OperationManager
-from ghoshell.ghost import Payload, State
+from ghoshell.ghost import Payload, StateMsg
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
 from ghoshell.ghost import Thought
 
@@ -112,15 +112,15 @@ class OpReceive(AbsOperator):
 
         thought = CtxTool.fetch_thought_by_task(ctx, state_task)
         match state.action:
-            case State.ON_START:
+            case StateMsg.ON_START:
                 return OpStart(thought)
-            case State.ON_QUIT:
+            case StateMsg.ON_QUIT:
                 return OpQuit(thought, "state action")
-            case State.ON_RESET:
+            case StateMsg.ON_RESET:
                 return OpReset()
-            case State.ON_CANCEL:
+            case StateMsg.ON_CANCEL:
                 return OpCancel(thought, "state action")
-            case State.ON_FINISH:
+            case StateMsg.ON_FINISH:
                 return OpFinish(thought)
             case _:
                 return None

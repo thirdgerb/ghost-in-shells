@@ -1,6 +1,6 @@
-from ghoshell.shell.framework.shell import ShellKernel
-from ghoshell.shell.shell import IShell, IShellContext
+from ghoshell.shell.shell import Shell, ShellContext
 
 __all__ = [
-    "IShell", "IShellContext", "ShellKernel"
+    "Shell",
+    "ShellContext",
 ]

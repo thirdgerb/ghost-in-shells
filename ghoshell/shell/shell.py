@@ -6,10 +6,14 @@ from typing import Tuple, Optional, Any
 from ghoshell.ghost import Ghost, Input, Output
 
 
-class IShellContext(metaclass=ABCMeta):
+class ShellContext(metaclass=ABCMeta):
     """
     shell 的上下文
     """
+
+    @abstractmethod
+    def input(self) -> Input:
+        pass
 
     @abstractmethod
     def send(self, _output: Output) -> None:
@@ -19,14 +23,14 @@ class IShellContext(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def destroy(self) -> None:
+    def finish(self) -> None:
         """
         清空上下文信息, 做后续的处理
         """
         pass
 
 
-class IShell(metaclass=ABCMeta):
+class Shell(metaclass=ABCMeta):
 
     @abstractmethod
     def kind(self) -> str:
@@ -36,7 +40,7 @@ class IShell(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def bootstrap(self) -> IShell:
+    def bootstrap(self) -> Shell:
         """
         对 shell 进行初始化
         通常是 shell.bootstrap().run()
@@ -44,14 +48,15 @@ class IShell(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def connect(self, _input: Input) -> Ghost:
+    def connect(self, _input: Input | None) -> Ghost:
         """
         shell 需要有联系 ghost 的能力
         有可能是一对多的, 简单情况下一个 shell 与一个 ghost 强对应.
         """
         pass
 
-    def context(self, _input: Input) -> IShellContext:
+    @abstractmethod
+    def context(self, _input: Input) -> ShellContext:
         """
         根据 Input 生成 Context.
         """
@@ -85,3 +90,9 @@ class IShell(metaclass=ABCMeta):
         将 shell 作为一个 app 来运行.
         """
         pass
+
+    async def async_run(self) -> None:
+        ghost = self.connect(None)
+        while True:
+            output = await ghost.async_output()
+            self.on_output(output)

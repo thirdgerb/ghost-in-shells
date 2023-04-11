@@ -76,13 +76,13 @@ class CommandDriver(AttentionDriver):
         text = ctx.input.payload.text
         if text is None:
             return None
-        if len(text.string) == 0:
+        if len(text.raw) == 0:
             return None
         command_lines = []
         for meta in metas:
             if isinstance(meta, CommandLine):
                 command_lines.append(meta)
-        return self.match_raw_text(text.string, *command_lines)
+        return self.match_raw_text(text.raw, *command_lines)
 
     def match_raw_text(self, text: str, *metas: CommandLine) -> Optional[CommandLine]:
         prefix = text[0]

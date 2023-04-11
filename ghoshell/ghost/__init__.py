@@ -22,7 +22,7 @@ __all__ = [
     "Attentions", "Intention",
     # io
     "Input", "Output", "Payload", "Trace", "Message",
-    "State", "Text",
+    "StateMsg", "TextMsg",
     # mindset
     "Mindset", "Thought", "Think", "Stage", "Event",
     # operator
