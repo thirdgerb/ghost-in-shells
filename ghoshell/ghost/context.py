@@ -5,21 +5,12 @@ from logging import LoggerAdapter
 from typing import Any, Optional, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
+    from ghoshell.contracts import Container
     from ghoshell.ghost.ghost import Clone
     from ghoshell.ghost.mindset import Thought
-    from ghoshell.ghost.io import Input, Output, Message
+    from ghoshell.ghost.io import Input, Output
     from ghoshell.ghost.operator import OperationManager
-
-
-class Messenger(metaclass=ABCMeta):
-
-    @abstractmethod
-    def output(self, *messages: "Message") -> "Messenger":
-        pass
-
-    @abstractmethod
-    def async_input(self, message: "Message", pid: str) -> "Messenger":
-        pass
+    from ghoshell.ghost.messenger import Messenger
 
 
 class Context(metaclass=ABCMeta):
@@ -32,27 +23,47 @@ class Context(metaclass=ABCMeta):
     def clone(self) -> "Clone":
         pass
 
+    def container(self) -> "Container":
+        """
+        容器层层传递.
+        """
+        return self.clone.container
+
     def manage(self, this: "Thought") -> "OperationManager":
+        """
+        操作上下文的关键方法.
+        """
         return self.clone.manage(this)
 
     @abstractmethod
     def send(self, _with: "Thought") -> Messenger:
+        """
+        以 Thought 为基础, 发出各种消息体给 Shell
+        再由 Shell 发送出去.
+        返回的 Messenger 是语法糖.
+        """
         pass
 
     @property
     @abstractmethod
     def input(self) -> "Input":
         """
-        请求的输入消息, 任何时候都不应该变更.
+        请求的输入消息, 不应该被外部行为变更.
+        要处理好指针的问题.
+        但是 python 的话, 怎么样都不好解决深拷贝问题.
+        考虑 Input 是 pydantic.BaseModel, 可以保存协议数据.
+        """
+        pass
+
+    @abstractmethod
+    def set_input(self, _input: "Input") -> None:
+        """
+        通过 set_input 可以强行变更当前上下文.
         """
         pass
 
     @abstractmethod
     def logger(self) -> LoggerAdapter:
-        pass
-
-    @abstractmethod
-    def set_input(self, _input: "Input") -> None:
         pass
 
     @abstractmethod
@@ -100,6 +111,16 @@ class Context(metaclass=ABCMeta):
     @abstractmethod
     def finish(self, failed: bool = False) -> None:
         """
-        上下文运行完成后, 需要考虑 python 的特点, 要主动清理记忆
+        上下文运行完成后,
+        需要考虑 python 的特点, 要主动清理记忆
+        """
+        pass
+
+    @abstractmethod
+    def destroy(self) -> None:
+        """
+        运行结束后, 手动清理所有持有的对象.
+        这个是为了解决脚本语言 GC 困难而强行设定的 feature.
+        不实现也可以.
         """
         pass

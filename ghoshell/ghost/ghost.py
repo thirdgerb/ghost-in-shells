@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Optional, Dict
 
+from ghoshell.contracts import Container
 from ghoshell.ghost.io import Input, Output, Message
 
 if TYPE_CHECKING:
@@ -35,7 +36,17 @@ class Ghost(metaclass=ABCMeta):
         """
         pass
 
-    #
+    @property
+    @abstractmethod
+    def container(self) -> "Container":
+        """
+        通过 Container 把和 Ghost 无关,
+        又需要通过 Ghost 传递的各种组件包起来.
+        这是一种解耦的思路.
+        不需要我在 Ghost 里定义 Logger 之类的组件.
+        """
+        pass
+
     # @property
     # @abstractmethod
     # def knowledge(self) -> "Memory":
@@ -174,6 +185,15 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
+    def container(self) -> "Container":
+        """
+        保证每一层都有自己的 container
+        clone 层的 container 通常直接就是 ghost 的
+        """
+        pass
+
+    @property
+    @abstractmethod
     def config(self) -> Dict:
         """
         返回一个 Clone 的默认配置.
@@ -254,6 +274,8 @@ class Clone(metaclass=ABCMeta):
     def manage(self, this: "Thought") -> "OperationManager":
         """
         返回上下文的操作工具
+        为什么这个在 Clone 上, 而不封装到 Ctx
+        就是为了让 Clone 可以对外暴露一个超级干预能力.
         """
         pass
 

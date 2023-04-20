@@ -18,7 +18,9 @@ INTENTION_KIND = TypeVar('INTENTION_KIND', bound=str)
 
 class Intention(BaseModel, metaclass=ABCMeta):
     """
-    对上下文进行意图解析.
+    描述一个对外部输入信号的意图分析策略.
+    意图分析策略存在许多种, 每种都会有不一样的数据结构.
+
     比如:
     - 自然语言
     - 消息类型
@@ -26,7 +28,7 @@ class Intention(BaseModel, metaclass=ABCMeta):
     - API
     - 命令行
 
-    解析的结果应该包含参数.
+    每一种预测的意图, 都应该通过不同的解析机制来解决.
     """
     KIND: ClassVar[str] = ""
 
