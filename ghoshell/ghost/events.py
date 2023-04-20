@@ -5,6 +5,12 @@ from ghoshell.ghost.mindset import Event, Thought
 from ghoshell.ghost.uml import UML
 
 
+# 事件体系是 Runtime 和 Think 之间的纽带.
+# Runtime 的运行轨迹基于 Operator, 主要解决 Task 与 Task 之间的调度.
+# 而 Event 则解决调度过程与每个 Think 之间的互动.
+# 响应 Event 的是 mindset Stage
+
+
 class OnActivate(Event, metaclass=ABCMeta):
     """
     从一个节点主动进入到当前节点.
@@ -42,12 +48,18 @@ class OnReceive(Event, metaclass=ABCMeta):
     def __init__(self, this: Thought, params: Optional[Dict], fr: UML | None = None):
         self.this = this
         self.params = params
+        self.fr = fr
 
     def destroy(self):
         del self.this
+        del self.params
+        del self.fr
 
 
 class OnCallback(Event):
+    """
+    系统任务之间的回调.
+    """
 
     def __init__(self, this: Thought, result: Dict):
         self.this = this

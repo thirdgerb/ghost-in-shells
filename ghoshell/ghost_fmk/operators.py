@@ -2,7 +2,6 @@ from abc import ABCMeta, abstractmethod
 from typing import Optional, Dict, List, Any, Tuple
 
 from ghoshell.ghost import Context, CtxTool, UML, Process, Intention, Event
-from ghoshell.ghost import MissUnderstoodException, RuntimeException
 from ghoshell.ghost import OnCallback
 from ghoshell.ghost import OnCancel, OnFailed, OnQuit
 from ghoshell.ghost import OnDepended, OnRedirect
@@ -12,6 +11,7 @@ from ghoshell.ghost import Operator, OperationManager
 from ghoshell.ghost import Payload, StateMsg
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
 from ghoshell.ghost import Thought
+from ghoshell.ghost import UnhandledException, RuntimeException
 
 
 class AbsOperator(Operator, metaclass=ABCMeta):
@@ -26,7 +26,7 @@ class AbsOperator(Operator, metaclass=ABCMeta):
             return event_op
         return self._next(ctx)
 
-    def enqueue(self, ctx: "Context") -> Optional[List["Operator"]]:
+    def prepose(self, ctx: "Context") -> Optional[List["Operator"]]:
         return None
 
     @abstractmethod
@@ -56,7 +56,7 @@ class OpReceive(AbsOperator):
             self.uml = matched
             self.args = args
 
-    def enqueue(self, ctx: "Context") -> Optional[List["Operator"]]:
+    def prepose(self, ctx: "Context") -> Optional[List["Operator"]]:
         if self.enqueued:
             return None
         self.enqueued = True
@@ -209,7 +209,7 @@ class OpReceive(AbsOperator):
             result = cls._add_task_intention_to_attentions(ctx, result, blocking_task, attentions=False)
 
         # 检查 waiting.
-        waiting = process.waiting
+        waiting = process.running
         for tid in waiting:
             waiting_task = process.get_task(tid)
             result = cls._add_task_intention_to_attentions(ctx, result, waiting_task, attentions=False)
@@ -244,7 +244,7 @@ class OpReceive(AbsOperator):
             return result
 
         # 第三步, 添加 waiting 中的节点的意图.
-        for tid in process.waiting:
+        for tid in process.running:
             waiting = process.get_task(tid)
             result = cls._add_task_intention_to_attentions(ctx, result, waiting)
         return result
@@ -310,7 +310,7 @@ class OpFallback(AbsOperator):
     def _next(self, ctx: "Context") -> Optional[Operator]:
         # 无法处理的输入消息, 返回错误.
         # todo: fulfill exception details
-        raise MissUnderstoodException("todo")
+        raise UnhandledException("todo")
 
     @classmethod
     def fallback_to_task(cls, ctx: "Context", task: Task) -> Optional[Operator]:
@@ -383,7 +383,7 @@ class OpGoStage(AbsOperator):
         task = CtxTool.fetch_task_by_thought(ctx, self.this)
         # 将 stages 插入到前面.
         if len(self.forwards) > 0:
-            task.add_stages(*self.forwards)
+            task.append(*self.forwards)
         # 离开时保存.
         task = CtxTool.complete_task(ctx, task)
         ctx.clone.runtime.store_task(task)
@@ -556,7 +556,7 @@ class OpSchedule(AbsOperator):
         if len(blocking) > 0:
             return self._preempt(ctx, process, blocking[0])
 
-        waiting = process.waiting
+        waiting = process.running
         if len(waiting) > 0:
             return self._preempt(ctx, process, waiting[0])
         return self._preempt(ctx, process, process.root)
@@ -797,7 +797,7 @@ class OpQuit(OpCancel):
         if len(blocking) > 0:
             self.withdraw_list = [blocking[0]]
             return super()._next(ctx)
-        waiting = process.waiting
+        waiting = process.running
         if len(waiting) > 0:
             self.withdraw_list = [waiting[0]]
             return super()._next(ctx)

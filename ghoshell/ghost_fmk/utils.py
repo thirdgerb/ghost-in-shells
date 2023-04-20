@@ -25,7 +25,7 @@ class CtxTool:
         think = mind.force_fetch(thought.think)
         task = ctx.clone.runtime.fetch_task(thought.tid, think.is_long_term())
 
-        stage = think.fetch_stage(task.stage)
+        stage = think.fetch_stage(task.await_stage)
         if stage is None:
             raise MindsetNotFoundException("todo")
         return cls.merge_thought_from_task(thought, task)
@@ -34,7 +34,7 @@ class CtxTool:
     def complete_task(cls, ctx: "Context", task: Task) -> Task:
         mind = ctx.clone.mind
         think = mind.force_fetch(task.resolver)
-        stage = think.fetch_stage(task.stage)
+        stage = think.fetch_stage(task.await_stage)
         if stage is None:
             raise MindsetNotFoundException("todo")
         task.overdue = think.overdue
@@ -47,7 +47,7 @@ class CtxTool:
 
     @classmethod
     def task_to_uml(cls, task: Task) -> UML:
-        return UML(think=task.resolver, stage=task.stage, args=task.args.copy())
+        return UML(think=task.resolver, stage=task.await_stage, args=task.args.copy())
 
     @classmethod
     def merge_thought_from_task(cls, thought: Thought, task: Task) -> "Thought":
@@ -55,7 +55,7 @@ class CtxTool:
         从 task 中重置当前状态.
         """
         thought.set_variables(task.vars)
-        thought.stage = task.stage
+        thought.stage = task.await_stage
         return thought
 
     @classmethod

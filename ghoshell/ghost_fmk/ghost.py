@@ -3,7 +3,7 @@ from typing import Callable, List, Dict, Optional
 
 from ghoshell.ghost import Ghost, Input, Output, Context, Operator
 from ghoshell.ghost_fmk.middleware import IMiddleware, ExceptionHandlerMiddleware, GHOST_PIPE, GHOST_PIPELINE
-from ghoshell.ghost_fmk.runtime import IRuntimeDriver
+from ghoshell.ghost_fmk.runtime import AbsRuntimeDriver
 from ghoshell.utils import create_pipeline
 
 
@@ -19,9 +19,9 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
 
     # --- 以下是各种 driver 的实现 --- #
 
-    runtime_driver: IRuntimeDriver
+    runtime_driver: AbsRuntimeDriver
 
-    def react(self, inpt: Input) -> Output:
+    def respond(self, inpt: Input) -> Output:
         """
         核心方法: 处理输入 inpt
         """

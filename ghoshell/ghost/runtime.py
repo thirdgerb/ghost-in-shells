@@ -12,29 +12,31 @@ TASK_LEVEL = TypeVar('TASK_LEVEL', bound=int)
 
 
 class TaskStatus:
+    NEW: TASK_STATUS = 0
+
     """
     任务的调度状态. 方便 Runtime 进行多任务调度.
     """
-    RUNNING: TASK_STATUS = 0  # RUNNING 是任务的默认状态. 其它的状态都是非默认的.
+    RUNNING: TASK_STATUS = 100  # RUNNING 是任务的默认状态. 其它的状态都是非默认的.
 
     # ---- 以下是中断状态, 等待外部输入 --- #
 
-    WAITING: TASK_STATUS = 1  # 等待外部输入来唤醒的任务, 自身已经中断.
+    WAITING: TASK_STATUS = 200  # 等待外部输入来唤醒的任务, 自身已经中断.
 
     # ---- 以下是调度状态, 等待 Runtime 调度 --- #
 
-    BLOCKING: TASK_STATUS = 2  # 阻塞, 等待抢占式调度. 一旦任务的优先级低于阻塞中的任务, 就会发生切换事件.
+    BLOCKING: TASK_STATUS = 300  # 阻塞, 等待抢占式调度. 一旦任务的优先级低于阻塞中的任务, 就会发生切换事件.
 
     # ---- 以下是中断状态, 等待内部回调 --- #
 
-    YIELDING: TASK_STATUS = 3  # 异步任务, 等待异步任务的回调.
-    DEPENDING: TASK_STATUS = 4  # 同步任务, 等待另一个同步任务的回调.
+    YIELDING: TASK_STATUS = 400  # 异步任务, 等待异步任务的回调.
+    DEPENDING: TASK_STATUS = 500  # 同步任务, 等待另一个同步任务的回调.
 
     # ---- 以下是回收状态 --- #
 
-    FINISHED: TASK_STATUS = 5  # 任务已经完成, 但没有被清除.
-    CANCELED: TASK_STATUS = 6  # 任务已经取消
-    FAILED: TASK_STATUS = 7  # 任务已经失败
+    FINISHED: TASK_STATUS = 600  # 任务已经完成, 但没有被清除.
+    CANCELED: TASK_STATUS = 700  # 任务已经取消
+    FAILED: TASK_STATUS = 800  # 任务已经失败
 
     @classmethod
     def is_waiting_callback(cls, status: TASK_STATUS) -> bool:
@@ -85,14 +87,14 @@ class Task(BaseModel):
     # args: 任务的入参. 当一个任务的 resolver 支持传入参数时, 这里会需要传入 args
     args: Dict = Field(default_factory=lambda: {})
 
-    # await_at: 是任务的运行状态. 如果我们把任务理解成一段代码, stage 则指向了代码中的某一行.
+    # 是任务的运行状态. 如果我们把任务理解成一段代码, stage 则指向了代码中的某一行.
     # 值得注意的是, await_stage 只记录任务中断时的位置, 但 resolver 可能有大量的 stages
     # 只有会进入 await 状态的 stage 才会记录到这里.
-    await_at: str = ""
+    await_stage: str = ""
 
     # status: 当前任务在 runtime 中排列用的状态.
     # 用来让 runtime 调度多个同时存在的 tasks
-    status: TASK_STATUS = TaskStatus.RUNNING
+    status: TASK_STATUS = TaskStatus.NEW
 
     # level: 当前任务的开放程度.
     # 决定了任务执行中, 是否可以被中断. 目前有三种级别.
@@ -110,7 +112,7 @@ class Task(BaseModel):
 
     # forwards: 是当前任务运行中积压的节点.
     # task 运行 forwards 时应该将 forwards 视作一个 FIFO 栈.
-    # 栈的入口为 index == 0, 这样是为了符合人类直觉.
+    # 栈的入口为 index == 0, 这样是为了符合人类直觉, 方便查看.
     # 当 forwards 为空时仍然执行 forward 事件, 会转为 finish 事件. 并触发回调.
     forwards: List[str] = Field(default_factory=lambda: [])
 
@@ -158,13 +160,15 @@ class Task(BaseModel):
             return None
         _next = self.forwards[0]
         self.forwards = self.forwards[1:]
+        return _next
 
-    def done(self, status: TASK_STATUS) -> None:
+    def done(self, stage: str, status: TASK_STATUS) -> None:
         """
         标记 task 已经结束. 会清空掉状态相关的信息.
         status 应该是回收状态中的一种.
         """
         self.status = status
+        self.await_stage = stage
         self.forwards = []
         self.depending = None
 
@@ -173,28 +177,33 @@ class Task(BaseModel):
         等待输入侧的信息.
         """
         self.status = TaskStatus.RUNNING
-        self.await_at = at_stage
+        self.await_stage = at_stage
         self.depending = None
 
-    def be_blocking(self) -> None:
+    def be_blocking(self, stage: str | None) -> None:
         """
         进入抢占状态.
         """
+        if stage is None:
+            stage = self.await_stage
         self.status = TaskStatus.BLOCKING
+        self.await_stage = stage
         self.depending = None
 
-    def be_yielding(self, yield_to: str) -> None:
+    def be_yielding(self, stage: str, yield_to: str) -> None:
         """
         进入异步等待状态.
         """
         self.status = TaskStatus.YIELDING
+        self.await_stage = stage
         self.depending = yield_to
 
-    def be_depending(self, depend_on: str) -> None:
+    def be_depending(self, stage: str, depend_on: str) -> None:
         """
         进入同步等待状态
         """
         self.status = TaskStatus.DEPENDING
+        self.await_stage = stage
         self.depending = depend_on
 
     def reset(self) -> None:
@@ -203,7 +212,7 @@ class Task(BaseModel):
         清空所有多余的信息.
         """
         self.status = TaskStatus.RUNNING
-        self.await_at = ""
+        self.await_stage = ""
         self.forwards = []
         self.depending = None
 

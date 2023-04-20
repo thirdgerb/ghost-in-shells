@@ -159,7 +159,7 @@ class ShellKernel(Shell, metaclass=ABCMeta):
             _input, _output = self.on_input(_input)
             if _output is None:
                 ghost = self.connect(_input)
-                _output = ghost.react(_input)
+                _output = ghost.respond(_input)
             self.on_output(_output)
         finally:
             # todo: 异常处理
