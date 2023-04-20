@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from ghoshell.shell_prototypes import ConsoleShell
+from ghoshell.shell_protos import ConsoleShell
 
 
 def main():

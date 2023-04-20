@@ -1,8 +1,8 @@
-from ghoshell.ghost.framework.runtime.driver import RuntimeDriver, CacheRuntimeDriver
-from ghoshell.ghost.framework.runtime.runtime import IRuntime
+from ghoshell.ghost_fmk.runtime.driver import AbsRuntimeDriver, CacheRuntimeDriver
+from ghoshell.ghost_fmk.runtime.runtime import IRuntime
 
 __all__ = [
     "IRuntime",
-    "RuntimeDriver",
+    "AbsRuntimeDriver",
     "CacheRuntimeDriver",
 ]

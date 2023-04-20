@@ -4,13 +4,13 @@ from typing import Optional, Dict
 from ghoshell.ghost import Context, CtxTool
 from ghoshell.ghost import Runtime, Process, Task
 from ghoshell.ghost import UML
-from ghoshell.ghost.framework.runtime.driver import RuntimeDriver, TaskData
+from ghoshell.ghost_fmk.runtime.driver import AbsRuntimeDriver, TaskData
 
 
 class IRuntime(Runtime):
 
-    def __init__(self, driver: RuntimeDriver, ctx: Context):
-        self._driver: RuntimeDriver = driver
+    def __init__(self, driver: AbsRuntimeDriver, ctx: Context):
+        self._driver: AbsRuntimeDriver = driver
         self._session_id: str = ctx.clone.session.session_id
         self.logger = ctx.logger()
 

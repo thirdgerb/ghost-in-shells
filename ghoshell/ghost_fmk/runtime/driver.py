@@ -8,7 +8,7 @@ from ghoshell.contracts import Cache
 TaskData = namedtuple("TaskData", "data overdue")
 
 
-class RuntimeDriver(metaclass=ABCMeta):
+class AbsRuntimeDriver(metaclass=ABCMeta):
 
     @abstractmethod
     def get_process_data(self, session_id: str, process_id: str) -> Dict | None:
@@ -43,7 +43,7 @@ class RuntimeDriver(metaclass=ABCMeta):
         pass
 
 
-class CacheRuntimeDriver(RuntimeDriver):
+class CacheRuntimeDriver(AbsRuntimeDriver):
 
     def __init__(self, cache: Cache):
         self._cache = cache
@@ -105,4 +105,3 @@ class CacheRuntimeDriver(RuntimeDriver):
             key = self._get_task_key(tid)
             keys.append(key)
         return self._cache.remove(*keys)
-

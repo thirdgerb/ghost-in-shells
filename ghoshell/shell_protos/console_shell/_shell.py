@@ -11,8 +11,8 @@ from ghoshell.ghost import Input, Ghost, Payload, TextMsg, Trace
 from ghoshell.shell import ShellContext
 from ghoshell.shell_fmk import InputMiddleware, OutputMiddleware
 from ghoshell.shell_fmk import ShellKernel, Bootstrapper
-from ghoshell.shell_prototypes.console_shell._context import ConsoleContext
-from ghoshell.shell_prototypes.console_shell._input_pipes import InputTestMiddleware
+from ghoshell.shell_protos.console_shell._context import ConsoleContext
+from ghoshell.shell_protos.console_shell._input_pipes import InputTestMiddleware
 
 
 class ConsoleShell(ShellKernel):

@@ -2,8 +2,8 @@ from abc import ABCMeta, abstractmethod
 from typing import Callable, List, Dict, Optional
 
 from ghoshell.ghost import Ghost, Input, Output, Context, Operator
-from ghoshell.ghost.framework.middleware import IMiddleware, ExceptionHandlerMiddleware, GHOST_PIPE, GHOST_PIPELINE
-from ghoshell.ghost.framework.runtime import IRuntimeDriver
+from ghoshell.ghost_fmk.middleware import IMiddleware, ExceptionHandlerMiddleware, GHOST_PIPE, GHOST_PIPELINE
+from ghoshell.ghost_fmk.runtime import IRuntimeDriver
 from ghoshell.utils import create_pipeline
 
 
