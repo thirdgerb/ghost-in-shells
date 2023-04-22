@@ -1,8 +1,6 @@
 import logging
-from logging import LoggerAdapter
 from typing import List, Dict, Any, Optional
 
-from ghoshell import contracts
 from ghoshell.ghost import *
 from ghoshell.ghost.context import Messenger
 
@@ -24,8 +22,8 @@ class IContext(Context):
         self._async_inputs: List[Input] = []
 
     def _prepare_log(self) -> logging.LoggerAdapter:
-        container = self.clone.ghost.container()
-        log = contracts.LogManager.fetch(container)
+        container = self.clone.ghost.container
+        log = container.LogManager.fetch(container)
         adapter = log.new_adapter(self._input.trace.dict())
         return adapter
 
@@ -40,9 +38,6 @@ class IContext(Context):
     @property
     def input(self) -> "Input":
         return self._input
-
-    def logger(self) -> LoggerAdapter:
-        return self._logger
 
     def set_input(self, _input: "Input") -> None:
         self._input = _input

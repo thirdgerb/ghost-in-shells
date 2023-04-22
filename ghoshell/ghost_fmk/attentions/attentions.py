@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional, List, Dict
 
-from ghoshell.ghost import Attentions, Context, Intention
+from ghoshell.ghost import Attention, Context, Intention
 
 
 class AttentionDriver(metaclass=ABCMeta):
@@ -23,7 +23,7 @@ class AttentionDriver(metaclass=ABCMeta):
         pass
 
 
-class IAttentions(Attentions):
+class IAttentions(Attention):
 
     def __init__(self, handlers: List[AttentionDriver]):
         self.driver_map: Dict[str, AttentionDriver] = {}
@@ -70,7 +70,7 @@ class IAttentions(Attentions):
             metas = meta_group[kind]
             driver.register(*metas)
 
-    def wildcard_match(self, ctx: Context) -> Optional[Intention]:
+    def global_match(self, ctx: Context) -> Optional[Intention]:
         for kind in self.driver_kinds:
             driver = self.driver_map[kind]
             matched = driver.wildcard_match(ctx)

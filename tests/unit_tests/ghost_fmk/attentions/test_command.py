@@ -4,7 +4,7 @@ from ghoshell.ghost_fmk.attentions.command import CommandLine, CommandDriver
 def test_driver_baseline() -> None:
     driver = CommandDriver('/')
 
-    command = CommandLine(uml={"think": "/hello"}, config={
+    command = CommandLine(url={"think": "/hello"}, config={
         "name": "foo",
         "description": "foo is a command name",
         "epilog": "end info",

@@ -1,9 +1,9 @@
-from ghoshell.ghost import UML
+from ghoshell.ghost import URL
 
 
-def test_ghost_uml():
-    class Test(UML):
-        think: str = "e/f/g"
+def test_ghost_url():
+    class Test(URL):
+        resolver: str = "e/f/g"
         args: str = {
             "h": 123
         }
@@ -18,5 +18,5 @@ def test_ghost_uml():
     ]
 
     for case in cases:
-        uml = UML(**case)
-        assert uml.dict(exclude_none=True) == case
+        url = URL(**case)
+        assert url.dict(exclude_none=True) == case

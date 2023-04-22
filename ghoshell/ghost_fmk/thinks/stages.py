@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Dict, Any, List, Optional
 
-from ghoshell.ghost import Stage, UML, Thought, Context, Intention, Operator, TASK_LEVEL
+from ghoshell.ghost import Stage, URL, Thought, Context, Intention, Operator, TASK_LEVEL
 
 
 class AttentionStage(Stage, metaclass=ABCMeta):
@@ -51,7 +51,7 @@ class WaitStage(Stage, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def attentions(self, this: Thought, ctx: Context) -> List[UML]:
+    def attentions(self, this: Thought, ctx: Context) -> List[URL]:
         """
         从当前状态进入别的状态的连接点.
         可进入的状态, 与自身的开放性有关.
@@ -92,7 +92,7 @@ class DependingStage(Stage, metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def depending(self) -> UML:
+    def depending(self) -> URL:
         pass
 
     @abstractmethod
@@ -120,7 +120,7 @@ class YieldingStage(Stage, metaclass=ABCMeta):
         """
         pass
 
-    def yield_to(self) -> UML:
+    def yield_to(self) -> URL:
         """
         当前任务让出时, 会启动另一个异步任务.
         异步任务完成后, 会回调到当前任务.

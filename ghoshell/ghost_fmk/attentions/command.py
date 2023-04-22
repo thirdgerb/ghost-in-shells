@@ -39,7 +39,7 @@ class CommandOutput(BaseModel):
 class CommandLine(Intention):
     KIND = "command_line"
     config: CommandConfig
-    result: CommandOutput | None = None
+    matched: CommandOutput | None = None
 
 
 class _ArgumentParserWrapper(ArgumentParser):

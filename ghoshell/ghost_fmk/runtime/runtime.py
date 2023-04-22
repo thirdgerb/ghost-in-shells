@@ -3,7 +3,7 @@ from typing import Optional, Dict
 
 from ghoshell.ghost import Context, CtxTool
 from ghoshell.ghost import Runtime, Process, Task
-from ghoshell.ghost import UML
+from ghoshell.ghost import URL
 from ghoshell.ghost_fmk.runtime.driver import AbsRuntimeDriver, TaskData
 
 
@@ -16,7 +16,7 @@ class IRuntime(Runtime):
 
         # init root
         root = ctx.clone.root
-        self._root_uml: UML = UML(**root.dict())
+        self._root_url: URL = URL(**root.dict())
 
         # 缓存数据的初始化.
         self._cached_tasks: Dict[str, Dict[str, Task]] = {}
@@ -40,7 +40,7 @@ class IRuntime(Runtime):
 
         process = self.get_process(self._process_id)
         if process is None:
-            task = CtxTool.new_task_from_uml(ctx, self._root_uml)
+            task = CtxTool.new_task_from_url(ctx, self._root_url)
             process = Process.new_process(self._session_id, task, process_id, parent_id=None)
         self.store_process(process)
 

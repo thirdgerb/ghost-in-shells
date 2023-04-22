@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Type
 
-from ghoshell.contracts.contract import Contract
+from ghoshell.container import Contract
 
 
 class Cache(Contract, metaclass=ABCMeta):

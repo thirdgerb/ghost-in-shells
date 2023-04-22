@@ -16,7 +16,10 @@ class Tasked(Message):
     KIND = "tasked"
 
     resolver: str
+    stage: str
     status: int
     args: Dict
     vars: Dict
+    overdue: int = 0
+    priority: float = 0
     tid: str | None = None

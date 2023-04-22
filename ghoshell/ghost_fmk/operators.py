@@ -1,48 +1,61 @@
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Dict, List, Any, Tuple
+from typing import Optional, Dict, List, Any, Tuple, Type
 
-from ghoshell.ghost import Context, CtxTool, UML, Process, Intention, Event
-from ghoshell.ghost import OnCallback
-from ghoshell.ghost import OnCancel, OnFailed, OnQuit
-from ghoshell.ghost import OnDepended, OnRedirect
-from ghoshell.ghost import OnFallback, OnIntend, OnRepeat, OnAttend
-from ghoshell.ghost import OnPreempt, OnStart
+from ghoshell.ghost import Callback
+from ghoshell.ghost import Context, URL, Process
+from ghoshell.ghost import OnPreempt
+from ghoshell.ghost import OnStart, OnStaging
 from ghoshell.ghost import Operator, OperationManager
-from ghoshell.ghost import Payload, StateMsg
+from ghoshell.ghost import Payload
+from ghoshell.ghost import Receiving, Fallback, Intending, Attending
+from ghoshell.ghost import RuntimeTool, CtxTool
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
 from ghoshell.ghost import Thought
 from ghoshell.ghost import UnhandledException, RuntimeException
+from ghoshell.ghost import Withdrawing, Canceling, Failing, Quiting
+from ghoshell.messages import Tasked
 
 
 class AbsOperator(Operator, metaclass=ABCMeta):
 
     def run(self, ctx: "Context") -> Optional["Operator"]:
+        # 先看是否有拦截发生, 如果发生了拦截, 则 operator 不会真正执行.
         interceptor = self._intercept(ctx)
         if interceptor is not None:
             return interceptor
-        self._save_change(ctx)
-        event_op = self._fire_event(ctx)
+        # 运行 operator 的事件.
+        event_op = self._run_operation(ctx)
         if event_op is not None:
             return event_op
+        # 如果运行事件没结果, 就往后走.
         return self._next(ctx)
 
-    def prepose(self, ctx: "Context") -> Optional[List["Operator"]]:
+    def prepose(self, ctx: "Context") -> List["Operator"] | None:
+        """
+        是否有前置节点.
+        FIFO, 头部在数组 index = 0
+        """
         return None
 
     @abstractmethod
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
+        """
+        判断是否有拦截事件, 可以组织 operator 运行
+        """
         pass
 
     @abstractmethod
-    def _save_change(self, ctx: "Context") -> None:
-        pass
-
-    @abstractmethod
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
+        """
+        触发 Operator 自身的事件.
+        """
         pass
 
     @abstractmethod
     def _next(self, ctx: "Context") -> Optional["Operator"]:
+        """
+        如果没有任何中断, 则继续往后运行.
+        """
         pass
 
 
@@ -51,234 +64,123 @@ class OpReceive(AbsOperator):
     def __init__(self):
         self.enqueued = False
 
-    class Matched:
-        def __init__(self, matched: UML, args: Optional[Dict]):
-            self.uml = matched
-            self.args = args
-
     def prepose(self, ctx: "Context") -> Optional[List["Operator"]]:
         if self.enqueued:
             return None
         self.enqueued = True
 
+        # 前置准备.
         enqueue: List[Operator] = []
         runtime = ctx.clone.runtime
         process = runtime.current_process()
-        if process.is_new:
-            root = process.root_task
-            root_thought = CtxTool.fetch_thought_by_task(ctx, root)
-            enqueue.append(OpStart(root_thought))
-            process.round += 1
-            runtime.store_process(process)
-
-        # 检查 payload 的 tid
-        _input = ctx.input
-        payload = _input.payload
-        op = self._payload_tid_op(ctx, payload)
-        if op is not None:
-            enqueue.append(op)
-
-        # 继续检查 payload action
-        op = self._payload_state_op(ctx, payload)
-        if op is not None:
-            enqueue.append(op)
+        enqueue = self._init_new_process(ctx, process, enqueue)
+        enqueue = self._payload_tid_op(ctx, payload=ctx.input.payload, enqueue=enqueue)
         return enqueue
 
     @classmethod
-    def _payload_tid_op(cls, ctx: Context, payload: Payload) -> Optional[Operator]:
-        if not payload.tid:
-            return None
-        payload_task = CtxTool.fetch_task_by_tid(ctx, payload.tid)
-        if payload_task is None:
-            return None
-        if payload_task.status != TaskStatus.RUNNING:
-            return None
-        payload_thought = CtxTool.fetch_thought_by_task(ctx, payload_task)
-        return OpAwait(payload_thought)
+    def _init_new_process(cls, ctx: Context, process: Process, enqueue: List[Operator]) -> List[Operator]:
+        if not process.is_new:
+            return enqueue
+        # 保证 process 不是 new 了.
+        process.round += 1
+        root = process.root_task
+        # root 如果没有初始化.
+        if root:
+            return enqueue
+        tasked = ctx.read(Tasked)
+        # 先用
+        if tasked is not None:
+            root = RuntimeTool.new_task(
+                ctx,
+                URL.new(resolver=tasked.resolver, stage=tasked.stage, args=tasked.args),
+            )
+            RuntimeTool.store_task(ctx, root)
+            # tasked 的情况, 不需要重新启动.
+            # 等待下一轮处理
+            return enqueue
+        # 否则 root 用默认方式生成.
+        root = RuntimeTool.new_task(ctx, ctx.clone.root)
+        RuntimeTool.store_task(ctx, root)
+        # 意思意思保存下.
+        ctx.clone.runtime.store_process(process)
+        # 让 process 变成 not new
+        # 先要启动.
+        enqueue.append(OpActivate(root, None))
+        return enqueue
 
     @classmethod
-    def _payload_state_op(cls, ctx: Context, payload: Payload) -> Optional[Operator]:
-        if payload.state is None:
-            return None
-        state = payload.state
-        state_task = CtxTool.fetch_task(ctx, state.uml, or_create=True)
-        if state.vars is not None:
-            state_task.vars = state.vars
-        ctx.clone.runtime.store_task(state_task)
-        # 匹配动作.
-        action = state.action
-        if action == "":
-            return None
+    def _payload_tid_op(cls, ctx: Context, payload: Payload, enqueue: List[Operator]) -> List[Operator]:
+        """
+        如果 payload 里包含了 tid, 说明消息有明确的目标任务.
+        系统先要重定向到这个任务, 然后再用它接受信息.
+        """
+        if not payload.tid:
+            return enqueue
+        # 如果 payload 包含了 tid, 意味着它应该命中某个任务.
+        payload_target_task = RuntimeTool.fetch_task(ctx, payload.tid)
 
-        thought = CtxTool.fetch_thought_by_task(ctx, state_task)
-        match state.action:
-            case StateMsg.ON_START:
-                return OpStart(thought)
-            case StateMsg.ON_QUIT:
-                return OpQuit(thought, "state action")
-            case StateMsg.ON_RESET:
-                return OpReset()
-            case StateMsg.ON_CANCEL:
-                return OpCancel(thought, "state action")
-            case StateMsg.ON_FINISH:
-                return OpFinish(thought)
-            case _:
-                return None
+        # 检查目标任务是否存在.
+        if payload_target_task is None:
+            return enqueue
+
+        process = ctx.clone.runtime.current_process()
+        # 如果目标任务就是 current task, 则
+        if payload_target_task.tid == process.awaiting_task:
+            return enqueue
+        # 如果 payload 对应的任务不在等待状态?
+        if payload_target_task.status != TaskStatus.WAITING:
+            return enqueue
+        enqueue.append(OpAwait(payload_target_task))
+        return enqueue
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
-        # 检查是否匹配到某个 attentions
-        matched = self.match_attentions(ctx)
-        if matched is not None:
-            return OpIntendTo(matched.uml, matched.result, attend=True)
 
-        # 检查是否匹配了全局的 attentions
-        matched = self.match_intentions(ctx)
+        # 如果消息是 tasked, 则直接定向到目标任务.
+        tasked = ctx.read(Tasked)
+        if tasked is not None:
+            return self._handle_tasked(ctx, tasked)
+
+        #  接下来进行意图匹配
+        awaiting_task = ctx.clone.runtime.current_process().awaiting_task
+        # 检查是否匹配到某个 router
+        router_intentions = CtxTool.context_attentions(ctx)
+        matched = CtxTool.match_intentions(ctx, router_intentions, awaiting_task.level == TaskLevel.LEVEL_PUBLIC)
         if matched is not None:
-            return OpIntendTo(matched.uml, matched.result, attend=False)
+            return OpIntendTo(matched.url, matched.matched, route=True)
+
+        # 检查是否匹配了回调栈中的意图.
+        fallback_intentions = CtxTool.context_intentions(ctx)
+        matched = CtxTool.match_intentions(ctx, fallback_intentions, public=False)
+        if matched is not None:
+            return OpIntendTo(matched.url, matched.matched, route=False)
         return None
 
-    def _save_change(self, ctx: "Context") -> None:
-        pass
+    @classmethod
+    def _handle_tasked(cls, ctx: Context, tasked: Tasked) -> Optional[Operator]:
+        task = RuntimeTool.fetch_task(ctx, tasked.tid)
+        if task is None:
+            task = RuntimeTool.new_task(ctx, URL(think=tasked.resolver, stage=tasked.stage, args=tasked.args.copy()))
+        task.merge_tasked(tasked)
+        RuntimeTool.store_task(ctx, task)
+        match tasked.status:
+            case TaskStatus.WAITING:
+                return OpAwait(task.url)
+            case TaskStatus.CANCELED:
+                return OpCancel(task.url, None, None)
+            case TaskStatus.FAILED:
+                return OpFail(task.url, None, None)
+            case TaskStatus.PREEMPTING:
+                return OpBlock(task.url, None)
+            case TaskStatus.FINISHED:
+                return OpFinish(task.url, task.tid)
+            case _:
+                return OpActivate(task.url, None)
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         pass
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return OpFallback()
-
-    @classmethod
-    def match_attentions(cls, ctx: "Context") -> Optional[Intention]:
-        """
-        将进程的 attentions 生成出来
-        用来从 ctx 中匹配一个目标意图.
-        """
-        # 添加 current
-        attention_metas = cls.attention_metas(ctx)
-        attentions = ctx.clone.attentions
-        predefined_kinds = attentions.kinds()
-        # 只能匹配已有的.
-        for kind in predefined_kinds:
-            if kind not in attention_metas:
-                continue
-            # 匹配所有的 metas
-            metas = attention_metas[kind]
-            matched = attentions.match(ctx, *metas)
-            if matched is not None:
-                return matched
-        return None
-
-    @classmethod
-    def match_intentions(cls, ctx: "Context") -> Optional[Intention]:
-        # 如果当前任务是 public 级别的任务, 则允许做意图的模糊匹配.
-        # 意图的模糊匹配并不精确到参数上. 需要二次加工.
-        process = ctx.clone.runtime.current_process()
-        attentions = ctx.clone.attentions
-        awaiting_task = process.awaiting_task
-
-        intention_metas = cls.intention_metas(ctx)
-        predefined_kinds = attentions.kinds()
-        for kind in predefined_kinds:
-            if kind not in intention_metas:
-                continue
-            # 匹配所有的 metas
-            metas = intention_metas[kind]
-            matched = attentions.match(ctx, *metas)
-            if matched is not None:
-                return matched
-
-        if awaiting_task.level < TaskLevel.LEVEL_PUBLIC:
-            return None
-
-        # 模糊匹配.
-        return attentions.wildcard_match(ctx)
-
-    @classmethod
-    def intention_metas(cls, ctx: "Context") -> Dict[str, List[Intention]]:
-        runtime = ctx.clone.runtime
-        process = runtime.current_process()
-        awaiting_task = process.awaiting_task
-        result: Dict[str, List[Intention]] = {}
-
-        # protected 才允许回溯匹配.
-        if awaiting_task.level < TaskLevel.LEVEL_PROTECTED:
-            return result
-
-        blocking = process.blocking
-        for tid in blocking:
-            blocking_task = process.get_task(tid)
-            result = cls._add_task_intention_to_attentions(ctx, result, blocking_task, attentions=False)
-
-        # 检查 waiting.
-        waiting = process.running
-        for tid in waiting:
-            waiting_task = process.get_task(tid)
-            result = cls._add_task_intention_to_attentions(ctx, result, waiting_task, attentions=False)
-
-        # 添加 awaiting
-        if process.awaiting != process.root:
-            root_task = process.root_task
-            result = cls._add_task_intention_to_attentions(ctx, result, root_task, attentions=False)
-
-        return result
-
-    @classmethod
-    def attention_metas(cls, ctx: "Context") -> Dict[str, List[Intention]]:
-        """
-        从进程中获取当前匹配的意图.
-        """
-        runtime = ctx.clone.runtime
-        process = runtime.current_process()
-        result: Dict[str, List[Intention]] = {}
-
-        # 第一步, 添加 root
-        root_task = process.root_task
-        result = cls._add_task_intention_to_attentions(ctx, result, root_task)
-
-        awaiting_task = process.awaiting_task
-        # 添加 awaiting
-        if process.awaiting != process.root:
-            result = cls._add_task_intention_to_attentions(ctx, result, awaiting_task)
-
-        # 封闭域任务, 不再继续增加注意目标.
-        if awaiting_task.level < TaskLevel.LEVEL_PROTECTED:
-            return result
-
-        # 第三步, 添加 waiting 中的节点的意图.
-        for tid in process.running:
-            waiting = process.get_task(tid)
-            result = cls._add_task_intention_to_attentions(ctx, result, waiting)
-        return result
-
-    @classmethod
-    def _add_task_intention_to_attentions(
-            cls,
-            ctx: Context,
-            result: Dict[str, List[Intention]],
-            task: Task,
-            attentions: bool = True,
-    ) -> Dict[str, List[Intention]]:
-        # 初始化
-        # 上下文中生成意图树.
-        if attentions:
-            uml_list = task.attentions
-        else:
-            uml_list = CtxTool.task_to_uml(task)
-
-        for uml in uml_list:
-            stage = CtxTool.fetch_stage(ctx, uml.think, uml.stage)
-            if stage is None:
-                continue
-            # 从 stage 里生成 intention
-            intentions = stage.intentions(ctx)
-            if not intentions:
-                continue
-            # 从 intention 里拿到 metas
-            for meta in intentions:
-                kind = meta.KIND
-                if kind not in result:
-                    result[kind] = []
-                result[kind].append(meta)
-        return result
 
     def destroy(self) -> None:
         del self.enqueued
@@ -287,15 +189,13 @@ class OpReceive(AbsOperator):
 class OpFallback(AbsOperator):
     """
     没有任何意图被匹配到时.
+    会进入到 fallback 流程, 返回
     """
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
-    def _save_change(self, ctx: "Context") -> None:
-        return
-
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         process = ctx.clone.runtime.current_process()
         #  让 current 对话任务来做兜底
         forward = self.fallback_to_task(ctx, process.awaiting_task)
@@ -315,9 +215,8 @@ class OpFallback(AbsOperator):
     @classmethod
     def fallback_to_task(cls, ctx: "Context", task: Task) -> Optional[Operator]:
         # 当前任务.  fallback
-        thought = CtxTool.fetch_thought_by_task(ctx, task)
-        event = OnFallback(thought, None)
-        return CtxTool.fire_event(ctx, event)
+        event = Fallback(task, None, None)
+        return RuntimeTool.fire_event(ctx, event)
 
     def destroy(self) -> None:
         pass
@@ -325,37 +224,55 @@ class OpFallback(AbsOperator):
 
 class OpIntendTo(AbsOperator):
     """
-    todo: ???
-    命中了一个意图, 前往目标任务.
+    命中了一个意图, 前往目标 Task
     过程中生产一个事件, 如果没问题的话就正式激活目标任务.
     """
 
-    def __init__(self, to: UML, params: Optional[Dict] = None, fr: UML | None = None, attend: bool = False):
+    def __init__(
+            self,
+            to: URL,
+            params: Optional[Dict] = None,
+            fr: URL | None = None,
+            route: bool = False,
+    ):
         # 匹配的目标
-        self.to: UML = to
+        self.to: URL = to
         # 匹配的参数, 如果为 none 的话还需要二次检查.
         self.fr = fr
         self.params: Optional[Dict] = params
-        self.attend = attend
+        self.attend = route
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
+        # target_task = RuntimeTool.fetch_task_by_url(ctx, self.to, True)
+        # # 只有 waiting 状态, 才需要专门 preempt 一下.
+        # # todo: 验证这个思路是否正确. 目前的 Operator 流程还是不流畅.
+        # if target_task.status != TaskStatus.WAITING:
+        #     return None
+        #
+        # fr = None
+        # if self.fr is not None:
+        #     fr = RuntimeTool.fetch_task_by_url(ctx, self.to, False)
+        # event = OnPreempt(target_task, fr)
+        # # 为 None 的话就继续往后走.
+        # return RuntimeTool.fire_event(ctx, event)
+
+        # 去掉了复杂逻辑, 先从最简单的来. 以后再想复杂的流程.
         return None
 
-    def _save_change(self, ctx: "Context") -> None:
-        return
-
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
-        this = CtxTool.fetch_thought(ctx, self.to)
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         params = self.params
+        # 尽量携带参数来访问.
         if params is None:
-            stage = CtxTool.fetch_stage(ctx, self.to.think, self.to.think)
-            intentions = stage.intentions()
+            stage = CtxTool.force_fetch_stage(ctx, self.to.resolver, self.to.resolver)
+            intentions = stage.intentions(ctx)
             if intentions is not None:
                 matched = ctx.clone.attentions.match(ctx, *intentions)
-                params = matched.result
-        wrapper = OnAttend if self.attend else OnIntend
-        event = wrapper(this, params, self.fr)
-        return CtxTool.fire_event(ctx, event)
+                params = matched.matched
+
+        wrapper: Type[Receiving] = Attending if self.attend else Intending
+        task = RuntimeTool.fetch_task_by_url(ctx, self.to, True)
+        event = wrapper(task, self.fr, params)
+        return RuntimeTool.fire_event(ctx, event)
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -372,88 +289,68 @@ class OpGoStage(AbsOperator):
     当前任务切换一个 stage.
     """
 
-    def __init__(self, thought: Thought, *stages: str):
-        self.this = thought
+    def __init__(self, url: URL, tid: str, *stages: str):
+        self.url = url
+        self.tid = tid
         self.forwards: Tuple = stages
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
-    def _save_change(self, ctx: "Context") -> None:
-        task = CtxTool.fetch_task_by_thought(ctx, self.this)
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
+        task = RuntimeTool.fetch_task(ctx, self.tid)
         # 将 stages 插入到前面.
         if len(self.forwards) > 0:
-            task.append(*self.forwards)
-        # 离开时保存.
-        task = CtxTool.complete_task(ctx, task)
-        ctx.clone.runtime.store_task(task)
-        return
+            task.insert(*self.forwards)
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+        # 离开时保存.
+        RuntimeTool.store_task(ctx, task)
         return None
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
-        return OpForwardStage(self.this)
+        task = RuntimeTool.fetch_task(ctx, self.tid)
+        success = task.forward()
+        # forward 到头了, 就进入 finish 进程.
+        if not success:
+            # 走 finish 流程.
+            return OpFinish(self.url, self.tid)
+
+        # 否则运行当前节点.
+        RuntimeTool.store_task(ctx, task)
+
+        # 触发事件.
+        event = OnStaging(task, None)
+        return RuntimeTool.fire_event(ctx, event)
 
     def destroy(self) -> None:
-        del self.this
+        del self.url
+        del self.tid
         del self.forwards
 
 
-class OpForwardStage(AbsOperator):
-    """
-    推进状态机往前走一格, 如果 task 栈中有节点, 则运行.
-    没有节点的话, 进入 finish 操作.
-    """
+class OpActivate(AbsOperator):
 
-    def __init__(self, this: Thought):
-        self.this: Thought = this
-        self.fr: UML = CtxTool.thought_to_uml(this)
-
-    def _intercept(self, ctx: "Context") -> Optional["Operator"]:
-        task = CtxTool.fetch_task_by_thought(ctx, self.this, or_create=True)
-        if not task.forward():
-            return OpFinish(self.this)
-        ctx.clone.runtime.store_task(task)
-        self.this = CtxTool.merge_thought_from_task(self.this, task)
-        return None
-
-    def _save_change(self, ctx: "Context") -> None:
-        return None
-
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
-        return None
-
-    def _next(self, ctx: "Context") -> Optional["Operator"]:
-        # 触发事件, 等待事件提供的后续流程.
-        return OpStart(self.this, self.fr)
-
-    def destroy(self) -> None:
-        del self.this
-        del self.fr
-
-
-class OpStart(AbsOperator):
-
-    def __init__(self, this: Thought, fr: Optional[UML] = None):
-        self.this = this
+    def __init__(self, target: URL, fr: URL | None):
+        self.target = target
         self.fr = fr
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
-    def _save_change(self, ctx: "Context") -> None:
-        return None
-
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
-        event = OnStart(self.this, self.fr)
-        return CtxTool.fire_event(ctx, event)
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
+        task = RuntimeTool.fetch_task_by_url(ctx, self.target, True)
+        fr = None
+        if self.fr is not None:
+            fr = RuntimeTool.fetch_task_by_url(ctx, self.target, False)
+        event = OnStart(task, fr)
+        return RuntimeTool.fire_event(ctx, event)
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def destroy(self) -> None:
-        del self.this
+        del self.target
+        del self.fr
 
 
 class OpFinish(AbsOperator):
@@ -462,30 +359,31 @@ class OpFinish(AbsOperator):
     将所有依赖当前任务的那些任务, 都推入 blocking 栈.
     """
 
-    def __init__(self, this: Thought):
-        self.this = this
+    def __init__(self, url: URL, tid: str):
+        self.url = url
+        self.tid = tid
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
-    def _save_change(self, ctx: "Context") -> None:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
+
         # 变更状态
-        this = self.this
-        tid = this.tid
-        task = CtxTool.fetch_task_by_thought(ctx, this)
+        task = RuntimeTool.fetch_task(ctx, self.tid)
         # 更新状态.
-        task.done(TaskStatus.FINISHED)
+        task.done(self.url.stage, TaskStatus.FINISHED)
 
         # 变更状态, 并保存.
-        runtime = ctx.clone.runtime
-        runtime.store_task(task)
+        RuntimeTool.store_task(ctx, task)
 
+        runtime = ctx.clone.runtime
         process = runtime.current_process()
         if task.tid == process.root:
-            # 根节点结束.
-            return
+            # 根节点结束的话, 任务整体结束. 并回调.
+            return self._finish_root(ctx)
+
         depended_by_map = process.depended_by_map
-        if tid not in depended_by_map:
+        if self.tid not in depended_by_map:
             # 没有依赖当前任务的.
             return
         depending = depended_by_map[tid]
@@ -497,42 +395,40 @@ class OpFinish(AbsOperator):
             if ptr is None:
                 continue
             # depending 任务调整为 blocking 任务
-            ptr.status = TaskStatus.BLOCKING
+            ptr.status = TaskStatus.PREEMPTING
             blocking.append(ptr)
 
         # 只保存 runtime 变更, 不涉及 data.
         process.store_task(*blocking)
         runtime.store_process(process)
-        return
-
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
-        clone = ctx.clone
-        runtime = clone.runtime
-        process = runtime.current_process()
-        if process.root == self.this.tid:
-            return self._finish_root(ctx)
-
         # 让调度来解决后续问题.
-        # 回调到 blocking, 然后是 waiting.
-        this_uml = CtxTool.thought_to_uml(self.this)
-        return OpSchedule(this_uml)
+        return OpSchedule(self.url)
 
-    def _finish_root(self, ctx: Context):
+    @classmethod
+    def _finish_root(cls, ctx: Context):
+        """
+        结束根节点, 有必要的话就回调.
+        """
         clone = ctx.clone
         runtime = clone.runtime
         process = runtime.current_process()
         process.quit()
         runtime.store_process(process)
+
+        # 如果父进程存在的话, 发起回调.
         if process.parent_id:
-            result = CtxTool.task_result(ctx, process.root_task)
-            clone.async_input(result, )
+            root_task = process.root_task
+            tasked = root_task.to_tasked()
+            # 异步投递任务.
+            ctx.async_input(tasked, process.parent_id, None)
         return None
 
     def destroy(self) -> None:
-        del self.this
+        del self.url
+        del self.tid
 
 
 class OpSchedule(AbsOperator):
@@ -540,7 +436,7 @@ class OpSchedule(AbsOperator):
     调度到一个等待中的任务.
     """
 
-    def __init__(self, fr: UML):
+    def __init__(self, fr: URL | None):
         self.fr = fr
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
@@ -549,14 +445,14 @@ class OpSchedule(AbsOperator):
     def _save_change(self, ctx: "Context") -> None:
         return
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         runtime = ctx.clone.runtime
         process = runtime.current_process()
         blocking = process.blocking
         if len(blocking) > 0:
             return self._preempt(ctx, process, blocking[0])
 
-        waiting = process.running
+        waiting = process.waiting
         if len(waiting) > 0:
             return self._preempt(ctx, process, waiting[0])
         return self._preempt(ctx, process, process.root)
@@ -566,9 +462,11 @@ class OpSchedule(AbsOperator):
 
     def _preempt(self, ctx: Context, process: Process, tid: str) -> Optional[Operator]:
         task = process.get_task(tid)
-        thought = CtxTool.fetch_thought_by_task(ctx, task)
-        event = OnPreempt(thought, self.fr)
-        return CtxTool.fire_event(ctx, event)
+        fr = None
+        if self.fr is not None:
+            fr = RuntimeTool.fetch_task_by_url(ctx, self.fr, False)
+        event = OnPreempt(task, fr)
+        return RuntimeTool.fire_event(ctx, event)
 
     def destroy(self) -> None:
         del self.fr
@@ -579,41 +477,43 @@ class OpAwait(AbsOperator):
     让进程进入等待状态
     """
 
-    def __init__(self, this: Thought):
-        self.this: Thought = this
+    def __init__(self, current: URL):
+        self.current = current
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
-    def _save_change(self, ctx: "Context") -> None:
-        # 先保存当前状态.
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         runtime = ctx.clone.runtime
-        new_wait_task = CtxTool.fetch_task_by_thought(ctx, self.this, or_create=True)
-        new_wait_task.status = TaskStatus.RUNNING
-        runtime.store_task(new_wait_task)
+        new_wait_task = RuntimeTool.fetch_task_by_url(ctx, self.current, create=True)
+
+        # url 中包含了目标 stage
+        new_wait_task.await_at(self.current.stage)
 
         # 检查 current.
         process = runtime.current_process()
-        await_task_ptr = process.get_task(process.awaiting)
+        awaiting_task = process.get_task(process.awaiting)
 
         # 不是同一个任务才需要保存.
-        if new_wait_task.tid != await_task_ptr.tid:
-            await_task_ptr.status = TaskStatus.RUNNING
+        if new_wait_task.tid != awaiting_task.tid:
+            # 应该就是 waiting 状态.
+            awaiting_task.status = TaskStatus.WAITING
             # 变更当前 current 状态.
             process.awaiting = new_wait_task.tid
             # 顺序会在最前面.
-            process.store_task(await_task_ptr)
-        runtime.store_process(process)
-        return None
+            process.store_task(awaiting_task)
+            runtime.store_process(process)
+            RuntimeTool.store_task(ctx, awaiting_task)
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+        #  注意保存的先后顺序.
+        RuntimeTool.store_task(ctx, new_wait_task)
         return None
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def destroy(self) -> None:
-        del self.this
+        del self.current
 
 
 class OpRepeat(AbsOperator):
@@ -622,36 +522,22 @@ class OpRepeat(AbsOperator):
     但是不会清空运行中的状态.
     """
 
-    def __init__(self, this: Thought):
-        this.status = TaskStatus.RUNNING
-        self.this = this
-
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
-    def _save_change(self, ctx: "Context") -> None:
-        CtxTool.save_thought(ctx, self.this)
-        return
-
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         runtime = ctx.clone.runtime
         # 拿到原始的 process
         process = runtime.current_process()
         awaits_task = runtime.fetch_task(process.awaiting)
-        if awaits_task.tid == self.this.tid:
-            thought = self.this
-        else:
-            thought = CtxTool.fetch_thought_by_task(ctx, awaits_task)
-        # 重新启动 awaits 任务.
-        this_uml = CtxTool.thought_to_uml(self.this)
-        event = OnRepeat(thought, this_uml)
-        return CtxTool.fire_event(ctx, event)
+        target = awaits_task.url.to_stage(awaits_task.await_stage)
+        return OpAwait(target)
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def destroy(self) -> None:
-        del self.this
+        pass
 
 
 class OpRewind(AbsOperator):
@@ -659,8 +545,7 @@ class OpRewind(AbsOperator):
     重置当前会话状态, 装作一切没有发生过.
     """
 
-    def __init__(self, this: Thought, repeat: bool = False):
-        self.this = this
+    def __init__(self, repeat: bool = False):
         self.repeat = repeat
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
@@ -670,17 +555,16 @@ class OpRewind(AbsOperator):
         # rewind 什么也不存
         return
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         ctx.clone.runtime.rewind()
         if self.repeat:
-            return OpRepeat(self.this)
+            return OpRepeat()
         return None
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def destroy(self) -> None:
-        del self.this
         del self.repeat
 
 
@@ -690,55 +574,69 @@ class OpCancel(AbsOperator):
     """
     status = TaskStatus.CANCELED
 
-    def __init__(self, this: Thought, reason: Any | None, fr: Optional[UML] = None):
-        self.this = this
-        self.reason = reason
+    def __init__(self, current: URL, fr: Optional[URL] = None, reason: Any | None = None,
+                 withdraw_list: List[str] = None):
+        self.current = current
         self.fr = fr
-        self.withdraw_list: List[Tuple[str, UML]] = []
+        self.reason = reason
+        if withdraw_list is None:
+            withdraw_list = []
+        self.withdraw_list: List[str] = withdraw_list
 
     def _intercept(self, ctx: Context) -> Optional[Operator]:
         # cancel 流程是可以拦截的.
-        event = self._event()
-        return CtxTool.fire_event(ctx, event)
+        event_wrapper = self._event()
+        current_task = RuntimeTool.fetch_task_by_url(ctx, self.current, False)
+        fr_task = None
+        if self.fr is not None:
+            fr_task = RuntimeTool.fetch_task_by_url(ctx, self.fr, False)
 
-    def _save_change(self, ctx: Context) -> None:
-        runtime = ctx.clone.runtime
-        process = runtime.current_process()
+        # 可能是一个 None
+        event = event_wrapper(current_task, fr_task, self.reason)
+        return RuntimeTool.fire_event(ctx, event)
+
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         # 走 cancel 流程.
-        current_ptr = process.get_task(self.this.tid)
-        current_ptr.done(self.status)
+        current_task = RuntimeTool.fetch_task_by_url(ctx, self.current, False)
+        if current_task is None:
+            # todo
+            raise RuntimeException("todo")
+        current_task.done(self.current.stage, self.status)
 
         # 保存变更.
-        process.store_task(current_ptr)
-        runtime.store_process(process)
+        RuntimeTool.store_task(ctx, current_task)
 
-        canceling = OpCancel.withdraw_depending(ctx, self.this.tid)
-        uml = CtxTool.thought_to_uml(self.this)
+        # 回调
+        canceling = OpCancel.withdraw_depending(ctx, current_task.tid)
         if len(canceling) > 0:
-            for tid in canceling:
-                self.withdraw_list.append((tid, uml))
-
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+            # 插入到头部.
+            canceling.append(*self.withdraw_list)
+            self.withdraw_list = canceling
         return None
 
     def _next(self, ctx: Context) -> Optional[Operator]:
         if len(self.withdraw_list) == 0:
-            return None
+            # 如果根节点也是取消状态. 则进程退出.
+            root_task = RuntimeTool.fetch_root_task(ctx)
+            if root_task.status != TaskStatus.WAITING:
+                RuntimeTool.quit_current_process(ctx)
+                # 结束运行.
+                return None
 
-            # 继续 cancel
+            # 如果不是根节点也退出了, 就走正常的调度.
+            return OpSchedule(self.current)
+
+        # 继续 cancel
         canceling_id, fr = self.withdraw_list[0]
         self.withdraw_list = self.withdraw_list[1:]
 
         # 进入下一个 cancel 任务.
-        task = ctx.clone.runtime.fetch_task(canceling_id, False)
-        _next = CtxTool.fetch_thought_by_task(ctx, task)
-        self.this = _next
-        self.fr = fr
-        return self
+        task = RuntimeTool.force_fetch_task(ctx, canceling_id)
+        return self.__class__(task.url.copy(), self.current.copy(), self.reason, self.withdraw_list)
 
-    def _event(self) -> Optional[Event]:
+    def _event(self) -> Type[Withdrawing]:
         # cancel 流程是可以拦截的.
-        return OnCancel(self.this, fr=self.fr, reason=self.reason)
+        return Canceling
 
     @staticmethod
     def withdraw_depending(ctx: Context, tid: str) -> List[str]:
@@ -760,7 +658,7 @@ class OpCancel(AbsOperator):
         return withdraw_task_ids
 
     def destroy(self) -> None:
-        del self.this
+        del self.current
         del self.fr
         del self.withdraw_list
         del self.reason
@@ -773,8 +671,8 @@ class OpFail(OpCancel):
     """
     status = TaskStatus.FAILED
 
-    def _event(self) -> Optional[Event]:
-        return OnFailed(self.this, fr=self.fr, reason=self.reason)
+    def _event(self) -> Type[Withdrawing]:
+        return Failing
 
 
 class OpQuit(OpCancel):
@@ -784,20 +682,21 @@ class OpQuit(OpCancel):
     """
     status = TaskStatus.CANCELED
 
-    def _event(self) -> Optional[Event]:
-        return OnQuit(self.this, fr=self.fr, reason=self.reason)
+    def _event(self) -> Type[Withdrawing]:
+        return Quiting
 
     def _next(self, ctx: Context) -> Optional[Operator]:
         if len(self.withdraw_list) > 0:
             # 继续走依赖关系的取消流程.
             return super()._next(ctx)
+
         process = ctx.clone.runtime.current_process()
         # blocking 优先.
         blocking = process.blocking
         if len(blocking) > 0:
             self.withdraw_list = [blocking[0]]
             return super()._next(ctx)
-        waiting = process.running
+        waiting = process.waiting
         if len(waiting) > 0:
             self.withdraw_list = [waiting[0]]
             return super()._next(ctx)
@@ -811,9 +710,9 @@ class OpQuit(OpCancel):
 
 class OpDependOn(AbsOperator):
 
-    def __init__(self, this: Thought, target: UML, force: bool = False):
+    def __init__(self, this: Thought, target: URL, force: bool = False):
         self.this: Thought = this
-        self.target_uml: UML = target
+        self.target_url: URL = target
         self._target: Optional[Thought] = None
         self.force = force
 
@@ -821,66 +720,66 @@ class OpDependOn(AbsOperator):
         """
         depend 事件可以被终止.
         """
-        # target = CtxTool.fetch_thought(ctx, self.target_uml)
-        target_task = CtxTool.fetch_task(ctx, self.target_uml, or_create=True)
+        # target = RuntimeTool.fetch_thought(ctx, self.target_url)
+        target_task = RuntimeTool.fetch_task(ctx, self.target_url, or_create=True)
         match target_task.status:
             case TaskStatus.FINISHED:
                 #  目标任务已经完成的话, 直接回调.
-                target = CtxTool.fetch_thought_by_task(ctx, target_task)
+                target = RuntimeTool.fetch_thought_by_task(ctx, target_task)
                 return OpCallback(self.this, target)
             case _:
                 # 否则出发一次 OnDepended 事件, 允许被拦截中断.
-                target = CtxTool.fetch_thought_by_task(ctx, target_task)
-                this_uml = CtxTool.thought_to_uml(self.this)
-                event = OnDepended(target, this_uml)
-                return CtxTool.fire_event(ctx, event)
+                target = RuntimeTool.fetch_thought_by_task(ctx, target_task)
+                this_url = RuntimeTool.thought_to_url(self.this)
+                event = OnDepended(target, this_url)
+                return RuntimeTool.fire_event_with_thought(ctx, event)
 
     def _get_target(self, ctx: "Context") -> Thought:
         if self._target is None:
-            self._target = CtxTool.fetch_thought(ctx, self.target_uml)
+            self._target = RuntimeTool.new_thought(ctx, self.target_url)
         return self._target
 
     def _save_change(self, ctx: "Context") -> None:
         target = self._get_target(ctx)
 
-        task = CtxTool.fetch_task_by_thought(ctx, self.this)
+        task = RuntimeTool._fetch_task_by_thought(ctx, self.this)
         task.status = TaskStatus.DEPENDING
         task.depending = target.tid
         # 保存当前的 task
         ctx.clone.runtime.store_task(task)
         return
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         target = self._get_target(ctx)
         if self.force:
             # 强制重启.
             return OpRestart(target)
         # 进入目标任务.
-        this_uml = CtxTool.thought_to_uml(self.this)
-        return OpRedirect(target, this_uml, intercept=True)
+        this_url = RuntimeTool.thought_to_url(self.this)
+        return OpRedirect(target, this_url, intercept=True)
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def destroy(self) -> None:
         del self.this
-        del self.target_uml
+        del self.target_url
         del self._target
         del self.force
 
 
 class OpRedirect(AbsOperator):
 
-    def __init__(self, this: Thought, to: UML, intercept: bool = True):
+    def __init__(self, this: Thought, to: URL, intercept: bool = True):
         self.this = this
         self.to = to
         self.intercept = intercept
-        self.this_uml = CtxTool.thought_to_uml(this)
+        self.this_url = RuntimeTool.thought_to_url(this)
         self.__target: Optional[Thought] = None
 
     def target_thought(self, ctx: Context) -> Thought:
         if self.__target is None:
-            self.__target = CtxTool.fetch_thought(ctx, self.to)
+            self.__target = RuntimeTool.new_thought(ctx, self.to)
         return self.__target
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
@@ -890,8 +789,8 @@ class OpRedirect(AbsOperator):
         target = self.target_thought(ctx)
 
         if self.this.tid != target.tid:
-            event = OnRedirect(target, self.this_uml)
-            return CtxTool.fire_event(ctx, event)
+            event = OnActivate(target, self.this_url)
+            return RuntimeTool.fire_event_with_thought(ctx, event)
 
         if self.this.stage == self.to.stage:
             raise RuntimeException("todo: order")
@@ -900,13 +799,13 @@ class OpRedirect(AbsOperator):
     def _save_change(self, ctx: "Context") -> None:
         return
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         target = self.target_thought(ctx)
-        task = CtxTool.fetch_task_by_thought(ctx, target)
+        task = RuntimeTool._fetch_task_by_thought(ctx, target)
         match task.status:
-            case TaskStatus.BLOCKING, TaskStatus.DEPENDING, TaskStatus.YIELDING, TaskStatus.RUNNING:
-                event = OnPreempt(target, self.this_uml)
-                return CtxTool.fire_event(ctx, event)
+            case TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING, TaskStatus.NEW:
+                event = OnPreempt(target, self.this_url)
+                return RuntimeTool.fire_event_with_thought(ctx, event)
             case _:
                 return OpRestart(target)
 
@@ -915,7 +814,7 @@ class OpRedirect(AbsOperator):
 
     def destroy(self) -> None:
         del self.this
-        del self.this_uml
+        del self.this_url
         del self.to
         del self.__target
 
@@ -929,14 +828,14 @@ class OpRestart(AbsOperator):
         return None
 
     def _save_change(self, ctx: "Context") -> None:
-        task = CtxTool.fetch_task_by_thought(ctx, self.this)
+        task = RuntimeTool._fetch_task_by_thought(ctx, self.this)
         task.reset()
-        CtxTool.save_task(ctx, task)
+        RuntimeTool.save_task(ctx, task)
         return
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         event = OnStart(self.this)
-        return CtxTool.fire_event(ctx, event)
+        return RuntimeTool.fire_event_with_thought(ctx, event)
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -955,15 +854,15 @@ class OpCallback(AbsOperator):
         return None
 
     def _save_change(self, ctx: "Context") -> None:
-        task = CtxTool.fetch_task_by_thought(ctx, self.this)
-        task.status = TaskStatus.RUNNING
-        CtxTool.save_task(ctx, task)
-        self.this = CtxTool.merge_thought_from_task(self.this, task)
+        task = RuntimeTool._fetch_task_by_thought(ctx, self.this)
+        task.status = TaskStatus.NEW
+        RuntimeTool.save_task(ctx, task)
+        self.this = RuntimeTool.merge_thought_from_task(self.this, task)
         return
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
-        event = OnCallback(self.this, self.fr.result())
-        return CtxTool.fire_event(ctx, event)
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
+        event = Callback(self.this, self.fr.matched())
+        return RuntimeTool.fire_event_with_thought(ctx, event)
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         pass
@@ -988,12 +887,12 @@ class OpReset(AbsOperator):
         runtime.store_process(process)
         return None
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         process = ctx.clone.runtime.current_process()
         task = process.root_task
-        thought = CtxTool.fetch_thought_by_task(ctx, task)
+        thought = RuntimeTool.fetch_thought_by_task(ctx, task)
         event = OnStart(thought)
-        return CtxTool.fire_event(ctx, event)
+        return RuntimeTool.fire_event_with_thought(ctx, event)
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -1004,7 +903,7 @@ class OpReset(AbsOperator):
 
 class OpYieldTo(AbsOperator):
 
-    def __init__(self, this: Thought, to: UML, pid: str | None):
+    def __init__(self, this: Thought, to: URL, pid: str | None):
         self.this = this
         self.to = to
         self.pid = pid
@@ -1013,28 +912,28 @@ class OpYieldTo(AbsOperator):
         """
         depend 事件可以被终止.
         """
-        target_task = CtxTool.fetch_task(ctx, self.to, or_create=False)
+        target_task = RuntimeTool.fetch_task(ctx, self.to, or_create=False)
         if not target_task:
             return None
 
         # 目标任务已经完成的情况.
         if target_task.status == TaskStatus.FINISHED:
             #  目标任务已经完成的话, 直接回调.
-            target = CtxTool.fetch_thought_by_task(ctx, target_task)
+            target = RuntimeTool.fetch_thought_by_task(ctx, target_task)
             return OpCallback(self.this, target)
         return None
 
     def _save_change(self, ctx: "Context") -> None:
-        task = CtxTool.fetch_task_by_thought(ctx, self.this)
+        task = RuntimeTool._fetch_task_by_thought(ctx, self.this)
         task.status = TaskStatus.YIELDING
-        target_id = CtxTool.new_tid(ctx, self.to)
+        target_id = RuntimeTool.new_tid(ctx, self.to)
         task.depending = target_id
         runtime = ctx.clone.runtime
         runtime.store_task(task)
         process = runtime.current_process()
 
         # 创建并保存异步进程.
-        target_task = CtxTool.fetch_task(ctx, self.to, or_create=True)
+        target_task = RuntimeTool.fetch_task(ctx, self.to, or_create=True)
         sub_process = process.new_process(process.sid, target_task, self.pid, process.pid)
         runtime.store_process(sub_process)
 
@@ -1045,12 +944,12 @@ class OpYieldTo(AbsOperator):
         )
         return
 
-    def _fire_event(self, ctx: "Context") -> Optional["Operator"]:
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
-        uml = CtxTool.thought_to_uml(self.this)
-        return OpSchedule(uml)
+        url = RuntimeTool.thought_to_url(self.this)
+        return OpSchedule(url)
 
     def destroy(self) -> None:
         del self.this
@@ -1073,7 +972,7 @@ class IOperatorManager(OperationManager):
         finally:
             self.destroy()
 
-    def redirect_to(self, to: "UML") -> "Operator":
+    def redirect_to(self, to: "URL") -> "Operator":
         """
         从当前对话任务, 进入一个目标对话任务.
         """
@@ -1120,10 +1019,10 @@ class IOperatorManager(OperationManager):
             self.destroy()
 
     @abstractmethod
-    def intend_to(self, uml: UML, params: Dict | None = None) -> "Operator":
+    def intend_to(self, url: URL, params: Dict | None = None) -> "Operator":
         try:
-            this_uml = CtxTool.thought_to_uml(self.this)
-            return OpIntendTo(uml, params, this_uml, attend=False)
+            this_url = RuntimeTool.thought_to_url(self.this)
+            return OpIntendTo(url, params, this_url, route=False)
         finally:
             self.destroy()
 
@@ -1151,13 +1050,13 @@ class IOperatorManager(OperationManager):
         finally:
             self.destroy()
 
-    def depend_on(self, on: UML, force: bool = False) -> Operator:
+    def depend_on(self, on: URL, force: bool = False) -> Operator:
         try:
             return OpDependOn(self.this, on, force=force)
         finally:
             self.destroy()
 
-    def yield_to(self, to: UML, pid: Optional[str] = None) -> Operator:
+    def yield_to(self, to: URL, pid: Optional[str] = None) -> Operator:
         try:
             return OpYieldTo(self.this, to, pid)
         finally:

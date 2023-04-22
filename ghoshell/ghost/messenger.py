@@ -1,10 +1,6 @@
-from __future__ import annotations
-
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from ghoshell.messages import Message
+from ghoshell.ghost.io import Message, Trace
 
 
 class Messenger(metaclass=ABCMeta):
@@ -14,7 +10,10 @@ class Messenger(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def output(self, *messages: "Message") -> "Messenger":
+    def output(self, *messages: "Message", trace: Trace | None = None) -> "Messenger":
+        """
+        输出一个消息.
+        """
         pass
 
     @abstractmethod

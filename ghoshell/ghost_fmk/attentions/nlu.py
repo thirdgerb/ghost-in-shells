@@ -16,4 +16,4 @@ class TextClassifier(Intention):
         prop: float
 
     config: Config
-    result: Result | None = None
+    matched: Result | None = None

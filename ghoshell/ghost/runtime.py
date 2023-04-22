@@ -1,42 +1,59 @@
 import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Set, List, Dict, Optional
-from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost.exceptions import RuntimeException
+from ghoshell.ghost.url import URL
+from ghoshell.messages import Tasked
 
-TASK_STATUS = TypeVar('TASK_STATUS', bound=int)
-TASK_LEVEL = TypeVar('TASK_LEVEL', bound=int)
+TASK_STATUS = int
+TASK_LEVEL = int
 
 
 class TaskStatus:
-    NEW: TASK_STATUS = 0
-
     """
     任务的调度状态. 方便 Runtime 进行多任务调度.
     """
-    RUNNING: TASK_STATUS = 100  # RUNNING 是任务的默认状态. 其它的状态都是非默认的.
+
+    # 任务在运行状态
+    NEW: TASK_STATUS = 0
 
     # ---- 以下是中断状态, 等待外部输入 --- #
 
-    WAITING: TASK_STATUS = 200  # 等待外部输入来唤醒的任务, 自身已经中断.
+    # 等待外部输入来继续执行任务.
+    # 即便被别的任务打断了, 也仍然会等待用户输入.
+    # 期待事件: OnInput
+    WAITING: TASK_STATUS = 200  # 等待外部输入来唤醒的任务
 
     # ---- 以下是调度状态, 等待 Runtime 调度 --- #
 
-    BLOCKING: TASK_STATUS = 300  # 阻塞, 等待抢占式调度. 一旦任务的优先级低于阻塞中的任务, 就会发生切换事件.
+    # 任务进入睡眠状态. 等待调度来唤醒. 不会主动响应任何消息.
+    # 暂不实现.
+    # SLEEPING: TASK_STATUS = 300  # 等待系统调用, 重新激活
+
+    # 等待抢占式调度. 一旦任务的优先级低于阻塞中的任务, 就会发生切换事件.
+    PREEMPTING: TASK_STATUS = 300
 
     # ---- 以下是中断状态, 等待内部回调 --- #
 
-    YIELDING: TASK_STATUS = 400  # 异步任务, 等待异步任务的回调.
-    DEPENDING: TASK_STATUS = 500  # 同步任务, 等待另一个同步任务的回调.
+    # 任务正在异步执行中, 等待异步执行结果, 拿到结果后回到正常状态.
+    # YIELDING: TASK_STATUS = 400
+
+    # 同步任务, 等待另一个或多个同步任务的回调.
+    DEPENDING: TASK_STATUS = 500
 
     # ---- 以下是回收状态 --- #
 
-    FINISHED: TASK_STATUS = 600  # 任务已经完成, 但没有被清除.
-    CANCELED: TASK_STATUS = 700  # 任务已经取消
-    FAILED: TASK_STATUS = 800  # 任务已经失败
+    # 任务已经完成, 但没有被清除.
+    FINISHED: TASK_STATUS = 600
+
+    # 任务已经取消
+    CANCELED: TASK_STATUS = 700
+
+    # 任务已经失败
+    FAILED: TASK_STATUS = 800
 
     @classmethod
     def is_waiting_callback(cls, status: TASK_STATUS) -> bool:
@@ -80,12 +97,11 @@ class Task(BaseModel):
     # 这会导致运行时的相互覆盖问题, 需要做更复杂的锁来解决隔离.
     tid: str
 
-    # resolver 是任务的实现者, 用字符串来表示, 方便获取其运行逻辑.
-    # 没有和 think name 对齐, 这是考虑到 runtime 的实现并不是只有 mindset 这一种抽象.
-    resolver: str
+    # task 自我描述的 resolver, 相当于一个指针.
+    url: URL
 
-    # args: 任务的入参. 当一个任务的 resolver 支持传入参数时, 这里会需要传入 args
-    args: Dict = Field(default_factory=lambda: {})
+    # vars: 任务运行中的变量. 保存的时候非指针的信息需要清除掉.
+    vars: Dict | None = None
 
     # 是任务的运行状态. 如果我们把任务理解成一段代码, stage 则指向了代码中的某一行.
     # 值得注意的是, await_stage 只记录任务中断时的位置, 但 resolver 可能有大量的 stages
@@ -123,6 +139,35 @@ class Task(BaseModel):
     # 考虑增加一个时间戳记录被放入的时间, 但实际上这个时间戳很可能不够敏感?
     # restore_at: float
 
+    attentions: List[URL] | None = None
+
+    def to_tasked(self) -> Tasked:
+        """
+        返回出可传输, 可保存的 task 数据.
+        """
+        return Tasked(
+            url=self.url.dict(),
+            status=self.status,
+            vars=self.vars,
+            tid=self.tid,
+            overdue=self.overdue,
+            priority=self.priority,
+        )
+
+    def merge_tasked(self, tasked: Tasked):
+        """
+        合并一个 tasked 消息.
+        """
+        if tasked.tid is not None and self.tid != tasked.tid:
+            # todo
+            raise RuntimeException("todo")
+        self.vars = tasked.vars
+        self.await_stage = tasked.stage
+        self.overdue = tasked.overdue
+        self.priority = tasked.priority
+        # 状态需要 operator 调度.
+        # self.status = tasked.status
+
     @property
     def is_long_term(self) -> bool:
         """
@@ -137,7 +182,7 @@ class Task(BaseModel):
         表示任务本身可以是否可以被遗忘.
         如果是可被遗忘的, 则当任务被中断时, 就会进入静默的垃圾回收过程.
         """
-        return TaskStatus.RUNNING == self.status and self.priority < 0
+        return TaskStatus.NEW == self.status and self.priority < 0
 
     def insert(self, *stages: str) -> None:
         """
@@ -152,15 +197,16 @@ class Task(BaseModel):
             stack = stack.append(*self.forwards)
         self.forwards = stack
 
-    def forward(self) -> Optional[str]:
+    def forward(self) -> bool:
         """
         前进一个状态, 如果为 None 表示栈已经空了.
         """
         if len(self.forwards) == 0:
-            return None
+            return False
         _next = self.forwards[0]
         self.forwards = self.forwards[1:]
-        return _next
+        self.url = self.url.to_stage(_next)
+        return True
 
     def done(self, stage: str, status: TASK_STATUS) -> None:
         """
@@ -172,11 +218,11 @@ class Task(BaseModel):
         self.forwards = []
         self.depending = None
 
-    def be_awaiting(self, at_stage: str) -> None:
+    def await_at(self, at_stage: str) -> None:
         """
         等待输入侧的信息.
         """
-        self.status = TaskStatus.RUNNING
+        self.status = TaskStatus.WAITING
         self.await_stage = at_stage
         self.depending = None
 
@@ -186,7 +232,7 @@ class Task(BaseModel):
         """
         if stage is None:
             stage = self.await_stage
-        self.status = TaskStatus.BLOCKING
+        self.status = TaskStatus.PREEMPTING
         self.await_stage = stage
         self.depending = None
 
@@ -211,7 +257,7 @@ class Task(BaseModel):
         强行重置当前任务的状态.
         清空所有多余的信息.
         """
-        self.status = TaskStatus.RUNNING
+        self.status = TaskStatus.NEW
         self.await_stage = ""
         self.forwards = []
         self.depending = None
@@ -317,20 +363,6 @@ class Process(BaseModel):
         return self.parent_id is not None
 
     @property
-    def root_task(self) -> Task:
-        """
-        取出 Process 的根任务.
-        """
-        return self.get_task(self.root)
-
-    @property
-    def awaiting_task(self) -> Task:
-        """
-        取出等待中任务.
-        """
-        return self.get_task(self.awaiting)
-
-    @property
     def depended_by_map(self) -> Dict[str, Set[str]]:
         """
         生成一个数据结构, 用来返回所有被其它任务依赖的任务.
@@ -365,18 +397,18 @@ class Process(BaseModel):
         """
         blocking: List[Task] = []
         for task in self.tasks:
-            if task.status == TaskStatus.BLOCKING:
+            if task.status == TaskStatus.PREEMPTING:
                 blocking.append(task)
         blocking.sort(key=lambda t: t.priority, reverse=True)
         return [item.tid for item in blocking]
 
     @property
-    def running(self) -> List[str]:
+    def waiting(self) -> List[str]:
         """
         取出所有的运行中任务.
         要排除掉 await 和 root
         """
-        arr = self._get_tid_by_status(TaskStatus.RUNNING)
+        arr = self._get_tid_by_status(TaskStatus.WAITING)
         result = []
         # todo, 这样写感觉运行效率比较低, 内存开销增加. 不过问题不大.
         for tid in arr:
@@ -427,6 +459,9 @@ class Process(BaseModel):
         """
         return self.round == 0
 
+    def add_round(self) -> None:
+        self.round = self.round + 1
+
     def get_task(self, tid: str) -> Optional[Task]:
         """
         取出来一个任务的指针.
@@ -444,8 +479,10 @@ class Process(BaseModel):
         将任务记录到 Process 中.
         每次要重置索引.
         """
-        for p in tasks:
-            self._store_single_task(p)
+        for task in tasks:
+            if not self.root:
+                self.root = task.tid
+            self._store_single_task(task)
         self._reset_indexes()
 
     def _store_single_task(self, ptr: Task) -> None:
@@ -483,68 +520,68 @@ class Process(BaseModel):
             idx += 1
         self.__indexes = indexes
 
-    def gc(self, max_tasks: int = 30) -> List[Task]:
-        """
-        垃圾回收.
-        需要反复进化的复杂逻辑.
-        """
-        gc: List[Task] = []
-        alive: List[Task] = []
-        depended_by = self.depended_by_map
-        reversed_tasks = [ptr for ptr in reversed(self.tasks)]
-        # 检查基本状态.
-        for ptr in reversed_tasks:
-            tid = ptr.tid
-            if self._is_not_able_to_gc(tid):
-                alive.append(ptr)
-            if ptr.status == TaskStatus.DEPENDING and ptr.depending not in depended_by:
-                # 依赖一个任务, 但任务并不存在.
-                gc.append(ptr)
-                del depended_by[tid]
-            elif tid in depended_by:
-                # 如果被依赖中.
-                alive.append(ptr)
-            elif TaskStatus.is_able_to_gc(ptr.status):
-                #  明确可以 gc 的节点.
-                gc.append(ptr)
-            elif ptr.is_forgettable:
-                # 可以被遗忘的任务. 直接从栈里拿掉.
-                continue
-            else:
-                # 正常的节点.
-                alive.append(ptr)
-
-        # 如果没有超过栈深, 直接返回.
-        if len(alive) < max_tasks:
-            self.tasks = alive
-            self._reset_indexes()
-            return gc
-
-        # 否则用 lru 思路层层 gc
-        count = 0
-        result = []
-        for task in alive:
-            count += 1
-            tid = task.tid
-            if self._is_not_able_to_gc(tid):
-                result.append(task)
-            elif count > max_tasks:
-                continue
-            else:
-                result.append(task)
-            # todo 还需要更多的 gc 逻辑, 这里先这样了.
-        self.tasks = result
-        self._reset_indexes()
-
-        # 二次清洗.
-        # 再检查一次关联性的遗忘.
-        more = self.gc(max_tasks)
-        gc.append(*more)
-        self.__indexes = None
-        return gc
-
-    def _is_not_able_to_gc(self, tid: str):
-        return tid != self.root and tid != self.awaiting
+    # def gc(self, max_tasks: int = 30) -> List[Task]:
+    #     """
+    #     垃圾回收.
+    #     需要反复进化的复杂逻辑.
+    #     """
+    #     gc: List[Task] = []
+    #     alive: List[Task] = []
+    #     depended_by = self.depended_by_map
+    #     reversed_tasks = [ptr for ptr in reversed(self.tasks)]
+    #     # 检查基本状态.
+    #     for ptr in reversed_tasks:
+    #         tid = ptr.tid
+    #         if self._is_not_able_to_gc(tid):
+    #             alive.append(ptr)
+    #         if ptr.status == TaskStatus.DEPENDING and ptr.depending not in depended_by:
+    #             # 依赖一个任务, 但任务并不存在.
+    #             gc.append(ptr)
+    #             del depended_by[tid]
+    #         elif tid in depended_by:
+    #             # 如果被依赖中.
+    #             alive.append(ptr)
+    #         elif TaskStatus.is_able_to_gc(ptr.status):
+    #             #  明确可以 gc 的节点.
+    #             gc.append(ptr)
+    #         elif ptr.is_forgettable:
+    #             # 可以被遗忘的任务. 直接从栈里拿掉.
+    #             continue
+    #         else:
+    #             # 正常的节点.
+    #             alive.append(ptr)
+    #
+    #     # 如果没有超过栈深, 直接返回.
+    #     if len(alive) < max_tasks:
+    #         self.tasks = alive
+    #         self._reset_indexes()
+    #         return gc
+    #
+    #     # 否则用 lru 思路层层 gc
+    #     count = 0
+    #     result = []
+    #     for task in alive:
+    #         count += 1
+    #         tid = task.tid
+    #         if self._is_not_able_to_gc(tid):
+    #             result.append(task)
+    #         elif count > max_tasks:
+    #             continue
+    #         else:
+    #             result.append(task)
+    #         # todo 还需要更多的 gc 逻辑, 这里先这样了.
+    #     self.tasks = result
+    #     self._reset_indexes()
+    #
+    #     # 二次清洗.
+    #     # 再检查一次关联性的遗忘.
+    #     more = self.gc(max_tasks)
+    #     gc.append(*more)
+    #     self.__indexes = None
+    #     return gc
+    #
+    # def _is_not_able_to_gc(self, tid: str):
+    #     return tid != self.root and tid != self.awaiting
 
 
 class Runtime(metaclass=ABCMeta):
@@ -554,6 +591,15 @@ class Runtime(metaclass=ABCMeta):
     Runtime 是一个 Process 级的实现.
     对于一个 Ghost 而言, 可能存在多个 Process.
     """
+
+    @property
+    @abstractmethod
+    def session_id(self) -> str:
+        """
+        返回当前会话的 ID
+        通常也是根据会话 ID 来获取 Process.
+        """
+        pass
 
     @abstractmethod
     def lock_process(self, process_id: str | None = None) -> bool:
@@ -569,12 +615,10 @@ class Runtime(metaclass=ABCMeta):
     def unlock_process(self, process_id: str | None = None) -> bool:
         pass
 
-    @property
     @abstractmethod
-    def session_id(self) -> str:
+    def get_process(self, pid: str | None = None) -> Optional[Process]:
         """
-        返回当前会话的 ID
-        通常也是根据会话 ID 来获取 Process.
+        取出一个 process
         """
         pass
 
@@ -587,54 +631,6 @@ class Runtime(metaclass=ABCMeta):
         """
         pass
 
-    def fetch_task(self, tid: str, is_long_term: bool, pid: str | None = None) -> Optional[Task]:
-        """
-        根据 TaskID 取出一个 Task.
-        取不到的话, 说明协议上存在问题.
-        """
-        process = self.current_process()
-        task = process.get_task(tid)
-        if task is not None:
-            return task
-        if is_long_term:
-            task = self.fetch_long_term_task(tid)
-        if task is not None:
-            process.store_task(task)
-            return task
-        return None
-
-    @abstractmethod
-    def fetch_long_term_task(self, tid: str, pid: str | None = None) -> Optional[Task]:
-        pass
-
-    def store_task(self, *tasks: Task, pid: str | None = None) -> None:
-        """
-        添加一个 Task, 在 destroy 的时候才会保存.
-        """
-        pid = pid if pid else self.current_process_id
-        stack = []
-        for task in tasks:
-            # 保存结束状态的话, 需要清空状态栈
-            if TaskStatus.is_able_to_gc(task.status) and len(task.forwards) > 0:
-                task.forwards = []
-            if task.is_long_term:
-                self.store_long_term_task(task)
-            stack.append(task)
-
-        process = self.get_process(pid)
-        if process is not None:
-            process.store_task(*stack)
-            self.store_process(process)
-        return
-
-    @abstractmethod
-    def store_long_term_task(self, task: Task, pid: str | None = None) -> None:
-        pass
-
-    @abstractmethod
-    def get_process(self, pid: str | None = None) -> Optional[Process]:
-        pass
-
     def current_process(self) -> Process:
         """
         获取当前会话的进程
@@ -643,6 +639,30 @@ class Runtime(metaclass=ABCMeta):
         if process is None:
             raise RuntimeException(f"current process {self.current_process_id} not found, runtime initialize failed")
         return process
+
+    @abstractmethod
+    def gc_process(self, process: Process) -> None:
+        """
+        提供一个算法, 用来将 process 里的数据进行精简
+        这个方法通常在 finish 方法中被调用.
+        """
+        pass
+
+    @abstractmethod
+    def fetch_task(self, tid: str) -> Optional[Task]:
+        """
+        根据 TaskID 取出一个 Task.
+        Task 本身是一个任务的指针, tid 自己就包含了隔离级别
+        如果不能正确取出的话, 则应该用初始化的 task 去获取信息.
+        """
+        pass
+
+    @abstractmethod
+    def store_task(self, *tasks: Task) -> None:
+        """
+        添加一个 Task, 通常在 finish 的时候才会保存.
+        """
+        pass
 
     @abstractmethod
     def rewind(self, pid: str | None = None) -> Process:
@@ -666,5 +686,12 @@ class Runtime(metaclass=ABCMeta):
         1. process 内部的 gc
         2. process 的保存.
         3. 方便 python gc, 删除一些持有的数据.
+        """
+        pass
+
+    @abstractmethod
+    def destroy(self) -> None:
+        """
+        方便垃圾回收
         """
         pass

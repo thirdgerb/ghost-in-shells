@@ -1,16 +1,16 @@
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Optional, Dict
 
-from ghoshell.contracts import Container
-from ghoshell.ghost.io import Input, Output, Message
+from ghoshell.container import Container
+from ghoshell.ghost.io import Input, Output
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
     from ghoshell.ghost.operator import OperationManager, OperationKernel
     from ghoshell.ghost.mindset import Mindset, Thought
     from ghoshell.ghost.session import Session
-    from ghoshell.ghost.attention import Attentions
-    from ghoshell.ghost.uml import UML
+    from ghoshell.ghost.intention import Attention
+    from ghoshell.ghost.url import URL
     from ghoshell.ghost.runtime import Runtime
 
 
@@ -203,7 +203,7 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def root(self) -> "UML":
+    def root(self) -> "URL":
         pass
 
     @property
@@ -225,7 +225,7 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def mind(self) -> "Mindset":
+    def mindset(self) -> "Mindset":
         """
         用来获取所有的记忆.
         """
@@ -243,7 +243,7 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def attentions(self) -> "Attentions":
+    def attentions(self) -> "Attention":
         """
         机器人状态机当前保留的工程化注意力机制
         与算法不同, 注意的可能是命令行, API, 事件等复杂信息.
@@ -260,13 +260,6 @@ class Clone(metaclass=ABCMeta):
         """
         锁住一个 clone, 不让它产生新的分身.
         通常只要锁住进程(Process), 而不是锁住 clone
-        """
-        pass
-
-    @abstractmethod
-    def async_input(self, message: "Message", process_id: str) -> None:
-        """
-        异步输入一个消息.
         """
         pass
 

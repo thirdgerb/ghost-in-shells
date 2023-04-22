@@ -46,17 +46,30 @@ class AbstractMindset(Mindset, metaclass=ABCMeta):
     def register_sub_mindset(self, mindset: Mindset) -> None:
         self._sub_mindsets.append(mindset)
 
-    def register_driver(self, key: str, driver: ThinkDriver) -> None:
+    def register_driver(self, driver: ThinkDriver) -> None:
+        # 实现得复杂一些, 可以在这里放各种准入机制.
+        key = driver.driver_name()
         self._drivers[key] = driver
 
     def foreach_think(self) -> Iterator[Think]:
+        names = set()
+        # 一套遍历策略.
         for meta in self._foreach_local_think_metas():
+            if meta.url.resolver in names:
+                # 重名的跳过, 不允许遍历. 从而实现继承重写.
+                continue
+            names.add(meta.url.resolver)
             think = self._wrap_meta(meta)
             if think is not None:
                 yield think
 
+        # 遍历所有的子节点.
         for sub in self._sub_mindsets:
             for think in sub.foreach_think():
+                name = think.url().resolver
+                if name in names:
+                    continue
+                names.add(name)
                 yield think
 
     @abstractmethod
@@ -64,7 +77,12 @@ class AbstractMindset(Mindset, metaclass=ABCMeta):
         pass
 
 
-class LocalMindset(AbstractMindset):
+class DictMindset(AbstractMindset):
+    """
+    基于 dict 实现的 mind set.
+    显然, 只能作为 demo 使用.
+    真实的 mindset 应该要实现分布式配置中心.
+    """
 
     def __init__(self):
         self._local_metas: Dict[str, ThinkMeta] = {}
@@ -79,4 +97,4 @@ class LocalMindset(AbstractMindset):
             yield meta
 
     def register_meta(self, meta: ThinkMeta) -> None:
-        self._local_metas[meta.uml.think] = meta
+        self._local_metas[meta.url.resolver] = meta

@@ -1,7 +1,7 @@
 import logging
 from typing import Type
 
-from ghoshell.contracts.contract import Contract
+from ghoshell.container import Contract
 
 
 class LogManager(Contract):

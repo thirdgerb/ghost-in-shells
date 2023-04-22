@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from logging import LoggerAdapter
-from typing import Any, Optional, TYPE_CHECKING, List
+from typing import Any, Optional, TYPE_CHECKING, List, TypeVar, Type
+
+from ghoshell.messages import Message
 
 if TYPE_CHECKING:
-    from ghoshell.contracts import Container
+    from ghoshell.container import Container
     from ghoshell.ghost.ghost import Clone
-    from ghoshell.ghost.mindset import Thought
-    from ghoshell.ghost.io import Input, Output
-    from ghoshell.ghost.operator import OperationManager
+    from ghoshell.ghost.mindset import Thought, Mind
+    from ghoshell.ghost.io import Input, Output, Trace
     from ghoshell.ghost.messenger import Messenger
+
+M = TypeVar('M', bound=Message)
 
 
 class Context(metaclass=ABCMeta):
@@ -29,11 +32,19 @@ class Context(metaclass=ABCMeta):
         """
         return self.clone.container
 
-    def manage(self, this: "Thought") -> "OperationManager":
+    @abstractmethod
+    def mind(self, this: "Thought") -> "Mind":
         """
         操作上下文的关键方法.
         """
-        return self.clone.manage(this)
+        pass
+
+    @abstractmethod
+    def read(self, expect: Type[M]) -> M | None:
+        """
+        从上下文中读取信息.
+        """
+        pass
 
     @abstractmethod
     def send(self, _with: "Thought") -> Messenger:
@@ -67,7 +78,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def async_input(self, _input: "Input") -> None:
+    def async_input(self, message: Message, pid: Optional[str] = None, trace: Optional["Trace"] = None) -> None:
         """
         ghost 给 ghost 发送信息时使用
         """

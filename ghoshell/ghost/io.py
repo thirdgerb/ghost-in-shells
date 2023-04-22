@@ -4,7 +4,7 @@ from typing import Dict, Optional, List
 
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost.uml import UML
+from ghoshell.ghost.url import URL
 from ghoshell.messages import *
 
 
@@ -53,8 +53,8 @@ class Input(BaseModel):
     # ghost 约定的上下文协议. 可以传入额外的信息
     ghost_env: Dict = None
 
-    # 请求相关的场景. 如果 ghost 是初始化, 则用 UML 定位场景.
-    uml: Optional[UML] = None
+    # 请求相关的场景. 如果 ghost 是初始化, 则用 url 定位场景.
+    url: Optional[URL] = None
 
     # 如果是无状态请求, 则这个消息预期不会变更 ghost 的状态.
     # 任何与状态相关的动作都不应该最终保存.

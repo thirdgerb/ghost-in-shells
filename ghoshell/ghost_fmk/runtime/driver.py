@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from typing import Dict, List
 
-from ghoshell.contracts import Cache
+from ghoshell.container import Cache
 
 TaskData = namedtuple("TaskData", "data overdue")
 

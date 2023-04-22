@@ -9,17 +9,33 @@ class Container:
     一个简单的容器, 用来存放一些有隔离级别的单例.
     这个单例可以通过 contract 的方式来获取, 变更实现.
     Python 没有比较方便的 IOC, 用来解耦各种与架构设计无关的 interface 获取.
-    所以自己做了一个极简的方式, 方便各种工具封装 Adapter
+    所以自己做了一个极简的方式, 方便各种工具封装 Adapter, 在工程中复用
     """
 
-    def __init__(self):
+    def __init__(self, parent: Container | None = None):
         self.__instances: Dict[str, Any] = {}
+        self.__parent = parent
 
     def set(self, abstract_name: str, instance: Any) -> Any:
+        """
+        设置一个实例
+        """
         self.__instances[abstract_name] = instance
 
     def get(self, abstract_name: str) -> Any | None:
-        return self.__instances.get(abstract_name, None)
+        """
+        获取一个实例.
+        """
+        got = self.__instances.get(abstract_name, None)
+        if got is not None:
+            return got
+        if self.__parent is not None:
+            return self.__parent.get(abstract_name)
+        return None
+
+    def destroy(self) -> None:
+        del self.__instances
+        del self.__parent
 
 
 class Contract(metaclass=ABCMeta):

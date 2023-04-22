@@ -12,7 +12,11 @@ class Payload(BaseModel):
 
     todo: 未来 payload 也需要支持多轮输入聚合. 等有具体场景再研究.
     """
+    # 消息体的唯一 ID
     id: str
+
+    # 消息体如果和 Task 挂钩的话, 可以携带 task 的 id
+    tid: str
 
     # body 仍然是一个 1:n:n 的协议
     body: Dict[str, Dict]
@@ -27,7 +31,7 @@ class Message(BaseModel, metaclass=ABCMeta):
     KIND: ClassVar[str] = ""
 
     @classmethod
-    def wrap(cls, payload: Payload) -> Optional["Message"]:
+    def from_payload(cls, payload: Payload) -> Optional["Message"]:
         data = payload.body.get(cls.KIND, None)
         if data is None:
             return None
@@ -36,4 +40,3 @@ class Message(BaseModel, metaclass=ABCMeta):
     def join_payload(self, payload: Payload) -> Payload:
         payload.body[self.KIND] = self.dict()
         return payload
-
