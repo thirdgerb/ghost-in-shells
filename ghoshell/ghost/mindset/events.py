@@ -16,12 +16,14 @@ class Event(metaclass=ABCMeta):
     发生在 Runtime 的调度过程中.
     """
 
-    def __init__(self, target: URL, fr: URL | None):
-        self.target = target
-        self.fr = fr  # from
+    def __init__(self, task_id: str, stage: str, fr: URL | None):
+        self.task_id = task_id  # task_id
+        self.stage = stage
+        self.fr = fr  # task_id
 
     def destroy(self):
-        del self.target
+        del self.task_id
+        del self.stage
         del self.fr
 
 
@@ -35,9 +37,9 @@ class Intending(Event):
     会包含 Params, 是对 Input 解析后, 适配为结构化的参数
     """
 
-    def __init__(self, target: URL, fr: URL | None, matched: Dict):
+    def __init__(self, task_id: str, stage: str, fr: URL | None, matched: Dict):
+        super().__init__(task_id, stage, fr)
         self.matched = matched
-        super().__init__(target, fr)
 
     def destroy(self):
         super().destroy()
@@ -55,8 +57,8 @@ class Callback(Event):
     任务与任务之间的回调.
     """
 
-    def __init__(self, listener: URL, fr: URL, data: Dict | None):
-        super().__init__(listener, fr)
+    def __init__(self, task_id: str, stage: str, fr: URL, data: Dict | None):
+        super().__init__(task_id, stage, fr)
         self.data = data
 
     def destroy(self):

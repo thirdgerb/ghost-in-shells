@@ -1,4 +1,5 @@
-from typing import Dict, List
+import hashlib
+from typing import Dict, List, Any
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +17,7 @@ class UniformResolverLocator(BaseModel):
 
     # 参数, 如果是需要入参的状态机, 不传入正确的参数可能会报错, 或者影响运转的初始状态.
     # 注意, 每个 Resolver 能力应该有自己的 arguments 协议.
-    args: Dict = Field(default_factory=lambda: {})
+    args: Dict[str, Any] = Field(default_factory=lambda: {})
 
     # def is_same(self, url: "UniformMindLocator") -> bool:
     #     return (self.ghost == url.ghost or url.ghost == "") and self.Resolver == url.Resolver
@@ -41,6 +42,28 @@ class UniformResolverLocator(BaseModel):
             url = self.new_with(stage=stage)
             result.append(url)
         return result
+
+    def new_id(self, extra: Dict[str, str] = None, includes: set = None, args: bool = False) -> str:
+        """
+        提供一个默认的方法用来生成一个 id.
+        """
+        extra_str = ""
+        if extra is not None:
+            keys = extra.keys()
+            sort = sorted(keys)
+            for key in sort:
+                if includes is not None and key not in includes:
+                    continue
+                extra_str += f"&{key}={extra[key]}"
+        args_str = ""
+        if args and self.args:
+            keys = self.args.keys()
+            sort = sorted(keys)
+            for key in sort:
+                args_str += f"&{key}={self.args[key]}"
+
+        template = f"{self.resolver}::{self.stage}?{extra_str}::{args_str}"
+        return hashlib.md5(template).hexdigest()
 
     # def is_same(self, other: "url") -> bool:
     #     return (other.ghost == "" or self.ghost == "" or self.ghost == other.ghost) \

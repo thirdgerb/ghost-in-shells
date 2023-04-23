@@ -33,9 +33,10 @@ class Context(metaclass=ABCMeta):
         return self.clone.container
 
     @abstractmethod
-    def mind(self, this: "Thought") -> "Mind":
+    def mind(self, this: Optional["Thought"]) -> "Mind":
         """
         操作上下文的关键方法.
+        如果 this 为 None, 则操作对象为 awaiting 任务.
         """
         pass
 
@@ -78,7 +79,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def async_input(self, message: Message, trace: Optional["Trace"] = None) -> None:
+    def async_input(self, message: Message, pid: str | None = None, trace: Optional["Trace"] = None) -> None:
         """
         ghost 给 ghost 发送信息时使用
         pid 为 None, Trace 为 None 时, 默认是开启子进程.

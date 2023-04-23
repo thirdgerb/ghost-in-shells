@@ -17,6 +17,7 @@ class Tasked(Message):
 
     resolver: str
     stage: str
+    status: int
     args: Dict
     vars: Dict
-    tid: str | None = None
+    # tid: str | None = None

@@ -1,6 +1,6 @@
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 
 from pydantic import BaseModel, Field
 
@@ -67,12 +67,12 @@ class TaskStatus:
     #     """
     #     return status in (cls.DEPENDING, cls.YIELDING)
     #
-    # @classmethod
-    # def is_able_to_gc(cls, status: TASK_STATUS) -> bool:
-    #     """
-    #     进入可以被 GC 的状态.
-    #     """
-    #     return status in (cls.FINISHED, cls.CANCELED, cls.FAILED)
+    @classmethod
+    def is_final(cls, status: TASK_STATUS) -> bool:
+        """
+        进入可以被 GC 的状态.
+        """
+        return status in (cls.FINISHED, cls.DEAD)
 
 
 class TaskLevel:
@@ -139,7 +139,7 @@ class Task(BaseModel):
 
     # depending: 如果存在一个任务依赖另一个任务, 这里记录所依赖任务的 tid
     # 被依赖的任务必须要在 process 或者 runtime 里保存, 能够被读取出来.
-    callbacks: List[URL] = Field(default_factory=lambda: [])
+    callbacks: Set[str] | None = None
 
     # 考虑增加一个时间戳记录被放入的时间, 但实际上这个时间戳很可能不够敏感?
     # restore_at: float
@@ -153,6 +153,7 @@ class Task(BaseModel):
         return Tasked(
             resolver=self.url.resolver,
             stage=self.url.stage,
+            status=self.status,
             args=self.url.args.copy(),
             vars=self.vars,
             tid=self.tid,
@@ -162,13 +163,10 @@ class Task(BaseModel):
         """
         合并一个 tasked 消息.
         """
-        if tasked.tid is not None and self.tid != tasked.tid:
-            # todo
-            raise RuntimeException("todo")
-
         # 重置状态.
-        self.restart()
+        self.url.stage = tasked.stage
         self.vars = tasked.vars
+        # self.status = tasked.status
 
     @property
     def is_long_term(self) -> bool:
@@ -211,7 +209,7 @@ class Task(BaseModel):
         self.forwards = self.forwards[1:]
         return _next
 
-    def done(self, status: TASK_STATUS, stage: str | None) -> List[URL]:
+    def done(self, status: TASK_STATUS, stage: str | None) -> Set[str] | None:
         """
         标记 task 已经结束. 会清空掉状态相关的信息.
         status 应该是回收状态中的一种.
@@ -221,8 +219,13 @@ class Task(BaseModel):
         if stage is not None:
             self.url.stage = stage
         callbacks = self.callbacks
-        self.callbacks = []
+        self.callbacks = None
         return callbacks
+
+    def add_callback(self, tid: str) -> None:
+        if self.callbacks is None:
+            self.callbacks = set()
+        self.callbacks.add(tid)
 
     def await_at(self, at_stage: str) -> None:
         """
@@ -316,12 +319,13 @@ class Process(BaseModel):
     # 注意这个 tasks 是有序的,
     # 所有变更过状态的 task 会保存到数组的头部.
     # 数组的 index == 0 是头部, 符合人类直觉.
-    tasks: List[Task] = []
+    tasks: List[Task] = Field(default_factory=lambda: [])
 
     # 表示进程是否是退出状态.
     quiting: bool = False
 
     __indexes: Optional[Dict[str, int]] = None
+    __status_list_indexes: Optional[Dict[int, List[str]]] = None
 
     @classmethod
     def new_process(cls, sid: str, root: Task, pid: str | None = None, parent_id: str | None = None) -> "Process":
@@ -361,6 +365,14 @@ class Process(BaseModel):
         如果上下文命中了一个等待任务, 应该进入到它依赖的对象.
         """
         return self._get_tid_by_status(TaskStatus.DEPENDING)
+
+    @property
+    def running(self) -> List[str]:
+        """
+        等待回调的任务, 依赖另一个任务的完成.
+        如果上下文命中了一个等待任务, 应该进入到它依赖的对象.
+        """
+        return self._get_tid_by_status(TaskStatus.RUNNING)
 
     @property
     def canceling(self) -> List[str]:
@@ -425,11 +437,16 @@ class Process(BaseModel):
         return self._get_tid_by_status(TaskStatus.FINISHED)
 
     def _get_tid_by_status(self, status: TASK_STATUS) -> List[str]:
-        result: List[str] = []
-        for task in self.tasks:
-            if task.status == status:
-                result.append(task.tid)
-        return result
+        if self.__status_list_indexes is None:
+            status_indexes = {}
+            for task in self.tasks:
+                status = task.status
+                if status not in status_indexes:
+                    status_indexes[status] = []
+                status_indexes[status].append(task.tid)
+            self.__status_list_indexes = status_indexes
+
+        return self.__status_list_indexes.get(status, [])
 
     @property
     def is_new(self) -> bool:
@@ -447,7 +464,7 @@ class Process(BaseModel):
         取出来一个任务的指针.
         """
         if self.__indexes is None or len(self.__indexes) == 0:
-            self._reset_indexes()
+            self.__reset_indexes()
         indexes = self.__indexes
         if tid not in indexes:
             return None
@@ -463,7 +480,7 @@ class Process(BaseModel):
             if not self.root:
                 self.root = task.tid
             self._store_single_task(task)
-        self._reset_indexes()
+        self.__clear()
 
     def _store_single_task(self, ptr: Task) -> None:
         """
@@ -488,11 +505,41 @@ class Process(BaseModel):
         将进程重置到根任务上.
         """
         root = self.get_task(self.root)
+        root.restart()
         self.awaiting = self.root
         self.tasks = [root]
-        self._reset_indexes()
+        self.__clear()
 
-    def _reset_indexes(self) -> None:
+    def __clear(self) -> None:
+        self.__indexes = None
+        self.__status_list_indexes = None
+
+    def fallback(self) -> Task | None:
+        canceling = self.canceling
+        if len(canceling) > 0:
+            return self.get_task(canceling[0])
+        failing = self.failing
+        if len(failing) > 0:
+            return self.get_task(failing[0])
+
+        # running = self.running
+        # if len(running) > 0:
+        #     tid = running[0]
+        #     # running 的任务执行 forward
+        #     return self.get_task(tid)
+
+        preempting = self.preempting
+        if len(preempting) > 0:
+            tid = preempting[0]
+            return self.get_task(tid)
+
+        waiting = self.waiting
+        if len(waiting) > 0:
+            tid = waiting[0]
+            return self.get_task(tid)
+        return None
+
+    def __reset_indexes(self) -> None:
         indexes = {}
         idx = 0
         for task in self.tasks:

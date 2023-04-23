@@ -19,10 +19,8 @@ class Thought(metaclass=ABCMeta):
     thought 的生命周期: task => thought => task
     thought 是 task 与 mindset 互动时的中间态数据, 用来做强类型提示.
     """
-    tid: str
-
-    # 入参数据
-    url: URL
+    tid: str = ""
+    url: URL | None = None
 
     overdue: int = 0
 
@@ -34,12 +32,9 @@ class Thought(metaclass=ABCMeta):
 
     def __init__(
             self,
-            tid: str,
-            url: URL,
+            args: Dict
     ):
-        self.tid = tid
-        self.url = url.copy()
-        self.prepare(url.args)
+        self.prepare(args)
 
     # ---- 抽象方法 ---- #
     @abstractmethod

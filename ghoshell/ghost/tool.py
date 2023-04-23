@@ -22,6 +22,11 @@ class CtxTool:
     """
 
     @classmethod
+    def fetch_thought(cls, ctx: "Context", url: URL) -> Thought:
+        task = RuntimeTool.fetch_task_by_url(ctx, url, True)
+        return RuntimeTool.fetch_thought_by_task(ctx, task)
+
+    @classmethod
     def fetch_think_result(cls, ctx: "Context", url: URL) -> Tuple[bool, Optional[Dict]]:
         task = RuntimeTool.fetch_task_by_url(ctx, url, False)
         # 目标任务未初始化.
@@ -229,28 +234,27 @@ class RuntimeTool:
         """
         基于 thought 触发一个 stage 的事件.
         """
-        target_url = event.target
-        # 初始化 thought. 这个 thought 里应该包含正确的 tid.
-        thought = cls.new_thought(ctx, target_url)
+        if event.fr is None:
+            awaiting = RuntimeTool.fetch_awaiting_task(ctx)
+            event.fr = awaiting.url.new_with()
 
         # 用 task 的信息补完 thought
-        task = cls.fetch_task(ctx, thought.tid)
-        # 将变量注入到 thought.
-        if task is not None:
-            thought = cls.merge_task_to_thought(task, thought)
+        task = cls.force_fetch_task(ctx, event.task_id)
 
-        # 触发事件.
-        stage = CtxTool.force_fetch_stage(ctx, target_url.resolver, target_url.stage)
+        # 初始化 thought. 这个 thought 里应该包含正确的 tid.
+        # 将变量注入到 thought.
+        thought = cls.fetch_thought_by_task(ctx, task)
+        thought.url.stage = event.stage
+
+        # 触发事件. 要使用 event 的 stage
+        stage = CtxTool.force_fetch_stage(ctx, thought.url.resolver, thought.url.stage)
         after = stage.on_event(ctx, thought, event)
 
         # 这时 thought 已经变更了, 变更的信息要保存到 task 里.
-        if task is None:
-            task = RuntimeTool.new_task(ctx, target_url)
         task = RuntimeTool.merge_thought_to_task(thought, task)
 
         # 保存 task 变更后的状态.
         cls.store_task(ctx, task)
-
         # 帮助 python 做 gc 的准备工作.
         thought.destroy()
         event.destroy()
@@ -261,9 +265,6 @@ class RuntimeTool:
     def fetch_thought_by_task(cls, ctx: Context, task: Task) -> Thought:
         # 初始化 thought. 这个 thought 里应该包含正确的 tid.
         thought = cls.new_thought(ctx, task.url)
-        if thought.tid != task.tid:
-            # todo
-            raise RuntimeException("todo")
         thought = cls.merge_task_to_thought(task, thought)
         return thought
 
@@ -277,17 +278,13 @@ class RuntimeTool:
         return task
 
     @classmethod
-    def fetch_process_tasks_by_urls(cls, ctx: Context, urls: List[URL]) -> List[Task]:
+    def fetch_process_tasks_by_ids(cls, ctx: Context, ids: List[str]) -> List[Task]:
         process = ctx.clone.runtime.current_process()
         result = []
-        for url in urls:
-            tid = RuntimeTool.new_task_id(ctx, url)
+        for tid in ids:
             ptr = process.get_task(tid)
             if ptr is None:
                 # 已经不被需要了.
-                continue
-            if ptr.url.stage != url.stage:
-                # 也不被需要了.
                 continue
             result.append(ptr)
         return result
@@ -332,7 +329,6 @@ class RuntimeTool:
         """
         think = ctx.clone.mindset.force_fetch(url.resolver)
         thought = think.new_thought(ctx, url.args)
-        thought.url.stage = url.stage
         return thought
 
     @classmethod
@@ -342,6 +338,8 @@ class RuntimeTool:
         if task.vars is not None:
             thought.set_variables(task.vars)
         # stage 以 url 为准. 不以 task 为准. 这个 trick 还是让人不舒服.
+        thought.tid = task.tid
+        thought.url = task.url.new_with()
         thought.status = task.status
         thought.level = task.level
         thought.overdue = task.overdue
@@ -395,14 +393,6 @@ class RuntimeTool:
     def store_task(cls, ctx: Context, *tasks: Task) -> None:
         if len(tasks) > 0:
             ctx.clone.runtime.store_task(*tasks)
-
-    @classmethod
-    def quit_current_process(cls, ctx: Context) -> None:
-        runtime = ctx.clone.runtime
-        process = runtime.current_process()
-        process.quit()
-        runtime.store_process(process)
-        return None
 
     @classmethod
     def set_quiting(cls, ctx: Context, quiting: bool) -> None:
