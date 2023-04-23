@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Optional, List, Dict, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.url import URL
@@ -24,9 +24,12 @@ class Intention(BaseModel):
     每一种预测的意图, 都应该通过不同的解析机制来解决.
     """
     KIND: ClassVar[str] = ""
-    config: Dict = Field(default_factory=lambda: {})
-    url: URL | None = None
+    to: URL
+    config: Dict
+    # 私有意图只有在当前任务中能被识别和匹配.
+    private: bool = False
     matched: Dict | None = None
+    fr: URL | None = None
 
 
 class Attention(metaclass=ABCMeta):

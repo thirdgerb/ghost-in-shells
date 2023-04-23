@@ -3,11 +3,11 @@ from typing import Optional, Dict, List, Any, Tuple, Type
 
 from ghoshell.ghost import Callback
 from ghoshell.ghost import Context, URL, Process
+from ghoshell.ghost import Fallback, Intending, Attending
 from ghoshell.ghost import OnPreempt
 from ghoshell.ghost import OnStart, OnStaging
 from ghoshell.ghost import Operator, OperationManager
 from ghoshell.ghost import Payload
-from ghoshell.ghost import Receiving, Fallback, Intending, Attending
 from ghoshell.ghost import RuntimeTool, CtxTool
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
 from ghoshell.ghost import Thought
@@ -143,16 +143,16 @@ class OpReceive(AbsOperator):
         #  接下来进行意图匹配
         awaiting_task = ctx.clone.runtime.current_process().awaiting_task
         # 检查是否匹配到某个 router
-        router_intentions = CtxTool.context_attentions(ctx)
+        router_intentions = CtxTool.context_forward_intentions(ctx)
         matched = CtxTool.match_intentions(ctx, router_intentions, awaiting_task.level == TaskLevel.LEVEL_PUBLIC)
         if matched is not None:
-            return OpIntendTo(matched.url, matched.matched, route=True)
+            return OpIntendTo(matched.fr, matched.matched, route=True)
 
         # 检查是否匹配了回调栈中的意图.
-        fallback_intentions = CtxTool.context_intentions(ctx)
+        fallback_intentions = CtxTool.context_backward_intentions(ctx)
         matched = CtxTool.match_intentions(ctx, fallback_intentions, public=False)
         if matched is not None:
-            return OpIntendTo(matched.url, matched.matched, route=False)
+            return OpIntendTo(matched.fr, matched.matched, route=False)
         return None
 
     @classmethod
@@ -165,9 +165,9 @@ class OpReceive(AbsOperator):
         match tasked.status:
             case TaskStatus.WAITING:
                 return OpAwait(task.url)
-            case TaskStatus.CANCELED:
+            case TaskStatus.CANCELING:
                 return OpCancel(task.url, None, None)
-            case TaskStatus.FAILED:
+            case TaskStatus.FAILING:
                 return OpFail(task.url, None, None)
             case TaskStatus.PREEMPTING:
                 return OpBlock(task.url, None)
@@ -269,7 +269,7 @@ class OpIntendTo(AbsOperator):
                 matched = ctx.clone.attentions.match(ctx, *intentions)
                 params = matched.matched
 
-        wrapper: Type[Receiving] = Attending if self.attend else Intending
+        wrapper: Type[Intending] = Attending if self.attend else Intending
         task = RuntimeTool.fetch_task_by_url(ctx, self.to, True)
         event = wrapper(task, self.fr, params)
         return RuntimeTool.fire_event(ctx, event)
@@ -448,7 +448,7 @@ class OpSchedule(AbsOperator):
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         runtime = ctx.clone.runtime
         process = runtime.current_process()
-        blocking = process.blocking
+        blocking = process.preempting
         if len(blocking) > 0:
             return self._preempt(ctx, process, blocking[0])
 
@@ -530,7 +530,7 @@ class OpRepeat(AbsOperator):
         # 拿到原始的 process
         process = runtime.current_process()
         awaits_task = runtime.fetch_task(process.awaiting)
-        target = awaits_task.url.to_stage(awaits_task.await_stage)
+        target = awaits_task.url.new_with(stage=awaits_task.await_stage)
         return OpAwait(target)
 
     def _next(self, ctx: "Context") -> Optional["Operator"]:
@@ -572,7 +572,7 @@ class OpCancel(AbsOperator):
     """
     取消当前任务, 并层层取消.
     """
-    status = TaskStatus.CANCELED
+    status = TaskStatus.CANCELING
 
     def __init__(self, current: URL, fr: Optional[URL] = None, reason: Any | None = None,
                  withdraw_list: List[str] = None):
@@ -669,7 +669,7 @@ class OpFail(OpCancel):
     当前任务失败, 会向上返回失败.
     走的是和 Cancel 一样的流程, 只是事件不同.
     """
-    status = TaskStatus.FAILED
+    status = TaskStatus.FAILING
 
     def _event(self) -> Type[Withdrawing]:
         return Failing
@@ -680,7 +680,7 @@ class OpQuit(OpCancel):
     退出所有的任务.
     每一个任务可以拦截
     """
-    status = TaskStatus.CANCELED
+    status = TaskStatus.CANCELING
 
     def _event(self) -> Type[Withdrawing]:
         return Quiting
@@ -692,7 +692,7 @@ class OpQuit(OpCancel):
 
         process = ctx.clone.runtime.current_process()
         # blocking 优先.
-        blocking = process.blocking
+        blocking = process.preempting
         if len(blocking) > 0:
             self.withdraw_list = [blocking[0]]
             return super()._next(ctx)
@@ -744,7 +744,7 @@ class OpDependOn(AbsOperator):
 
         task = RuntimeTool._fetch_task_by_thought(ctx, self.this)
         task.status = TaskStatus.DEPENDING
-        task.depending = target.tid
+        task.callbacks = target.tid
         # 保存当前的 task
         ctx.clone.runtime.store_task(task)
         return
@@ -803,7 +803,7 @@ class OpRedirect(AbsOperator):
         target = self.target_thought(ctx)
         task = RuntimeTool._fetch_task_by_thought(ctx, target)
         match task.status:
-            case TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING, TaskStatus.NEW:
+            case TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING, TaskStatus.RUNNING:
                 event = OnPreempt(target, self.this_url)
                 return RuntimeTool.fire_event_with_thought(ctx, event)
             case _:
@@ -829,7 +829,7 @@ class OpRestart(AbsOperator):
 
     def _save_change(self, ctx: "Context") -> None:
         task = RuntimeTool._fetch_task_by_thought(ctx, self.this)
-        task.reset()
+        task.restart()
         RuntimeTool.save_task(ctx, task)
         return
 
@@ -855,7 +855,7 @@ class OpCallback(AbsOperator):
 
     def _save_change(self, ctx: "Context") -> None:
         task = RuntimeTool._fetch_task_by_thought(ctx, self.this)
-        task.status = TaskStatus.NEW
+        task.status = TaskStatus.RUNNING
         RuntimeTool.save_task(ctx, task)
         self.this = RuntimeTool.merge_thought_from_task(self.this, task)
         return
@@ -927,7 +927,7 @@ class OpYieldTo(AbsOperator):
         task = RuntimeTool._fetch_task_by_thought(ctx, self.this)
         task.status = TaskStatus.YIELDING
         target_id = RuntimeTool.new_tid(ctx, self.to)
-        task.depending = target_id
+        task.callbacks = target_id
         runtime = ctx.clone.runtime
         runtime.store_task(task)
         process = runtime.current_process()

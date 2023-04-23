@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -24,19 +24,23 @@ class UniformResolverLocator(BaseModel):
     def new(cls, resolver: str, stage: str, args: Dict):
         return URL(resolver=resolver, stage=stage, args=args)
 
-    def to_stage(self, stage: str) -> "UniformResolverLocator":
+    def new_with(self, stage: str | None = None, args: Dict | None = None):
+        if stage is None:
+            stage = self.stage
+        if args is None:
+            args = self.args.copy()
         return UniformResolverLocator(
             resolver=self.resolver,
             stage=stage,
-            args=self.args.copy()
+            args=args,
         )
 
-    def new_args(self, args: Dict) -> "UniformResolverLocator":
-        return UniformResolverLocator(
-            resolver=self.resolver,
-            stage=self.stage,
-            args=args.copy()
-        )
+    def new_with_stages(self, *stages: str) -> List["URL"]:
+        result = []
+        for stage in stages:
+            url = self.new_with(stage=stage)
+            result.append(url)
+        return result
 
     # def is_same(self, other: "url") -> bool:
     #     return (other.ghost == "" or self.ghost == "" or self.ghost == other.ghost) \

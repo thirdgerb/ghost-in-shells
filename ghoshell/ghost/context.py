@@ -78,9 +78,10 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def async_input(self, message: Message, pid: Optional[str] = None, trace: Optional["Trace"] = None) -> None:
+    def async_input(self, message: Message, trace: Optional["Trace"] = None) -> None:
         """
         ghost 给 ghost 发送信息时使用
+        pid 为 None, Trace 为 None 时, 默认是开启子进程.
         """
         pass
 

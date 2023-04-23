@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 
 from pydantic import BaseModel, Field
 
@@ -44,7 +44,7 @@ class Think(BaseModel, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def description(self, thought: Thought) -> str:
+    def description(self, thought: Thought) -> Any:
         pass
 
     @abstractmethod

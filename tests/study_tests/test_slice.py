@@ -14,3 +14,10 @@ def test_array_append():
     assert len(arr) == 4
     assert arr.pop() == 4
     assert len(arr) == 3
+
+
+def test_slice_insert():
+    arr = list([2, 5, 3])
+    arr.insert(0, 6)
+    assert arr[0] == 6
+    assert len(arr) == 4

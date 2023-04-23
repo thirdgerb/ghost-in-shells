@@ -1,6 +1,6 @@
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import Set, List, Dict, Optional
+from typing import List, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,8 +17,10 @@ class TaskStatus:
     任务的调度状态. 方便 Runtime 进行多任务调度.
     """
 
-    # 任务在运行状态
     NEW: TASK_STATUS = 0
+
+    # 任务在运行状态
+    RUNNING: TASK_STATUS = 100
 
     # ---- 以下是中断状态, 等待外部输入 --- #
 
@@ -39,7 +41,7 @@ class TaskStatus:
     # ---- 以下是中断状态, 等待内部回调 --- #
 
     # 任务正在异步执行中, 等待异步执行结果, 拿到结果后回到正常状态.
-    # YIELDING: TASK_STATUS = 400
+    YIELDING: TASK_STATUS = 400
 
     # 同步任务, 等待另一个或多个同步任务的回调.
     DEPENDING: TASK_STATUS = 500
@@ -49,25 +51,28 @@ class TaskStatus:
     # 任务已经完成, 但没有被清除.
     FINISHED: TASK_STATUS = 600
 
-    # 任务已经取消
-    CANCELED: TASK_STATUS = 700
+    # 任务取消中
+    CANCELING: TASK_STATUS = 700
 
-    # 任务已经失败
-    FAILED: TASK_STATUS = 800
+    # 任务失败中
+    FAILING: TASK_STATUS = 800
 
-    @classmethod
-    def is_waiting_callback(cls, status: TASK_STATUS) -> bool:
-        """
-        表示任务等待内部的回调.
-        """
-        return status in (cls.DEPENDING, cls.YIELDING)
+    # 任务已经彻底取消.
+    DEAD: TASK_STATUS = 900
 
-    @classmethod
-    def is_able_to_gc(cls, status: TASK_STATUS) -> bool:
-        """
-        进入可以被 GC 的状态.
-        """
-        return status in (cls.FINISHED, cls.CANCELED, cls.FAILED)
+    # @classmethod
+    # def is_waiting_callback(cls, status: TASK_STATUS) -> bool:
+    #     """
+    #     表示任务等待内部的回调.
+    #     """
+    #     return status in (cls.DEPENDING, cls.YIELDING)
+    #
+    # @classmethod
+    # def is_able_to_gc(cls, status: TASK_STATUS) -> bool:
+    #     """
+    #     进入可以被 GC 的状态.
+    #     """
+    #     return status in (cls.FINISHED, cls.CANCELED, cls.FAILED)
 
 
 class TaskLevel:
@@ -110,7 +115,7 @@ class Task(BaseModel):
 
     # status: 当前任务在 runtime 中排列用的状态.
     # 用来让 runtime 调度多个同时存在的 tasks
-    status: TASK_STATUS = TaskStatus.NEW
+    status: TASK_STATUS = TaskStatus.RUNNING
 
     # level: 当前任务的开放程度.
     # 决定了任务执行中, 是否可以被中断. 目前有三种级别.
@@ -134,7 +139,7 @@ class Task(BaseModel):
 
     # depending: 如果存在一个任务依赖另一个任务, 这里记录所依赖任务的 tid
     # 被依赖的任务必须要在 process 或者 runtime 里保存, 能够被读取出来.
-    depending: Optional[str] = None
+    callbacks: List[URL] = Field(default_factory=lambda: [])
 
     # 考虑增加一个时间戳记录被放入的时间, 但实际上这个时间戳很可能不够敏感?
     # restore_at: float
@@ -146,12 +151,11 @@ class Task(BaseModel):
         返回出可传输, 可保存的 task 数据.
         """
         return Tasked(
-            url=self.url.dict(),
-            status=self.status,
+            resolver=self.url.resolver,
+            stage=self.url.stage,
+            args=self.url.args.copy(),
             vars=self.vars,
             tid=self.tid,
-            overdue=self.overdue,
-            priority=self.priority,
         )
 
     def merge_tasked(self, tasked: Tasked):
@@ -161,12 +165,10 @@ class Task(BaseModel):
         if tasked.tid is not None and self.tid != tasked.tid:
             # todo
             raise RuntimeException("todo")
+
+        # 重置状态.
+        self.restart()
         self.vars = tasked.vars
-        self.await_stage = tasked.stage
-        self.overdue = tasked.overdue
-        self.priority = tasked.priority
-        # 状态需要 operator 调度.
-        # self.status = tasked.status
 
     @property
     def is_long_term(self) -> bool:
@@ -182,85 +184,87 @@ class Task(BaseModel):
         表示任务本身可以是否可以被遗忘.
         如果是可被遗忘的, 则当任务被中断时, 就会进入静默的垃圾回收过程.
         """
-        return TaskStatus.NEW == self.status and self.priority < 0
+        return TaskStatus.RUNNING == self.status and self.priority < 0
 
-    def insert(self, *stages: str) -> None:
+    def insert(self, stages: List[str]) -> None:
         """
         增加新的待运行状态.
         """
         if len(stages) == 0:
             return None
-        stack = list(stages)
         # 将 stages 推入当前的任务中
         # 注意, 从头开始插入, 符合人类直觉.
-        if self.forwards is not None:
-            stack = stack.append(*self.forwards)
-        self.forwards = stack
+        for stage in stages:
+            first = self.forwards[0] if len(self.forwards) > 0 else None
+            if stage == first:
+                continue
+            self.forwards.insert(0, stage)
+        self.forwards = stages
 
-    def forward(self) -> bool:
+    def forward(self) -> str | None:
         """
         前进一个状态, 如果为 None 表示栈已经空了.
         """
         if len(self.forwards) == 0:
-            return False
+            return None
         _next = self.forwards[0]
         self.forwards = self.forwards[1:]
-        self.url = self.url.to_stage(_next)
-        return True
+        return _next
 
-    def done(self, stage: str, status: TASK_STATUS) -> None:
+    def done(self, status: TASK_STATUS, stage: str | None) -> List[URL]:
         """
         标记 task 已经结束. 会清空掉状态相关的信息.
         status 应该是回收状态中的一种.
         """
         self.status = status
-        self.await_stage = stage
         self.forwards = []
-        self.depending = None
+        if stage is not None:
+            self.url.stage = stage
+        callbacks = self.callbacks
+        self.callbacks = []
+        return callbacks
 
     def await_at(self, at_stage: str) -> None:
         """
         等待输入侧的信息.
         """
         self.status = TaskStatus.WAITING
-        self.await_stage = at_stage
-        self.depending = None
+        self.url.stage = at_stage
 
-    def be_blocking(self, stage: str | None) -> None:
+    def preempt(self, stage: str | None) -> None:
         """
         进入抢占状态.
         """
-        if stage is None:
-            stage = self.await_stage
+        if stage is not None:
+            self.url.stage = stage
         self.status = TaskStatus.PREEMPTING
-        self.await_stage = stage
-        self.depending = None
 
-    def be_yielding(self, stage: str, yield_to: str) -> None:
-        """
-        进入异步等待状态.
-        """
-        self.status = TaskStatus.YIELDING
-        self.await_stage = stage
-        self.depending = yield_to
+    #
+    # def be_yielding(self, stage: str, yield_to: str) -> None:
+    #     """
+    #     进入异步等待状态.
+    #     """
+    #     self.status = TaskStatus.YIELDING
+    #     self.await_stage = stage
+    #     self.callbacks = yield_to
 
-    def be_depending(self, stage: str, depend_on: str) -> None:
+    def depend(self, stage: str) -> None:
         """
         进入同步等待状态
         """
         self.status = TaskStatus.DEPENDING
-        self.await_stage = stage
-        self.depending = depend_on
+        self.url.stage = stage
 
-    def reset(self) -> None:
+    def restart(self) -> None:
         """
         强行重置当前任务的状态.
         清空所有多余的信息.
         """
-        self.status = TaskStatus.NEW
-        self.await_stage = ""
+        self.status = TaskStatus.RUNNING
+        self.url.stage = ""
         self.forwards = []
-        self.depending = None
+        # callbacks 保留
+        self.callbacks = self.callbacks
 
 
 class Process(BaseModel):
@@ -315,7 +319,7 @@ class Process(BaseModel):
     tasks: List[Task] = []
 
     # 表示进程是否是退出状态.
-    quited: bool = False
+    quiting: bool = False
 
     __indexes: Optional[Dict[str, int]] = None
 
@@ -359,48 +363,45 @@ class Process(BaseModel):
         return self._get_tid_by_status(TaskStatus.DEPENDING)
 
     @property
+    def canceling(self) -> List[str]:
+        """
+        等待回调的任务, 依赖另一个任务的完成.
+        如果上下文命中了一个等待任务, 应该进入到它依赖的对象.
+        """
+        return self._get_tid_by_status(TaskStatus.CANCELING)
+
+    @property
+    def failing(self) -> List[str]:
+        """
+        等待回调的任务, 依赖另一个任务的完成.
+        如果上下文命中了一个等待任务, 应该进入到它依赖的对象.
+        """
+        return self._get_tid_by_status(TaskStatus.FAILING)
+
+    @property
     def is_sub_process(self) -> bool:
         return self.parent_id is not None
 
-    @property
-    def depended_by_map(self) -> Dict[str, Set[str]]:
-        """
-        生成一个数据结构, 用来返回所有被其它任务依赖的任务.
-        key : 被依赖任务的 tid
-        value : 依赖 key 的所有任务的 tid
-
-        这个数据结构里不应该出现循环依赖, 如果出现循环依赖会导致系统崩溃.
-        todo: 未来实现成环检查, 成环的情况下需要 RuntimeCrash, 保护系统.
-        """
-        depended_by = {}
-        for task in self.tasks:
-            if task.status == TaskStatus.DEPENDING:
-                depended_task_id = task.depending
-                if depended_task_id not in depended_by:
-                    depended_by[depended_task_id] = set()
-                depended_by[depended_task_id].add(task.tid)
-        return depended_by
+    # @property
+    # def yielding(self) -> List[str]:
+    #     """
+    #     取出所有在 yielding 状态中的任务.
+    #     """
+    #     return self._get_tid_by_status(TaskStatus.YIELDING)
 
     @property
-    def yielding(self) -> List[str]:
-        """
-        取出所有在 yielding 状态中的任务.
-        """
-        return self._get_tid_by_status(TaskStatus.YIELDING)
-
-    @property
-    def blocking(self) -> List[str]:
+    def preempting(self) -> List[str]:
         """
         取出所有在 blocking 状态中的任务.
         同时对这些任务进行 priority 优先级排序.
         二级顺序应该是运行时数据.
         """
-        blocking: List[Task] = []
+        preempting: List[Task] = []
         for task in self.tasks:
             if task.status == TaskStatus.PREEMPTING:
-                blocking.append(task)
-        blocking.sort(key=lambda t: t.priority, reverse=True)
-        return [item.tid for item in blocking]
+                preempting.append(task)
+        preempting.sort(key=lambda t: t.priority, reverse=True)
+        return [item.tid for item in preempting]
 
     @property
     def waiting(self) -> List[str]:
@@ -423,33 +424,12 @@ class Process(BaseModel):
         """
         return self._get_tid_by_status(TaskStatus.FINISHED)
 
-    @property
-    def canceled(self) -> List[str]:
-        """
-        取出所有已经取消掉的任务.
-        理论上不运行 reset, 不能重新开始任务.
-        """
-        return self._get_tid_by_status(TaskStatus.CANCELED)
-
     def _get_tid_by_status(self, status: TASK_STATUS) -> List[str]:
         result: List[str] = []
         for task in self.tasks:
             if task.status == status:
                 result.append(task.tid)
         return result
-
-    @property
-    def is_quiting(self) -> bool:
-        """
-        表示当前 process 正在退出中.
-        """
-        return self.quited
-
-    def quit(self) -> None:
-        """
-        标记当前任务需要退出.
-        """
-        self.quited = True
 
     @property
     def is_new(self) -> bool:
@@ -507,9 +487,9 @@ class Process(BaseModel):
         """
         将进程重置到根任务上.
         """
-        tasks = [self.root_task]
+        root = self.get_task(self.root)
         self.awaiting = self.root
-        self.tasks = tasks
+        self.tasks = [root]
         self._reset_indexes()
 
     def _reset_indexes(self) -> None:

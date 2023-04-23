@@ -5,10 +5,12 @@ from typing import Optional, Dict, List, Tuple
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.exceptions import MindsetNotFoundException, RuntimeException
 from ghoshell.ghost.intention import Intention
-from ghoshell.ghost.mindset import Thought, Stage, Event
-from ghoshell.ghost.operator import Operator
+from ghoshell.ghost.mindset import Think, Thought, Stage, Event
+from ghoshell.ghost.mindset.operator import Operator
 from ghoshell.ghost.runtime import Task, TaskStatus, Process, TaskLevel
 from ghoshell.ghost.url import URL
+
+GroupedIntentions = Dict[str, List[Intention]]
 
 
 class CtxTool:
@@ -47,23 +49,31 @@ class CtxTool:
 
     # ---- thought 相关方法 ----#
 
-    @staticmethod
-    def force_fetch_stage(ctx: Context, think: str, stage: str) -> "Stage":
+    @classmethod
+    def force_fetch_stage(cls, ctx: Context, think: str, stage: str) -> "Stage":
         """
         取出一个 think.stage, 不存在要抛出异常.
         """
-        think = ctx.clone.mindset.fetch(think)
-        stage = think.fetch_stage(stage)
+        stage = cls.fetch_stage(ctx, think, stage)
         if stage is None:
             raise MindsetNotFoundException("todo")
+        return stage
+
+    @classmethod
+    def force_fetch_think(cls, ctx: Context, think: str) -> "Think":
+        return ctx.clone.mindset.force_fetch(think)
+
+    @classmethod
+    def fetch_stage(cls, ctx: Context, think: str, stage: str) -> Optional["Stage"]:
+        think = ctx.clone.mindset.fetch(think)
+        stage = think.fetch_stage(stage)
         return stage
 
     @classmethod
     def match_intentions(
             cls,
             ctx: "Context",
-            intention_metas: Dict[str, List[Intention]],
-            public: bool,
+            intention_metas: GroupedIntentions,
     ) -> Optional[Intention]:
         """
         匹配可能的意图. 直达或者创建任务.
@@ -80,79 +90,81 @@ class CtxTool:
             matched = attentions.match(ctx, *metas)
             if matched is not None:
                 return matched
-        if not public:
-            return None
+        return None
 
-        # 模糊匹配.
+    @classmethod
+    def match_global_intentions(
+            cls,
+            ctx: "Context",
+    ) -> Optional[Intention]:
+        attentions = ctx.clone.attentions
         return attentions.global_match(ctx)
 
     @classmethod
-    def context_intentions(cls, ctx: "Context") -> Dict[str, List[Intention]]:
+    def context_backward_intentions(cls, ctx: "Context", level: int) -> GroupedIntentions:
         """
-        上下文的运行中任务, 是否会被命中.
+        上下文相关的后序回调意图. 当前序意图没有匹配到时, 尝试匹配后序意图.
         """
         runtime = ctx.clone.runtime
         process = runtime.current_process()
-
-        result: Dict[str, List[Intention]] = {}
+        result = {}
 
         # 当前任务是最高优的.
         awaiting_task = RuntimeTool.fetch_root_task(ctx)
-        cls._add_task_intentions(ctx, result, awaiting_task, attentions=False)
+        cls._add_task_intentions(ctx, result, awaiting_task, private=True, forward=False)
 
         # 当前任务的状态是 protected, 才允许回溯匹配. 否则直接退出.
-        if awaiting_task.level == TaskLevel.LEVEL_PROTECTED:
+        if level != TaskLevel.LEVEL_PRIVATE:
             return result
 
         # blocking 的任务也可以被消息来主动抢占.
-        blocking = process.blocking
+        blocking = process.preempting
         for tid in blocking:
             blocking_task = process.get_task(tid)
-            result = cls._add_task_intentions(ctx, result, blocking_task, attentions=False)
+            result = cls._add_task_intentions(ctx, result, blocking_task, private=False, forward=False)
 
         # 检查 waiting, 将 waiting 都入栈.
         # waiting 不能包含 root 和 awaiting
         waiting = process.waiting
         for tid in waiting:
             waiting_task = process.get_task(tid)
-            result = cls._add_task_intentions(ctx, result, waiting_task, attentions=False)
+            result = cls._add_task_intentions(ctx, result, waiting_task, private=False, forward=False)
 
         # 添加 root 节点.
         if process.awaiting != process.root:
             root_task = RuntimeTool.fetch_root_task(ctx)
-            result = cls._add_task_intentions(ctx, result, root_task, attentions=False)
+            result = cls._add_task_intentions(ctx, result, root_task, private=False, forward=False)
 
         return result
 
     @classmethod
-    def context_attentions(cls, ctx: "Context") -> Dict[str, List[Intention]]:
+    def context_forward_intentions(cls, ctx: "Context", level: int) -> GroupedIntentions:
         """
-        对于一个任务而言, intention 是它自身可以被命中的意图. List[Intention]
-        attentions 是任务允许跳转到别的 think 或 stage 的意图. 是路由, List[url]
-        intentions 与状态无关, attentions 与状态有关.
+        上下文相关的前序意图
+        可以根据这些意图, 跳转到别的节点.
         """
         runtime = ctx.clone.runtime
         process = runtime.current_process()
-        result: Dict[str, List[Intention]] = {}
+        result: GroupedIntentions = {}
 
         # 第一步, 添加 root. root 永远有最高优先级.
         root_task = RuntimeTool.fetch_root_task(ctx)
-        result = cls._add_task_intentions(ctx, result, root_task)
+        result = cls._add_task_intentions(ctx, result, root_task, private=False, forward=True)
 
         awaiting_task = RuntimeTool.fetch_awaiting_task(ctx)
 
         # 添加 awaiting 的注意目标.
         if process.awaiting != process.root:
-            result = cls._add_task_intentions(ctx, result, awaiting_task)
+            result = cls._add_task_intentions(ctx, result, awaiting_task, private=True, forward=True)
 
         # 封闭域任务, 不再继续增加注意目标.
-        if awaiting_task.level == TaskLevel.LEVEL_PRIVATE:
+        if level == TaskLevel.LEVEL_PRIVATE:
             return result
 
         # 第三步, 添加 waiting 中的节点的意图.
         for tid in process.waiting:
             waiting = process.get_task(tid)
-            result = cls._add_task_intentions(ctx, result, waiting)
+            result = cls._add_task_intentions(ctx, result, waiting, private=False, forward=True)
         return result
 
     @classmethod
@@ -163,32 +175,39 @@ class CtxTool:
     def _add_task_intentions(
             cls,
             ctx: Context,
-            result: Dict[str, List[Intention]],
+            result: GroupedIntentions,
             task: Task,
-            attentions: bool = True,
-    ) -> Dict[str, List[Intention]]:
-        # 初始化
-        # 上下文中生成意图树.
-        if not task.attentions:
-            return result
+            private: bool,
+            forward: bool,
+    ) -> GroupedIntentions:
 
-        if attentions:
+        fr = None
+        if forward:
+            fr = task.url
             url_list = task.attentions
         else:
             url_list = [task.url]
 
-        for url in url_list:
-            stage = CtxTool.force_fetch_stage(ctx, url.resolver, url.stage)
+        if not url_list:
+            return result
+
+        for target in url_list:
+            stage = CtxTool.force_fetch_stage(ctx, target.resolver, target.stage)
 
             # 从 stage 里获取 intention
             intentions = stage.intentions(ctx)
             if not intentions:
                 continue
+            #  初始化 intentions
             for intention in intentions:
                 # 添加好关联路径.
-                intention.url = url
-            # 从 intention 里拿到 metas
+                intention.fr = fr
+
+            # 从 intentions 组装成为 GroupedIntentions
             for meta in intentions:
+                # 私有意图无法在非私有场景使用.
+                if meta.private and not private:
+                    continue
                 kind = meta.KIND
                 if kind not in result:
                     result[kind] = []
@@ -206,11 +225,11 @@ class RuntimeTool:
     """
 
     @classmethod
-    def fire_event(cls, ctx: Context, event: Event) -> Operator:
+    def fire_event(cls, ctx: Context, event: Event) -> Operator | None:
         """
         基于 thought 触发一个 stage 的事件.
         """
-        target_url = event.target.url
+        target_url = event.target
         # 初始化 thought. 这个 thought 里应该包含正确的 tid.
         thought = cls.new_thought(ctx, target_url)
 
@@ -258,6 +277,22 @@ class RuntimeTool:
         return task
 
     @classmethod
+    def fetch_process_tasks_by_urls(cls, ctx: Context, urls: List[URL]) -> List[Task]:
+        process = ctx.clone.runtime.current_process()
+        result = []
+        for url in urls:
+            tid = RuntimeTool.new_task_id(ctx, url)
+            ptr = process.get_task(tid)
+            if ptr is None:
+                # 已经不被需要了.
+                continue
+            if ptr.url.stage != url.stage:
+                # 也不被需要了.
+                continue
+            result.append(ptr)
+        return result
+
+    @classmethod
     def fetch_task(cls, ctx: Context, tid: str) -> Task | None:
         return ctx.clone.runtime.fetch_task(tid)
 
@@ -297,16 +332,20 @@ class RuntimeTool:
         """
         think = ctx.clone.mindset.force_fetch(url.resolver)
         thought = think.new_thought(ctx, url.args)
+        thought.url.stage = url.stage
         return thought
 
     @classmethod
     def merge_task_to_thought(cls, task: Task, thought: Thought) -> Thought:
+        """
+        """
         if task.vars is not None:
             thought.set_variables(task.vars)
+        # stage 以 url 为准. 不以 task 为准. 这个 trick 还是让人不舒服.
+        thought.status = task.status
         thought.level = task.level
         thought.overdue = task.overdue
         thought.priority = task.priority
-        thought.attentions = task.routers
         return thought
 
     @classmethod
@@ -315,7 +354,6 @@ class RuntimeTool:
         task.level = thought.level
         task.overdue = thought.overdue
         task.priority = thought.priority
-        task.routers = thought.attentions
         return task
 
     @classmethod
@@ -346,6 +384,7 @@ class RuntimeTool:
 
     @classmethod
     def new_task_id(cls, ctx: Context, url: URL) -> str:
+        # todo: 以后实现一个 ctx 级别的缓存, 避免重复生成.
         clone = ctx.clone
         mindset = clone.mindset
         think = mindset.force_fetch(url.resolver)
@@ -353,8 +392,9 @@ class RuntimeTool:
         return tid
 
     @classmethod
-    def store_task(cls, ctx: Context, task: Task) -> None:
-        ctx.clone.runtime.store_task(task)
+    def store_task(cls, ctx: Context, *tasks: Task) -> None:
+        if len(tasks) > 0:
+            ctx.clone.runtime.store_task(*tasks)
 
     @classmethod
     def quit_current_process(cls, ctx: Context) -> None:
@@ -363,6 +403,13 @@ class RuntimeTool:
         process.quit()
         runtime.store_process(process)
         return None
+
+    @classmethod
+    def set_quiting(cls, ctx: Context, quiting: bool) -> None:
+        runtime = ctx.clone.runtime
+        process = runtime.current_process()
+        process.quiting = quiting
+        runtime.store_process(process)
 
     #
     # @classmethod

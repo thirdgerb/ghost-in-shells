@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, ClassVar
 
 from ghoshell.messages.base import Message
 
@@ -13,13 +13,10 @@ class Tasked(Message):
     注意: 这里的 status 应该不是 running
     """
 
-    KIND = "tasked"
+    KIND: ClassVar[str] = "tasked"
 
     resolver: str
     stage: str
-    status: int
     args: Dict
     vars: Dict
-    overdue: int = 0
-    priority: float = 0
     tid: str | None = None

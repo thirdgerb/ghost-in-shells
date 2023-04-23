@@ -6,7 +6,7 @@ from ghoshell.ghost.io import Input, Output
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
-    from ghoshell.ghost.operator import OperationManager, OperationKernel
+    from ghoshell.ghost.mindset.operator import OperationManager, OperationKernel
     from ghoshell.ghost.mindset import Mindset, Thought
     from ghoshell.ghost.session import Session
     from ghoshell.ghost.intention import Attention

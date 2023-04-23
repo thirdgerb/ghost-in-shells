@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Dict, List
+from typing import Dict
 
-from ghoshell.ghost.runtime import TASK_LEVEL, TaskLevel
+from ghoshell.ghost.runtime import TaskLevel, TaskStatus
 from ghoshell.ghost.url import URL
 
 
@@ -24,27 +24,21 @@ class Thought(metaclass=ABCMeta):
     # 入参数据
     url: URL
 
-    overdue: int
+    overdue: int = 0
 
-    priority: float
+    priority: float = 0
 
-    level: TASK_LEVEL
+    level: int = TaskLevel.LEVEL_PUBLIC
 
-    attentions: List[URL] = None
+    status: int = TaskStatus.RUNNING
 
     def __init__(
             self,
             tid: str,
             url: URL,
-            overdue: int = 0,
-            priority: float = 0,
-            level: TASK_LEVEL = TaskLevel.LEVEL_PUBLIC,
     ):
         self.tid = tid
         self.url = url.copy()
-        self.overdue = overdue
-        self.priority = priority
-        self.level = level
         self.prepare(url.args)
 
     # ---- 抽象方法 ---- #

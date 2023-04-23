@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Any, List
 
+from ghoshell.ghost.mindset.operator import Operator
 from ghoshell.ghost.mindset.thought import Thought
-from ghoshell.ghost.operator import Operator
 from ghoshell.ghost.runtime import TASK_LEVEL
 from ghoshell.ghost.url import URL
 
@@ -30,7 +29,7 @@ class Mind(metaclass=ABCMeta):
         return self
 
     @abstractmethod
-    def go_stage(self, stage: str) -> "Operator":
+    def forward(self, *stages: str) -> "Operator":
         pass
 
     @abstractmethod
@@ -43,7 +42,8 @@ class Mind(metaclass=ABCMeta):
 
     # ---- 中断命令 ---- #
 
-    def awaits(self, focus_stages: List[str] = None, focus_thinks: List[URL] = None) -> "Operator":
+    @abstractmethod
+    def awaits(self) -> "Operator":
         """
         本来想用 await, 无奈 python 的系统关键字太多, 这是 python 一个巨大的缺点.
         wait 是挂起整个 Clone. 上下文也会同步休眠, 等待下一次 input 的唤醒.
@@ -51,35 +51,7 @@ class Mind(metaclass=ABCMeta):
         而实际上, 当前 Process 进入了 wait 状态, 可能 clone 还不会立刻释放 (unlock), 而是继续去处理异步消息.
         就看具体怎么实现了.
         """
-        return self._focus_stages(focus_stages)._focus_thinks(focus_thinks)._do_await()
-
-    @abstractmethod
-    def _do_await(self) -> "Operator":
         pass
-
-    def _focus_stages(self, stages: List[str] | None) -> Mind:
-        if not stages:
-            return self
-        attentions = self.this.attentions
-        if attentions is None:
-            attentions = []
-        self_url = self.this.url
-        for stage in stages:
-            attentions.append(self_url.to_stage(stage))
-        self.this.attentions = attentions
-        return self
-
-    def _focus_thinks(self, thinks: List[URL] | None) -> Mind:
-        if not thinks:
-            return self
-        attentions = self.this.attentions
-        if attentions is None:
-            attentions = []
-        for url in thinks:
-            url.stage = ""
-            attentions.append(url)
-        self.this.attentions = attentions
-        return self
 
     @abstractmethod
     def depend_on(self, target: "URL") -> "Operator":
@@ -108,6 +80,20 @@ class Mind(metaclass=ABCMeta):
     def restart(self) -> "Operator":
         """
         重启当前的 Task. 与 go_stage('') 不同, 还会重置掉上下文状态 (重置 thought)
+        """
+        pass
+
+    # ---- 取消流程 ---- #
+
+    @abstractmethod
+    def cancel(self) -> "Operator":
+        """
+        """
+        pass
+
+    @abstractmethod
+    def fail(self) -> "Operator":
+        """
         """
         pass
 
@@ -141,7 +127,7 @@ class Mind(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def quit(self, reason: Optional[Any] = None) -> "Operator":
+    def quit(self) -> "Operator":
         """
         退出整个进程.
         会从 current_task 开始逐个 cancel, 一直 cancel 到 root
