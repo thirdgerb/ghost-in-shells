@@ -110,7 +110,7 @@ class CtxTool:
         """
         上下文相关的后序回调意图. 当前序意图没有匹配到时, 尝试匹配后序意图.
         """
-        runtime = ctx.clone.runtime
+        runtime = ctx.runtime
         process = runtime.current_process()
         result = {}
 
@@ -148,7 +148,7 @@ class CtxTool:
         上下文相关的前序意图
         可以根据这些意图, 跳转到别的节点.
         """
-        runtime = ctx.clone.runtime
+        runtime = ctx.runtime
         process = runtime.current_process()
         result: GroupedIntentions = {}
 
@@ -174,7 +174,7 @@ class CtxTool:
 
     @classmethod
     def current_process(cls, ctx: Context) -> Process:
-        return ctx.clone.runtime.current_process()
+        return ctx.runtime.current_process()
 
     @classmethod
     def _add_task_intentions(
@@ -271,15 +271,15 @@ class RuntimeTool:
     @classmethod
     def fetch_task_by_url(cls, ctx: Context, url: URL, create: bool) -> Task:
         tid = cls.new_task_id(ctx, url)
-        task = ctx.clone.runtime.fetch_task(tid)
+        task = ctx.runtime.fetch_task(tid)
         if task is None and create:
             task = cls.new_task(ctx, url)
-            ctx.clone.runtime.store_task(task)
+            ctx.runtime.store_task(task)
         return task
 
     @classmethod
     def fetch_process_tasks_by_ids(cls, ctx: Context, ids: List[str]) -> List[Task]:
-        process = ctx.clone.runtime.current_process()
+        process = ctx.runtime.current_process()
         result = []
         for tid in ids:
             ptr = process.get_task(tid)
@@ -291,7 +291,7 @@ class RuntimeTool:
 
     @classmethod
     def fetch_task(cls, ctx: Context, tid: str) -> Task | None:
-        return ctx.clone.runtime.fetch_task(tid)
+        return ctx.runtime.fetch_task(tid)
 
     @classmethod
     def force_fetch_task(cls, ctx: Context, tid: str) -> Task:
@@ -303,7 +303,7 @@ class RuntimeTool:
 
     @classmethod
     def fetch_root_task(cls, ctx: Context) -> Task:
-        runtime = ctx.clone.runtime
+        runtime = ctx.runtime
         process = runtime.current_process()
         task = runtime.fetch_task(process.root)
         if task is None:
@@ -313,7 +313,7 @@ class RuntimeTool:
 
     @classmethod
     def fetch_awaiting_task(cls, ctx: Context) -> Task:
-        runtime = ctx.clone.runtime
+        runtime = ctx.runtime
         process = runtime.current_process()
         task = runtime.fetch_task(process.awaiting)
         if task is None:
@@ -392,11 +392,11 @@ class RuntimeTool:
     @classmethod
     def store_task(cls, ctx: Context, *tasks: Task) -> None:
         if len(tasks) > 0:
-            ctx.clone.runtime.store_task(*tasks)
+            ctx.runtime.store_task(*tasks)
 
     @classmethod
     def set_quiting(cls, ctx: Context, quiting: bool) -> None:
-        runtime = ctx.clone.runtime
+        runtime = ctx.runtime
         process = runtime.current_process()
         process.quiting = quiting
         runtime.store_process(process)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from logging import LoggerAdapter
 from typing import Any, Optional, TYPE_CHECKING, List, TypeVar, Type
 
 from ghoshell.messages import Message
@@ -10,8 +9,10 @@ if TYPE_CHECKING:
     from ghoshell.container import Container
     from ghoshell.ghost.ghost import Clone
     from ghoshell.ghost.mindset import Thought, Mind
-    from ghoshell.ghost.io import Input, Output, Trace
-    from ghoshell.ghost.messenger import Messenger
+    from ghoshell.ghost.io import Input, Output
+    from ghoshell.ghost.sending import Sending
+    from ghoshell.ghost.session import Session
+    from ghoshell.ghost.runtime import Runtime
 
 M = TypeVar('M', bound=Message)
 
@@ -32,6 +33,16 @@ class Context(metaclass=ABCMeta):
         """
         return self.clone.container
 
+    @property
+    @abstractmethod
+    def runtime(self) -> "Runtime":
+        pass
+
+    @property
+    @abstractmethod
+    def session(self) -> "Session":
+        pass
+
     @abstractmethod
     def mind(self, this: Optional["Thought"]) -> "Mind":
         """
@@ -48,7 +59,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def send(self, _with: "Thought") -> Messenger:
+    def send(self, _with: "Thought") -> Sending:
         """
         以 Thought 为基础, 发出各种消息体给 Shell
         再由 Shell 发送出去.
@@ -75,11 +86,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def logger(self) -> LoggerAdapter:
-        pass
-
-    @abstractmethod
-    def async_input(self, message: Message, pid: str | None = None, trace: Optional["Trace"] = None) -> None:
+    def async_input(self, _input: "Input") -> None:
         """
         ghost 给 ghost 发送信息时使用
         pid 为 None, Trace 为 None 时, 默认是开启子进程.

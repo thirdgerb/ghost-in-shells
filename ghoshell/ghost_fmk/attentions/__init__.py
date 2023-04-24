@@ -1,7 +1,7 @@
-from ghoshell.ghost_fmk.attentions.attentions import IAttentions, AttentionDriver
+from ghoshell.ghost_fmk.attentions.attentions import AttentionImpl, AttentionHandler
 from ghoshell.ghost_fmk.attentions.command import CommandLine, CommandDriver
 
 __all__ = [
-    "IAttentions", "AttentionDriver",
+    "AttentionImpl", "AttentionHandler",
     "CommandLine", "CommandDriver",
 ]

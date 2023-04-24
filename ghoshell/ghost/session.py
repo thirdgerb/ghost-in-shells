@@ -1,7 +1,5 @@
 from abc import ABCMeta, abstractmethod
 
-from ghoshell.ghost.io import Input, Output
-
 
 class Session(metaclass=ABCMeta):
     """
@@ -11,17 +9,33 @@ class Session(metaclass=ABCMeta):
     clone_id 确保它跨群共享记忆, 但 session 保证和 不同的人/不同的群 对话不会相互干扰
     """
 
+    @property
+    @abstractmethod
+    def clone_id(self) -> str:
+        pass
+
+    @property
     @abstractmethod
     def session_id(self) -> str:
-        """
-        session 的 id
-        """
         pass
 
     @abstractmethod
-    def save_input(self, _input: Input) -> None:
+    def new_process_id(self) -> str:
         pass
 
     @abstractmethod
-    def save_output(self, _output: Output) -> None:
+    def new_message_id(self) -> str:
+        pass
+
+    # todo: 先不急于实现
+    # @abstractmethod
+    # def save_input(self, _input: Input) -> None:
+    #     pass
+    #
+    # @abstractmethod
+    # def save_output(self, _output: Output) -> None:
+    #     pass
+
+    @abstractmethod
+    def destroy(self) -> None:
         pass

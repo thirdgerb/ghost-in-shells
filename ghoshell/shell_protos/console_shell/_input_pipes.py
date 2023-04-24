@@ -12,7 +12,7 @@ class InputTestMiddleware(InputMiddleware):
             if text is not None:
                 output = Output.new(_input)
                 message = TextMsg.new(raw=f"you said: {text.raw}")
-                output.payloads.append(message.new_payload())
+                output.payload.append(message.new_payload())
                 return _input, output
 
             return after(_input)

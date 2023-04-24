@@ -1,9 +1,10 @@
 from abc import ABCMeta, abstractmethod
 from typing import Callable, List, Dict, Optional
 
+from removed.runtime import AbsRuntimeDriver
+
 from ghoshell.ghost import Ghost, Input, Output, Context, Operator
 from ghoshell.ghost_fmk.middleware import IMiddleware, ExceptionHandlerMiddleware, GHOST_PIPE, GHOST_PIPELINE
-from ghoshell.ghost_fmk.runtime import AbsRuntimeDriver
 from ghoshell.utils import create_pipeline
 
 

@@ -82,5 +82,5 @@ def fetch(con: Container, contract: Type[Contract]) -> Contract | None:
 def force_fetch(con: Container, contract: Type[Contract]) -> Contract:
     ins = fetch(con, contract)
     if ins is None:
-        raise Exception("todo")
+        raise Exception(f"contract {contract} not register in container")
     return ins

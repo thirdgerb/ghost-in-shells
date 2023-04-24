@@ -1,18 +1,25 @@
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from typing import Optional, Iterator, List, Dict
 
 from ghoshell.ghost import Mindset, Think
 from ghoshell.ghost.mindset import ThinkMeta, ThinkDriver
+from ghoshell.ghost_fmk.contracts import ThinkMetaDriver  # ThinkMetaDriverProvider
 
 
-class AbstractMindset(Mindset, metaclass=ABCMeta):
+class MindsetImpl(Mindset):
 
-    def __init__(self):
+    def __init__(self, driver: ThinkMetaDriver, clone_id: str | None):
+        self._think_metas_driver = driver
+        self._clone_id = clone_id
         self._sub_mindsets: List[Mindset] = []
-        self._drivers: Dict[str, ThinkDriver] = {}
+        self._think_drivers: Dict[str, ThinkDriver] = {}
+
+    def clone(self, clone_id: str) -> Mindset:
+        mindset = MindsetImpl(self._think_metas_driver, clone_id)
+        return mindset
 
     def fetch(self, thinking: str) -> Optional[Think]:
-        meta = self._fetch_local_meta(thinking)
+        meta = self._think_metas_driver.fetch_local_meta(thinking, self._clone_id)
         if meta is not None:
             think = self._wrap_meta(meta)
             if think is not None:
@@ -24,17 +31,13 @@ class AbstractMindset(Mindset, metaclass=ABCMeta):
         return None
 
     def _wrap_meta(self, meta: ThinkMeta) -> Think | None:
-        driver = self._drivers.get(meta.driver, None)
+        driver = self._think_drivers.get(meta.driver, None)
         if driver is not None:
             return driver.from_meta(meta)
         return None
 
-    @abstractmethod
-    def _fetch_local_meta(self, thinking: str) -> Optional[ThinkMeta]:
-        pass
-
     def fetch_meta(self, thinking: str) -> Optional[ThinkMeta]:
-        meta = self._fetch_local_meta(thinking)
+        meta = self._think_metas_driver.fetch_local_meta(thinking, self._clone_id)
         if meta is not None:
             return meta
         for sub in self._sub_mindsets:
@@ -49,12 +52,12 @@ class AbstractMindset(Mindset, metaclass=ABCMeta):
     def register_driver(self, driver: ThinkDriver) -> None:
         # 实现得复杂一些, 可以在这里放各种准入机制.
         key = driver.driver_name()
-        self._drivers[key] = driver
+        self._think_drivers[key] = driver
 
     def foreach_think(self) -> Iterator[Think]:
         names = set()
         # 一套遍历策略.
-        for meta in self._foreach_local_think_metas():
+        for meta in self._think_metas_driver.iterate_think_metas(self._clone_id):
             if meta.url.resolver in names:
                 # 重名的跳过, 不允许遍历. 从而实现继承重写.
                 continue
@@ -73,28 +76,49 @@ class AbstractMindset(Mindset, metaclass=ABCMeta):
                 yield think
 
     @abstractmethod
-    def _foreach_local_think_metas(self) -> Iterator[ThinkMeta]:
-        pass
-
-
-class DictMindset(AbstractMindset):
-    """
-    基于 dict 实现的 mind set.
-    显然, 只能作为 demo 使用.
-    真实的 mindset 应该要实现分布式配置中心.
-    """
-
-    def __init__(self):
-        self._local_metas: Dict[str, ThinkMeta] = {}
-        super().__init__()
-
-    def _fetch_local_meta(self, thinking: str) -> Optional[ThinkMeta]:
-        return self._local_metas.get(thinking, None)
-
-    def _foreach_local_think_metas(self) -> Iterator[ThinkMeta]:
-        for key in self._local_metas:
-            meta = self._local_metas[key]
-            yield meta
-
     def register_meta(self, meta: ThinkMeta) -> None:
-        self._local_metas[meta.url.resolver] = meta
+        """
+        注册一个 thinking
+        当然, Mindset 可以有自己的实现, 从某个配置体系中获取.
+        或者合并多个 Mindset.
+        """
+        self._think_metas_driver.register_meta(meta)
+
+    def destroy(self) -> None:
+        if self._clone_id is not None:
+            del self._clone_id
+            del self._think_metas_driver
+            del self._think_drivers
+            del self._sub_mindsets
+
+#
+# class MockThinkMetaDriver(ThinkMetaDriver):
+#     """
+#     基于 dict 实现的 mind set.
+#     显然, 只能作为 demo 使用.
+#     真实的 mindset 应该要实现分布式配置中心.
+#     """
+#
+#     def __init__(self):
+#         self._local_metas: Dict[str, ThinkMeta] = {}
+#         super().__init__()
+#
+#     def with_clone_id(self, clone_id: str) -> "ThinkMetaDriver":
+#         return self
+#
+#     def fetch_local_meta(self, thinking: str) -> Optional[ThinkMeta]:
+#         return self._local_metas.get(thinking, None)
+#
+#     def foreach_local_think_metas(self) -> Iterator[ThinkMeta]:
+#         for key in self._local_metas:
+#             meta = self._local_metas[key]
+#             yield meta
+#
+#     def register_meta(self, meta: ThinkMeta) -> None:
+#         self._local_metas[meta.url.resolver] = meta
+#
+#
+# class MockThinkMetaDriverProvider(ThinkMetaDriverProvider):
+#
+#     def factory(self, con: Container) -> ThinkMetaDriver | None:
+#         return MockThinkMetaDriver()

@@ -134,3 +134,6 @@ class Mind(metaclass=ABCMeta):
         这也意味着 cancel 的过程中可以中断.
         """
         pass
+
+    def destroy(self) -> None:
+        del self.this

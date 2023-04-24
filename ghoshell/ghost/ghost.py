@@ -1,17 +1,16 @@
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Optional, Dict
+from typing import TYPE_CHECKING, Optional, ClassVar
 
 from ghoshell.container import Container
 from ghoshell.ghost.io import Input, Output
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
-    from ghoshell.ghost.mindset.operator import OperationManager, OperationKernel
-    from ghoshell.ghost.mindset import Mindset, Thought
-    from ghoshell.ghost.session import Session
+    from ghoshell.ghost.mindset.operator import OperationKernel
+    from ghoshell.ghost.mindset import Mindset
     from ghoshell.ghost.intention import Attention
     from ghoshell.ghost.url import URL
-    from ghoshell.ghost.runtime import Runtime
+    from ghoshell.ghost.intention import Attention
 
 
 class Ghost(metaclass=ABCMeta):
@@ -25,6 +24,7 @@ class Ghost(metaclass=ABCMeta):
 
     Ghost 和 Clone 两个抽象的划分是为了解决个性化问题.
     """
+    AS_SHELL_KIND: ClassVar[str] = "ghost"
 
     @property
     @abstractmethod
@@ -59,12 +59,17 @@ class Ghost(metaclass=ABCMeta):
         """
         pass
 
+    @property
     @abstractmethod
-    def mindset(self, clone_id: Optional[str] = None) -> "Mindset":
+    def mindset(self) -> "Mindset":
+        pass
+
+    @property
+    @abstractmethod
+    def attention(self) -> "Attention":
         """
-        Ghost 的思维模式.
-        注意, Clone 也会有 Mindset, 而一定会有一个 Ghost Mindset 用来做初始化.
-        有点像 "class" 的 "extend"
+        机器人状态机当前保留的工程化注意力机制
+        与算法不同, 注意的可能是命令行, API, 事件等复杂信息.
         """
         pass
 
@@ -180,35 +185,7 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def ghost(self) -> Ghost:
-        pass
-
-    @property
-    @abstractmethod
-    def container(self) -> "Container":
-        """
-        保证每一层都有自己的 container
-        clone 层的 container 通常直接就是 ghost 的
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def config(self) -> Dict:
-        """
-        返回一个 Clone 的默认配置.
-        这个配置的协议应该与具体的 prototype, 或者 framework 提供的类一致.
-        """
-        pass
-
-    @property
-    @abstractmethod
     def root(self) -> "URL":
-        pass
-
-    @property
-    @abstractmethod
-    def session(self) -> "Session":
         pass
 
         # @property
@@ -243,35 +220,9 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def attentions(self) -> "Attention":
-        """
-        机器人状态机当前保留的工程化注意力机制
-        与算法不同, 注意的可能是命令行, API, 事件等复杂信息.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def runtime(self) -> "Runtime":
+    def attention(self) -> "Attention":
         pass
 
     @abstractmethod
-    def lock(self, pid: Optional[str] = None) -> bool:
-        """
-        锁住一个 clone, 不让它产生新的分身.
-        通常只要锁住进程(Process), 而不是锁住 clone
-        """
-        pass
-
-    @abstractmethod
-    def manage(self, this: "Thought") -> "OperationManager":
-        """
-        返回上下文的操作工具
-        为什么这个在 Clone 上, 而不封装到 Ctx
-        就是为了让 Clone 可以对外暴露一个超级干预能力.
-        """
-        pass
-
-    @abstractmethod
-    def finish(self) -> None:
+    def destroy(self) -> None:
         pass

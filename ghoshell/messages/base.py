@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from typing import ClassVar, Optional, Dict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Payload(BaseModel):
@@ -12,14 +12,12 @@ class Payload(BaseModel):
 
     todo: 未来 payload 也需要支持多轮输入聚合. 等有具体场景再研究.
     """
-    # 消息体的唯一 ID
-    id: str
 
     # 消息体如果和 Task 挂钩的话, 可以携带 task 的 id
-    tid: str
+    tid: str = ""
 
     # body 仍然是一个 1:n:n 的协议
-    body: Dict[str, Dict]
+    body: Dict[str, Dict] = Field(default_factory=lambda: {})
 
 
 class Message(BaseModel, metaclass=ABCMeta):
@@ -37,6 +35,8 @@ class Message(BaseModel, metaclass=ABCMeta):
             return None
         return cls(**data)
 
-    def join_payload(self, payload: Payload) -> Payload:
+    def join_payload(self, payload: Payload) -> bool:
+        if self.KIND in payload.body:
+            return False
         payload.body[self.KIND] = self.dict()
-        return payload
+        return True

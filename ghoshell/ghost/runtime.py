@@ -328,7 +328,7 @@ class Process(BaseModel):
     __status_list_indexes: Optional[Dict[int, List[str]]] = None
 
     @classmethod
-    def new_process(cls, sid: str, root: Task, pid: str | None = None, parent_id: str | None = None) -> "Process":
+    def new_process(cls, sid: str, pid: str | None = None, parent_id: str | None = None) -> "Process":
         """
         创建, 初始化一个新的 process.
         """
@@ -337,10 +337,10 @@ class Process(BaseModel):
         return Process(
             sid=sid,
             pid=pid,
-            root=root.tid,
-            awaiting=root.tid,
+            root="",
+            awaiting="",
             parent_id=parent_id,
-            tasks=[root],
+            tasks=[],
         )
 
     def new_round(self) -> "Process":
@@ -707,7 +707,7 @@ class Runtime(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def finish(self, failed: bool = False) -> None:
+    def finish(self) -> None:
         """
         清空持有内容, 需要做的事情:
         1. process 内部的 gc

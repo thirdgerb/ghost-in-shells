@@ -16,7 +16,7 @@ class ConsoleContext(ShellContext):
         return Input(**self._input.dict())
 
     def send(self, _output: Output) -> None:
-        for payload in _output.payloads:
+        for payload in _output.payload:
             if payload.text is not None:
                 text_message = payload.text
                 self.console.print(Panel(Markdown(text_message.raw)))

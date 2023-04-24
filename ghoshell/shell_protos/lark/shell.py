@@ -2,6 +2,11 @@ from typing import Callable, Any
 from typing import Dict
 
 from flask import Flask, request, make_response, Response as FlaskResponse
+from ghoshell.shell.prototypes.lark.bootstraps import BootLarkShellConfig
+from ghoshell.shell.prototypes.lark.config import LarkShellConfig
+from ghoshell.shell.prototypes.lark.event_pipes import ParseLarkEventToInputPipe
+from ghoshell.shell.prototypes.lark.events import EVENTS_MAP
+from ghoshell.shell.prototypes.lark.suite import LarkSuite
 from larksuiteoapi import Config, DOMAIN_LARK_SUITE, DOMAIN_FEISHU
 from larksuiteoapi import Context
 from larksuiteoapi.app_settings import AppSettings
@@ -12,11 +17,6 @@ from pydantic import BaseModel
 
 from ghoshell.ghost import Input, Ghost, Output
 from ghoshell.shell import ShellKernel, IShellContext
-from ghoshell.shell.prototypes.lark.bootstraps import BootLarkShellConfig
-from ghoshell.shell.prototypes.lark.config import LarkShellConfig
-from ghoshell.shell.prototypes.lark.event_pipes import ParseLarkEventToInputPipe
-from ghoshell.shell.prototypes.lark.events import EVENTS_MAP
-from ghoshell.shell.prototypes.lark.suite import LarkSuite
 
 LARK_SHELL_KIND = "lark.shell"
 LARK_EVENT_HANDLER = Callable[[], Any]
@@ -46,7 +46,7 @@ class LarkContext(IShellContext):
         self.ctx = Context()
 
     def send(self, _output: Output) -> None:
-        for msg in _output.payloads:
+        for msg in _output.payload:
             pass
 
     def destroy(self) -> None:

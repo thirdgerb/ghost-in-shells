@@ -21,7 +21,7 @@ class MindImpl(Mind):
         return AwaitOperator(self.this.tid, None)
 
     def restart(self) -> "Operator":
-        pass
+        return RestartOperator(self.this.tid)
 
     def rewind(self, repeat: bool = False) -> "Operator":
         return RewindOperator(repeat=repeat)

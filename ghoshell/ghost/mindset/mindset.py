@@ -14,6 +14,10 @@ class Mindset(metaclass=ABCMeta):
     """
 
     @abstractmethod
+    def clone(self, clone_id: str) -> Mindset:
+        pass
+
+    @abstractmethod
     def fetch(self, thinking: str) -> Optional[Think]:
         """
         获取一个 Thinking
@@ -76,4 +80,8 @@ class Mindset(metaclass=ABCMeta):
         """
         需要提供一种机制, 遍历所有的 Think 对象.
         """
+        pass
+
+    @abstractmethod
+    def destroy(self) -> None:
         pass

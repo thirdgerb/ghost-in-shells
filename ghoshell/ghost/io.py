@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -38,7 +38,7 @@ class Input(BaseModel):
     """
     ghost 的输入
     """
-    id: str
+    mid: str
 
     # 传入的事件数据. 应该需要做归一化处理.
     payload: Payload
@@ -51,7 +51,8 @@ class Input(BaseModel):
     shell_env: Dict = None
 
     # ghost 约定的上下文协议. 可以传入额外的信息
-    ghost_env: Dict = None
+    # ghost_env: Dict = None
+    # 不急于实现.
 
     # 请求相关的场景. 如果 ghost 是初始化, 则用 url 定位场景.
     url: Optional[URL] = None
@@ -69,33 +70,39 @@ class Output(BaseModel):
     """
     ghost 的输出.
     """
-    #  输出的唯一 id, 用来记录 output 的 批次.
-    id: str
+    mid: str
 
     # 关联到的输入
-    input: Input
+    input_mid: str
 
     # 输出的路径. 如果为 None 的话, 则默认是 input 的 trace 作为输出的 trace.
     # 这是因为, 输出给 shell 的消息, 不一定和输入消息对应.
     # 这种复杂的 feature 并不都需要实现.
-    trace: Optional[Trace] = None
+    trace: Trace
 
     # 运行时拿到的各种动作.
-    payloads: List[Payload] = Field(default_factory=lambda: [])
+    payload: Payload
 
     # 传给 shell 的上下文信息, shell 侧定义的协议
     # ghost 理解 shell 的情况下, 可以用这种方式去控制 shell
-    shell_env: Dict = Field(default_factory=lambda: {})
+    # shell_env: Dict = Field(default_factory=lambda: {})
+    # 不急于实现
 
     # ghost 约定的上下文协议.
     # shell 如果理解 ghost 的话, 可以主动处理这部分信息.
-    ghost_env: Dict = Field(default_factory=lambda: {})
+    # ghost_env: Dict = Field(default_factory=lambda: {})
+    # 不急于实现.
+
+    is_async: bool = False
 
     @classmethod
-    def new(cls, _input: Input) -> Output:
+    def new(cls, mid: str, _input: Input, trace: Trace | None = None) -> Output:
+        if trace is None:
+            trace = _input.trace.dict()
         return Output(
-            input=Input(**_input.dict()),
+            mid=mid,
+            input_mid=_input.mid,
+            trace=trace,
+            payload={},
+            is_async=_input.is_async or trace is not None,
         )
-
-    def output_trace(self) -> Trace:
-        return self.trace if self.trace is not None else self.input.trace

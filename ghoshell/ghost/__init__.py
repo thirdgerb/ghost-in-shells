@@ -9,6 +9,8 @@ from ghoshell.ghost.mindset import Mindset, Mind
 from ghoshell.ghost.mindset import Operator, OperationKernel
 from ghoshell.ghost.mindset import Think, Thought, Stage
 from ghoshell.ghost.runtime import *
+from ghoshell.ghost.sending import Sending
+from ghoshell.ghost.session import Session
 from ghoshell.ghost.tool import CtxTool, RuntimeTool
 from ghoshell.ghost.url import URL, UniformResolverLocator
 
@@ -18,7 +20,7 @@ __all__ = [
     # url
     "URL", "UniformResolverLocator",
     # context
-    "Context",
+    "Context", "Sending", "Session",
     # intention
     "Attention", "Intention",
     # io

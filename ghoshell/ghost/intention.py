@@ -40,6 +40,10 @@ class Attention(metaclass=ABCMeta):
     """
 
     @abstractmethod
+    def clone(self, clone_id: str) -> "Attention":
+        pass
+
+    @abstractmethod
     def kinds(self) -> List[str]:
         pass
 
@@ -52,7 +56,7 @@ class Attention(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def register(self, *intentions: Intention) -> None:
+    def register_global_intentions(self, *intentions: Intention) -> None:
         pass
 
     @abstractmethod

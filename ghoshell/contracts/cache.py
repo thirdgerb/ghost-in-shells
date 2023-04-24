@@ -1,14 +1,10 @@
 from abc import ABCMeta, abstractmethod
 from typing import Type
 
-from ghoshell.container import Contract
+from ghoshell.container import Container, Provider
 
 
-class Cache(Contract, metaclass=ABCMeta):
-
-    @classmethod
-    def contract(cls) -> Type[Contract]:
-        return Cache
+class Cache(metaclass=ABCMeta):
 
     @abstractmethod
     def lock(self, key: str, overdue: int = 0) -> bool:
@@ -28,4 +24,16 @@ class Cache(Contract, metaclass=ABCMeta):
 
     @abstractmethod
     def remove(self, *keys: str) -> int:
+        pass
+
+
+class AbsCacheProvider(Provider, metaclass=ABCMeta):
+    def singleton(self) -> bool:
+        return True
+
+    def contract(self) -> Type[Cache]:
+        return Cache
+
+    @abstractmethod
+    def factory(self, con: Container) -> Cache | None:
         pass

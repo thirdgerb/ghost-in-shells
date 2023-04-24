@@ -4,7 +4,8 @@ from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost import Intention, Context
-from ghoshell.ghost_fmk.attentions.attentions import AttentionDriver
+from ghoshell.ghost_fmk.attentions.attentions import AttentionHandler
+from ghoshell.messages import Text
 
 
 class Argument(BaseModel):
@@ -63,7 +64,7 @@ class _ExitedException(Exception):
     pass
 
 
-class CommandDriver(AttentionDriver):
+class CommandDriver(AttentionHandler):
 
     def __init__(self, prefix: str):
         self.prefix = prefix[0]
@@ -73,16 +74,16 @@ class CommandDriver(AttentionDriver):
         return CommandLine.KIND
 
     def match(self, ctx: Context, *metas: Intention) -> Optional[Intention]:
-        text = ctx.input.payload.text
+        text = ctx.read(Text)
         if text is None:
             return None
-        if len(text.raw) == 0:
+        if len(text.content) == 0:
             return None
         command_lines = []
         for meta in metas:
             if isinstance(meta, CommandLine):
                 command_lines.append(meta)
-        return self.match_raw_text(text.raw, *command_lines)
+        return self.match_raw_text(text.content, *command_lines)
 
     def match_raw_text(self, text: str, *metas: CommandLine) -> Optional[CommandLine]:
         prefix = text[0]
@@ -184,7 +185,7 @@ class CommandDriver(AttentionDriver):
             result[alias] = value
         return result
 
-    def register(self, *intentions: Intention) -> None:
+    def register_global_intentions(self, *intentions: Intention) -> None:
         for intention in intentions:
             if isinstance(intention, CommandLine):
                 self.global_commands[intention.config.name] = intention

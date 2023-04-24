@@ -86,12 +86,16 @@ class ReceiveInputOperator(AbsOperator):
     """
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
-        process = ctx.clone.runtime.current_process()
+        process = ctx.runtime.current_process()
         tasked = ctx.read(Tasked)
 
         # root 如果没有初始化, 需要执行初始化根节点.
         if not process.root:
-            if tasked is not None:
+            if ctx.input.url is not None:
+                # input 传入场景信息.
+                root = ctx.input.url.new_with()
+            elif tasked is not None:
+                # 任务消息就是根节点.
                 root = RuntimeTool.new_task(
                     ctx,
                     URL.new(resolver=tasked.resolver, stage="", args=tasked.args),
@@ -101,7 +105,7 @@ class ReceiveInputOperator(AbsOperator):
                 root = RuntimeTool.new_task(ctx, ctx.clone.root)
             RuntimeTool.store_task(ctx, root)
             # 保存变更. 这一步理论上不是必须的.
-            ctx.clone.runtime.store_process(process)
+            ctx.runtime.store_process(process)
 
         if tasked is not None:
             # tasked 的情况, 只需要执行 tasked 的任务就可以了.
@@ -113,7 +117,7 @@ class ReceiveInputOperator(AbsOperator):
         if process.is_new:
             # 保证不再是 new 了.
             process.add_round()
-            ctx.clone.runtime.store_process(process)
+            ctx.runtime.store_process(process)
             root_task = RuntimeTool.fetch_root_task(ctx)
             # 必须先激活根节点, 然后让它进入某个状态后, 开始 receive input.
             # todo: 激活的过程是否要
@@ -164,9 +168,9 @@ class ReceiveInputOperator(AbsOperator):
             return
         if target_task.status != TaskStatus.WAITING:
             return
-        process = ctx.clone.runtime.current_process()
+        process = ctx.runtime.current_process()
         process.await_at(target_task.tid)
-        ctx.clone.runtime.store_process(process)
+        ctx.runtime.store_process(process)
         return
 
     def destroy(self) -> None:
@@ -354,7 +358,7 @@ class RewindOperator(AbsOperator):
         return None
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
-        ctx.clone.runtime.rewind()
+        ctx.runtime.rewind()
         if self.repeat:
             return AwaitOperator(None, None)
         return None
@@ -377,7 +381,7 @@ class AwaitOperator(AbsOperator):
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         tid = self.tid
-        runtime = ctx.clone.runtime
+        runtime = ctx.runtime
         process = runtime.current_process()
         # 变更 awaiting 任务.
         if tid is not None:
@@ -600,7 +604,7 @@ class ScheduleOperator(AbsOperator):
         return None
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
-        runtime = ctx.clone.runtime
+        runtime = ctx.runtime
         process = runtime.current_process()
         canceling = process.canceling
         if len(canceling) > 0:
@@ -626,14 +630,14 @@ class ScheduleOperator(AbsOperator):
             # 重新回到根节点.
             return self._preempt(ctx, process.root)
 
-        process = ctx.clone.runtime.current_process()
+        process = ctx.runtime.current_process()
         if TaskStatus.is_final(root.status):
             # 如果有父进程, 就回调父进程.
             if process.parent_id:
                 ctx.async_input(root.to_tasked(), pid=process.parent_id, trace=None)
 
         process.quiting = True
-        ctx.clone.runtime.store_process(process)
+        ctx.runtime.store_process(process)
         return None
 
     @classmethod
@@ -658,7 +662,7 @@ class ResetOperator(AbsOperator):
         return None
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
-        runtime = ctx.clone.runtime
+        runtime = ctx.runtime
         process = runtime.current_process()
         process.reset()
         runtime.store_process(process)
@@ -734,3 +738,25 @@ class DependOnOperator(AbsOperator):
         del self.tid
         del self.stage
         del self.target
+
+
+class RestartOperator(AbsOperator):
+
+    def __init__(self, tid: str):
+        self.tid = tid
+
+    def _intercept(self, ctx: "Context") -> Optional["Operator"]:
+        return None
+
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
+        task = RuntimeTool.force_fetch_task(ctx, self.tid)
+        if task.status != TaskStatus.NEW:
+            task.restart()
+            RuntimeTool.store_task(ctx, task)
+        return ActivateOperator(task.url, None, task.tid)
+
+    def _fallback(self, ctx: "Context") -> Optional["Operator"]:
+        return None
+
+    def destroy(self) -> None:
+        del self.tid

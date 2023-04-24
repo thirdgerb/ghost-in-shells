@@ -25,7 +25,7 @@ class UniformResolverLocator(BaseModel):
     def new(cls, resolver: str, stage: str, args: Dict):
         return URL(resolver=resolver, stage=stage, args=args)
 
-    def new_with(self, stage: str | None = None, args: Dict | None = None):
+    def new_with(self, stage: str | None = None, args: Dict | None = None) -> "URL":
         if stage is None:
             stage = self.stage
         if args is None:
