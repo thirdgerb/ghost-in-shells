@@ -6,7 +6,7 @@ from typing import Optional, Dict, List, Any
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.mindset.intention import Intention
+from ghoshell.ghost.mindset.focus import Intention
 from ghoshell.ghost.mindset.stage import Stage
 from ghoshell.ghost.mindset.thought import Thought
 from ghoshell.ghost.url import URL

@@ -5,7 +5,7 @@ from typing import Optional, Dict, List, Tuple
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.exceptions import MindsetNotFoundException, RuntimeException
 from ghoshell.ghost.mindset import Think, Thought, Stage, Event
-from ghoshell.ghost.mindset.intention import Intention, Attention
+from ghoshell.ghost.mindset.focus import Intention, Attention
 from ghoshell.ghost.mindset.operator import Operator
 from ghoshell.ghost.runtime import Task, TaskStatus, Process, TaskLevel
 from ghoshell.ghost.url import URL
@@ -50,7 +50,7 @@ class CtxTool:
     #     metas = stage.intentions(ctx)
     #     if metas is None:
     #         return None
-    #     return ctx.clone.attentions.match(ctx, *metas)
+    #     return ctx.clone.focus.match(ctx, *metas)
 
     # ---- thought 相关方法 ----#
 

@@ -40,21 +40,22 @@ class Attention(BaseModel):
     level: int = 0
 
 
-class Attend(metaclass=ABCMeta):
-    """
-    工具
-    """
+class FocusDriver(metaclass=ABCMeta):
 
     @abstractmethod
-    def to_stages(self, *stages) -> Attend:
+    def kind(self) -> str:
         pass
 
     @abstractmethod
-    def to_think(self, think_name: str, args: Dict | None) -> Attend:
+    def match(self, ctx: Context, *metas: Intention) -> Optional[Intention]:
         pass
 
     @abstractmethod
-    def destroy(self) -> None:
+    def register_global_intentions(self, *intentions: Intention) -> None:
+        pass
+
+    @abstractmethod
+    def wildcard_match(self, ctx: Context) -> Optional[Intention]:
         pass
 
 
@@ -62,11 +63,14 @@ class Focus(metaclass=ABCMeta):
     """
     工程化的注意力机制
     在运行中接受到各种事件, 比如 api/command/设备事件等等
-    通过 attentions 机制可以快速定位事件的处理者(task resolver => Thinking)
+    通过 focus 机制可以快速定位事件的处理者(task resolver => Thinking)
     """
 
     @abstractmethod
     def clone(self, clone_id: str) -> "Focus":
+        pass
+
+    def register(self, driver: FocusDriver) -> None:
         pass
 
     @abstractmethod

@@ -1,10 +1,10 @@
 from abc import ABCMeta, abstractmethod
-from typing import Callable, Optional
+from typing import Callable
 
-from ghoshell.ghost import Context, Input, Output
+from ghoshell.ghost import Context, Ghost
 
-GHOST_PIPELINE = Callable[[Input], Optional[Output]]
-GHOST_PIPE = Callable[[Input, GHOST_PIPELINE], Optional[Output]]
+GHOST_PIPELINE = Callable[[Context], Context]
+GHOST_PIPE = Callable[[Context, GHOST_PIPELINE], Context]
 
 
 class IMiddleware(metaclass=ABCMeta):
@@ -13,11 +13,11 @@ class IMiddleware(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def new(self, ctx: Context) -> GHOST_PIPE:
+    def new(self, ghost: Ghost) -> GHOST_PIPE:
         pass
 
 
-def mock_pipe(_input: Input, after: GHOST_PIPELINE) -> Optional[Output]:
+def mock_pipe(_input: Context, after: GHOST_PIPELINE) -> Context:
     return after(_input)
 
 

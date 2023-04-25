@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional
 
-from ghoshell.ghost.io import Message, Trace
+from ghoshell.messenger import Message, Trace
 
 
 class Sender(metaclass=ABCMeta):

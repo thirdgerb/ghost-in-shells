@@ -5,7 +5,7 @@ from typing import List, Dict, Optional, Set
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost.exceptions import RuntimeException
-from ghoshell.ghost.mindset.intention import Attention
+from ghoshell.ghost.mindset.focus import Attention
 from ghoshell.ghost.url import URL
 from ghoshell.messages import Tasked
 
@@ -81,11 +81,11 @@ class TaskLevel:
     任务 Task 的隔离级别. 目前有三种隔离级别. 对标面向对象的类(class) 中的三种级别.
     """
 
-    # Private, 封闭域, Process 只能专注于当前任务的 attentions
+    # Private, 封闭域, Process 只能专注于当前任务的 focus
     LEVEL_PRIVATE: TASK_LEVEL = 0
-    # Protected, 半封闭域, Process 里 task 链上的 task 都可以作为 attentions.
+    # Protected, 半封闭域, Process 里 task 链上的 task 都可以作为 focus.
     LEVEL_PROTECTED: TASK_LEVEL = 1
-    # 开放域. 任何全局意图都可以作为 attentions, 反过来说就没有 attentions 了.
+    # 开放域. 任何全局意图都可以作为 focus, 反过来说就没有 focus 了.
     LEVEL_PUBLIC: TASK_LEVEL = 2
 
     @classmethod

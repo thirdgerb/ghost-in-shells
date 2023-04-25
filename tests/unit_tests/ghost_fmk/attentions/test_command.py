@@ -1,4 +1,4 @@
-from ghoshell.ghost_fmk.attentions.command import CommandLine, CommandDriver
+from ghoshell.ghost_fmk.focus.command import CommandLine, CommandDriver
 
 
 def test_driver_baseline() -> None:

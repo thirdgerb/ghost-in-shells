@@ -4,7 +4,7 @@ from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost import Intention, Context
-from ghoshell.ghost_fmk.attentions.attentions import AttentionHandler
+from ghoshell.ghost_fmk.focus.focus import FocusHandler
 from ghoshell.messages import Text
 
 
@@ -64,7 +64,7 @@ class _ExitedException(Exception):
     pass
 
 
-class CommandDriver(AttentionHandler):
+class CommandDriver(FocusHandler):
 
     def __init__(self, prefix: str):
         self.prefix = prefix[0]

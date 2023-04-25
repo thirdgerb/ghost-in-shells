@@ -395,7 +395,7 @@ class AwaitOperator(AbsOperator):
             # 不用变更状态.
             return None
 
-        # 获取 attentions
+        # 获取 focus
         stage = CtxTool.force_fetch_stage(ctx, task.url.resolver, task.url.stage)
 
         reactions = stage.reactions()

@@ -15,7 +15,8 @@ class CloneImpl(Clone, metaclass=ABCMeta):
         self._config = config
         # 尽可能把工程方法放到 ghost 里.
         self._mindset = ghost.mindset.clone(clone_id)
-        self._attention = ghost.focus.clone(clone_id)
+        self._focus = ghost.focus.clone(clone_id)
+        self._memory = ghost.memory.clone(clone_id)
 
     @property
     def clone_id(self) -> str:
@@ -27,25 +28,31 @@ class CloneImpl(Clone, metaclass=ABCMeta):
 
     @property
     def root(self) -> "URL":
-        return self._config.root.copy_with()
+        return self._config.root_url.copy_with()
 
     @property
     def mindset(self) -> "Mindset":
         return self._mindset
 
     @property
+    def memory(self) -> "Memory":
+        return self._memory
+
+    @property
     def focus(self) -> "Focus":
-        return self._attention
+        return self._focus
 
     def destroy(self) -> None:
         # 清除 clone 级别的实例.
         # 如果不是请求级别的实例, destroy 方法不需要实现.
         self._mindset.destroy()
-        self._attention.destroy()
+        self._focus.destroy()
+        self._memory.destroy()
 
         # 删除持有.
         del self._config
-        del self._attention
+        del self._focus
         del self._mindset
         del self._clone_id
-        del self._attention
+        del self._focus
+        del self._memory

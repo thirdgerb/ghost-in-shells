@@ -1,16 +1,17 @@
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Optional, ClassVar
+from typing import TYPE_CHECKING, ClassVar, List
 
 from ghoshell.container import Container
-from ghoshell.ghost.io import Input, Output
+from ghoshell.messenger import Input, Output
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
     from ghoshell.ghost.mindset.operator import OperationKernel
     from ghoshell.ghost.mindset import Mindset
-    from ghoshell.ghost.mindset.intention import Focus
+    from ghoshell.ghost.mindset.focus import Focus
     from ghoshell.ghost.url import URL
-    from ghoshell.ghost.mindset.intention import Focus
+    from ghoshell.ghost.mindset.focus import Focus
+    from ghoshell.ghost.memory import Memory
 
 
 class Ghost(metaclass=ABCMeta):
@@ -34,6 +35,9 @@ class Ghost(metaclass=ABCMeta):
         比如对话机器人张三, 它在每一个 IM 里都叫张三, 但每个对话 session 里的张三都不一样.
         name 就是 "张三" 的意思, 它对于用户而言是唯一的实体, 对于 bot 提供方而言, 成千上万个张三是同一个项目.
         """
+        pass
+
+    def app_path(self) -> str:
         pass
 
     @property
@@ -73,6 +77,11 @@ class Ghost(metaclass=ABCMeta):
         """
         pass
 
+    @property
+    @abstractmethod
+    def memory(self) -> "Memory":
+        pass
+
     @abstractmethod
     def new_clone(self, clone_id: str) -> "Clone":
         """
@@ -90,19 +99,9 @@ class Ghost(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def respond(self, _input: "Input") -> Optional["Output"]:
+    def respond(self, _input: "Input") -> List["Output"]:
         """
         完成一轮的响应. 要支持没有任何响应.
-        """
-        pass
-
-    @abstractmethod
-    def async_input(self, _input: "Input") -> None:
-        """
-        向 Ghost 发送一个异步的输入消息.
-        对于 AsyncGhost, 只有用 await_async_input 才能获取到这个消息.
-        对于只能响应同步消息的 Ghost, 则需要用同步机制来响应.
-        AsyncGhost 是可以用来做发布时间调度的.
         """
         pass
 
@@ -113,37 +112,6 @@ class Ghost(metaclass=ABCMeta):
         而这个 kernel 是可以按需重构的.
         我理解不同的机器人, 可能会有不同的运行时方案, 这里做出抽象方便调整.
         但 ghoshell 只会实现唯一的一个 kernel
-        """
-        pass
-
-
-class AsyncGhost(Ghost, metaclass=ABCMeta):
-    """
-    可以响应异步消息的 Ghost
-    """
-
-    @abstractmethod
-    async def await_async_input(self, clone_id: str | None) -> "Input":
-        """
-        Ghost 需要拥有一个异步输入的消息队列
-        可以从这个队列里拿到异步的输入信息.
-        基于对 python 的理解, 将它定义成可阻塞的单次获取方法.
-        要实现并发, 则需要用多线程等办法, 平行处理多个异步输入.
-
-        这个队列必须是 clone 级别的, 需要实现好时序. 避免分布式系统出现 "脑裂".
-        假设可以通过传入 clone_id 来指定消息队列.
-        """
-        pass
-
-    @abstractmethod
-    def ack_async_input(self, _input: "Input", success: bool) -> None:
-        """
-        await_async_input 拿到消息时, 仍然可能因为阻塞等原因无法执行消息.
-        为了防止 "脑裂", 真正的异步input 队列 应该是 clone 级别的, 应该在出消息时有加锁动作, 防止多个消息输出到多个实例.
-        没有 ack 的话, 就无法重新激活队列, 也无法判断是否应该删除队头的信息.
-
-        实际的 Ghost 可能有 ack 机制, 也可能没有. 毕竟不是都要实现 at least once
-        所以这个接口要根据实际情况设计.
         """
         pass
 
@@ -188,24 +156,17 @@ class Clone(metaclass=ABCMeta):
     def root(self) -> "URL":
         pass
 
-        # @property
-        # @abstractmethod
-        # def memory(self) -> "Memory":
-        #     pass
-        #
-        # @property
-        # @abstractmethod
-        # def knowledge(self) -> "Memory":
-        #     """
-        #     ghost knowledge
-        #     """
-
     @property
     @abstractmethod
     def mindset(self) -> "Mindset":
         """
         用来获取所有的记忆.
         """
+        pass
+
+    @property
+    @abstractmethod
+    def memory(self) -> "Memory":
         pass
 
     # @property

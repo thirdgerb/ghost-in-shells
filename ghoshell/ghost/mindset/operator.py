@@ -64,6 +64,10 @@ class OperationKernel(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def init_operator(self) -> "Operator":
+        pass
+
     def run_dominos(self, ctx: "Context", initial_op: "Operator") -> None:
         """
         像推倒多米诺骨牌一样, 运行各种算子.

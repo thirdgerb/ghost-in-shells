@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from typing import Dict
 
 
 class Session(metaclass=ABCMeta):
@@ -25,6 +26,14 @@ class Session(metaclass=ABCMeta):
 
     @abstractmethod
     def new_message_id(self) -> str:
+        pass
+
+    @abstractmethod
+    def set(self, key: str, value: Dict) -> None:
+        pass
+
+    @abstractmethod
+    def get(self, key: str) -> Dict | None:
         pass
 
     # todo: 先不急于实现

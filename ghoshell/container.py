@@ -25,7 +25,7 @@ class Container:
         """
         self.__instances[contract] = instance
 
-    def get(self, contract: Type[Contract]) -> Contract | None:
+    def get(self, contract: Type[Contract], params: Dict | None = None) -> Contract | None:
         """
         获取一个实例.
         """
@@ -36,7 +36,7 @@ class Container:
         #  第二高优先级.
         if contract in self.__providers:
             provider = self.__providers[contract]
-            made = provider.factory(self)
+            made = provider.factory(self, params)
             if made is not None and provider.singleton():
                 self.set(contract, made)
             return made
@@ -50,6 +50,18 @@ class Container:
         contract = provider.contract()
         del self.__instances[contract]
         self.__providers[contract] = provider
+
+    def fetch(self, contract: Type[Contract]) -> Contract | None:
+        instance = self.get(contract)
+        if instance is not None and isinstance(instance, contract):
+            return instance
+        return None
+
+    def force_fetch(self, contract: Type[Contract]) -> Contract:
+        ins = fetch(self, contract)
+        if ins is None:
+            raise Exception(f"contract {contract} not register in container")
+        return ins
 
     def destroy(self) -> None:
         del self.__instances
@@ -68,7 +80,7 @@ class Provider(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def factory(self, con: Container) -> Contract | None:
+    def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         pass
 
 

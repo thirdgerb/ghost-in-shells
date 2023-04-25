@@ -4,7 +4,7 @@ from typing import Optional, List, Dict
 from ghoshell.ghost import Focus, Context, Intention
 
 
-class AttentionHandler(metaclass=ABCMeta):
+class FocusHandler(metaclass=ABCMeta):
 
     @abstractmethod
     def kind(self) -> str:
@@ -23,25 +23,25 @@ class AttentionHandler(metaclass=ABCMeta):
         pass
 
 
-class AttentionImpl(Focus):
+class FocusImpl(Focus):
     """
     一个最简单的实现.
     """
 
-    def __init__(self, *drivers: AttentionHandler):
-        self.driver_map: Dict[str, AttentionHandler] = {}
+    def __init__(self, *drivers: FocusHandler):
+        self.driver_map: Dict[str, FocusHandler] = {}
         # 保证有序.
         self.driver_kinds: List[str] = []
         for driver in drivers:
             self.register_driver(driver)
 
-    def clone(self) -> "Focus":
+    def clone(self, clone_id: str) -> "Focus":
         return self
 
     def kinds(self) -> List[str]:
         return self.driver_kinds.copy()
 
-    def register_driver(self, driver: AttentionHandler) -> None:
+    def register(self, driver: FocusHandler) -> None:
         kind = driver.kind()
         if kind not in self.driver_map:
             self.driver_kinds.append(kind)

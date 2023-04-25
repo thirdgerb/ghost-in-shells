@@ -1,11 +1,23 @@
 from abc import ABCMeta, abstractmethod
-from typing import Callable, List, Dict, Optional
+from typing import Callable, List
 
-from removed.runtime import AbsRuntimeDriver
-
-from ghoshell.ghost import Ghost, Input, Output, Context, Operator
+from ghoshell.container import Container, Provider
+from ghoshell.ghost import Ghost, Clone, Context, OperationKernel
+from ghoshell.ghost import Mindset, Focus, Memory
+from ghoshell.ghost import RuntimeException
+from ghoshell.ghost_fmk.clone import CloneImpl
+from ghoshell.ghost_fmk.config import GhostConfig
+from ghoshell.ghost_fmk.context import ContextImpl
 from ghoshell.ghost_fmk.middleware import IMiddleware, ExceptionHandlerMiddleware, GHOST_PIPE, GHOST_PIPELINE
+from ghoshell.messenger import Messenger, Input, Output
 from ghoshell.utils import create_pipeline
+
+
+class Bootstrapper(metaclass=ABCMeta):
+
+    @abstractmethod
+    def bootstrap(self, ghost: Ghost):
+        pass
 
 
 class GhostKernel(Ghost, metaclass=ABCMeta):
@@ -18,67 +30,120 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         ExceptionHandlerMiddleware(),
     ]
 
-    # --- 以下是各种 driver 的实现 --- #
+    bootstrapper: List[Bootstrapper] = []
 
-    runtime_driver: AbsRuntimeDriver
+    providers: List[Provider] = []
 
-    def respond(self, inpt: Input) -> Output:
-        """
-        核心方法: 处理输入 inpt
-        """
-        try:
-            ctx = self._new_context(inpt)
-            return self._react(ctx, inpt)
-        finally:
-            # todo: handle exception
-            pass
-
-    def _react(self, ctx: Context, inpt: Input) -> Output:
-        """
-        因为需要两层 try catch, 所以拆分一个内部方法.
-        """
-        try:
-            pipeline = self._build_pipeline(ctx)
-            output = pipeline(inpt)
-            # 输出时携带 ghost 的场景协议.
-            # 默认用 {} 来实现就可以了.
-            output.ghost_env = self.ghost_env(ctx)
-            return output
-        finally:
-            ctx.finish()
-
-    @abstractmethod
-    def ghost_env(self, ctx: Context) -> Dict:
-        """
-        根据上下文返回 ghost 定义的 env 协议.
-        """
-        pass
+    def __init__(
+            self,
+            name: str,
+            container: Container,
+            root_path: str,
+            config: GhostConfig,
+            messenger: Messenger,
+    ):
+        self._name = name
+        self._root_path = root_path
+        self._config = config
+        self._container = container
+        self._mindset: Mindset | None = None
+        self._focus: Focus | None = None
+        self._memory: Memory | None = None
+        self._messenger: Messenger = messenger
 
     # ---- abstract ---- #
 
     @abstractmethod
-    def _new_context(self, inpt: Input) -> Context:
+    def new_context(self, inpt: Input) -> Context:
         """
         机器人构建上下文, 最核心的能力
         """
-        pass
+        if not inpt.trace.clone_id:
+            raise RuntimeException("todo xxxx")
+
+        clone = self.new_clone(inpt.trace.clone_id)
+        return ContextImpl(
+            inpt=inpt,
+            clone=clone,
+
+        )
 
     @abstractmethod
-    def _failed(self, inpt: Input) -> Output:
-        """
-        解决异常问题
-        """
+    def new_operation_kernel(self) -> "OperationKernel":
         pass
 
-    def _init_operator(self, inpt: Input) -> Operator:
+    def app_path(self) -> str:
+        return self._root_path
+
+    def respond(self, inpt: Input) -> List[Output]:
         """
-        初始化算子
+        核心方法: 处理输入 inpt
         """
-        pass
+        try:
+            ctx = self.new_context(inpt)
+            return self._react(ctx)
+        finally:
+            # todo: handle exception
+            pass
+
+    def _react(self, ctx: Context) -> List[Output]:
+        """
+        因为需要两层 try catch, 所以拆分一个内部方法.
+        """
+        try:
+            pipeline = self._build_pipeline()
+            ctx = pipeline(ctx)
+            return ctx.get_outputs()
+        finally:
+            ctx.finish()
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def container(self) -> "Container":
+        return self._container
+
+    def boostrap(self) -> "Ghost":
+        # bootstrapper
+        for boot in self.bootstrapper:
+            boot.bootstrap(self)
+
+        # 注册所有的 provider
+        for provider in self.providers:
+            self._container.register(provider)
+        return self
+
+    @property
+    def mindset(self) -> "Mindset":
+        if self._mindset is None:
+            mindset = self._container.force_fetch(Mindset)
+            self._mindset = mindset
+        return self._mindset
+
+    @property
+    def focus(self) -> "Focus":
+        if self._focus is None:
+            self._focus = self._container.force_fetch(Focus)
+        return self._focus
+
+    @property
+    def memory(self) -> "Memory":
+        if self._memory is None:
+            self._memory = self._container.force_fetch(Memory)
+        return self._memory
+
+    def new_clone(self, clone_id: str) -> "Clone":
+        return CloneImpl(
+            self,
+            clone_id,
+            self._config,
+        )
 
     # ---- 内部方法 ---- #
 
-    def _build_pipeline(self, ctx: Context) -> Callable[[Input], Output]:
+    def _build_pipeline(self) -> Callable[[Context], Context]:
         """
         使用中间件实现一个管道
         """
@@ -86,25 +151,24 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         pipes: List[GHOST_PIPE] = []
         # 用 run 方法组成 pipes
         for m in middleware:
-            pipe = m.new(ctx)
+            pipe = m.new(self)
             pipes.append(pipe)
         # 返回 pipeline
-        return create_pipeline(pipes, self._build_destination(ctx))
+        return create_pipeline(pipes, self._build_destination())
 
-    def _build_destination(self, ctx: Context) -> GHOST_PIPELINE:
+    def _build_destination(self) -> GHOST_PIPELINE:
         """
         实现管道的最后一环.
         运行各种算子.
         """
 
-        def destination(_input: Input) -> Optional[Output]:
-            ctx.set_input(_input)
+        def destination(ctx: Context) -> Context:
             # 实例化一个上下文级别的 operator manager.
             # 用于解决 stack overflow 等问题.
-            manager = ctx.new_operator_manager()
-            manager.run_dominos(ctx, self._init_operator(_input))
+            kernel = self.new_operation_kernel()
+            kernel.run_dominos(ctx, kernel.init_operator())
             # 记得随手清空对象, 避免内存泄漏
-            manager.finish()
-            return ctx.gen_output()
+            kernel.destroy()
+            return ctx
 
         return destination

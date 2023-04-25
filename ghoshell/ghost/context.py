@@ -8,7 +8,7 @@ from ghoshell.messages import Message
 if TYPE_CHECKING:
     from ghoshell.ghost.ghost import Clone
     from ghoshell.ghost.mindset import Thought, Mind
-    from ghoshell.ghost.io import Input, Output
+    from ghoshell.messenger import Input, Output
     from ghoshell.ghost.sending import Sender
     from ghoshell.ghost.session import Session
     from ghoshell.ghost.runtime import Runtime

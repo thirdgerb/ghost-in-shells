@@ -5,7 +5,7 @@ from typing import List
 
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.mindset.events import *
-from ghoshell.ghost.mindset.intention import Intention
+from ghoshell.ghost.mindset.focus import Intention
 from ghoshell.ghost.mindset.operator import Operator
 from ghoshell.ghost.mindset.thought import Thought
 from ghoshell.ghost.url import URL
