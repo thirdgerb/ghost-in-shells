@@ -5,6 +5,7 @@ from typing import List, Dict, Optional, Set
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost.exceptions import RuntimeException
+from ghoshell.ghost.mindset.intention import Attention
 from ghoshell.ghost.url import URL
 from ghoshell.messages import Tasked
 
@@ -87,6 +88,14 @@ class TaskLevel:
     # 开放域. 任何全局意图都可以作为 attentions, 反过来说就没有 attentions 了.
     LEVEL_PUBLIC: TASK_LEVEL = 2
 
+    @classmethod
+    def allow(cls, current_level: int, target_level: int) -> bool:
+        if current_level > cls.LEVEL_PUBLIC:
+            return False
+        if target_level > cls.LEVEL_PUBLIC:
+            return False
+        return current_level + target_level > cls.LEVEL_PUBLIC
+
 
 class Task(BaseModel):
     """
@@ -144,7 +153,7 @@ class Task(BaseModel):
     # 考虑增加一个时间戳记录被放入的时间, 但实际上这个时间戳很可能不够敏感?
     # restore_at: float
 
-    attentions: List[URL] | None = None
+    attentions: List[Attention] | None = None
 
     def to_tasked(self) -> Tasked:
         """
@@ -220,6 +229,7 @@ class Task(BaseModel):
             self.url.stage = stage
         callbacks = self.callbacks
         self.callbacks = None
+        self.attentions = None
         return callbacks
 
     def add_callback(self, tid: str) -> None:
@@ -227,12 +237,14 @@ class Task(BaseModel):
             self.callbacks = set()
         self.callbacks.add(tid)
 
-    def await_at(self, at_stage: str) -> None:
+    def await_at(self, at_stage: str | None, attentions: List[Attention] | None) -> None:
         """
         等待输入侧的信息.
         """
         self.status = TaskStatus.WAITING
-        self.url.stage = at_stage
+        if at_stage is not None:
+            self.url.stage = at_stage
+        self.attentions = attentions
 
     def preempt(self, stage: str | None) -> None:
         """
@@ -241,6 +253,8 @@ class Task(BaseModel):
         if stage is not None:
             self.url.stage = stage
         self.status = TaskStatus.PREEMPTING
+        if stage != self.url.stage:
+            self.attentions = None
 
     #
     # def be_yielding(self, stage: str, yield_to: str) -> None:
@@ -257,6 +271,7 @@ class Task(BaseModel):
         """
         self.status = TaskStatus.DEPENDING
         self.url.stage = stage
+        self.attentions = None
 
     def restart(self) -> None:
         """
@@ -268,6 +283,7 @@ class Task(BaseModel):
         self.forwards = []
         # callbacks 保留
         self.callbacks = self.callbacks
+        self.attentions = None
 
 
 class Process(BaseModel):

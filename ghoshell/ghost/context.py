@@ -6,11 +6,10 @@ from typing import Any, Optional, TYPE_CHECKING, List, TypeVar, Type
 from ghoshell.messages import Message
 
 if TYPE_CHECKING:
-    from ghoshell.container import Container
     from ghoshell.ghost.ghost import Clone
     from ghoshell.ghost.mindset import Thought, Mind
     from ghoshell.ghost.io import Input, Output
-    from ghoshell.ghost.sending import Sending
+    from ghoshell.ghost.sending import Sender
     from ghoshell.ghost.session import Session
     from ghoshell.ghost.runtime import Runtime
 
@@ -26,12 +25,6 @@ class Context(metaclass=ABCMeta):
     @abstractmethod
     def clone(self) -> "Clone":
         pass
-
-    def container(self) -> "Container":
-        """
-        容器层层传递.
-        """
-        return self.clone.container
 
     @property
     @abstractmethod
@@ -59,7 +52,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def send(self, _with: "Thought") -> Sending:
+    def send_at(self, _with: Optional["Thought"]) -> "Sender":
         """
         以 Thought 为基础, 发出各种消息体给 Shell
         再由 Shell 发送出去.

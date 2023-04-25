@@ -1,4 +1,5 @@
 from ghoshell.ghost.mindset.events import *
+from ghoshell.ghost.mindset.intention import Attend
 from ghoshell.ghost.mindset.mind import Mind
 from ghoshell.ghost.mindset.mindset import Mindset
 from ghoshell.ghost.mindset.operator import Operator, OperationKernel
@@ -13,6 +14,8 @@ __all__ = [
     "Thought",
     "Stage",
     "Event",
-    "Intending", "Activating", "Callback", "Receiving", "Withdrawing", "Canceling", "Failing", "Quiting", "Preempting",
+    "OnActivating", "OnCallback", "OnReceiving", "OnWithdrawing", "OnCanceling", "OnFailing",
+    "OnQuiting",
+    "OnPreempting",
     "Operator", "OperationKernel",
 ]

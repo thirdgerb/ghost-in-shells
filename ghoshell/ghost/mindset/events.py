@@ -27,32 +27,17 @@ class Event(metaclass=ABCMeta):
         del self.fr
 
 
-class Receiving(Event):
+class OnReceiving(Event):
     pass
 
 
-class Intending(Event):
-    """
-    响应 Ghost 的 Input 产生的事件.
-    会包含 Params, 是对 Input 解析后, 适配为结构化的参数
-    """
-
-    def __init__(self, task_id: str, stage: str, fr: URL | None, matched: Dict):
-        super().__init__(task_id, stage, fr)
-        self.matched = matched
-
-    def destroy(self):
-        super().destroy()
-        del self.matched
-
-
-class Activating(Event):
+class OnActivating(Event):
     """
     重定向事件.
     """
 
 
-class Callback(Event):
+class OnCallback(Event):
     """
     任务与任务之间的回调.
     """
@@ -66,14 +51,14 @@ class Callback(Event):
         super().destroy()
 
 
-class Preempting(Event):
+class OnPreempting(Event):
     """
     从中断的状态中恢复.
     """
     pass
 
 
-class Withdrawing(Event):
+class OnWithdrawing(Event, metaclass=ABCMeta):
     """
     从别的节点退回到当前节点.
     这个事件也可以被中断, 否则会链式地退出.
@@ -82,21 +67,21 @@ class Withdrawing(Event):
 
 # --- withdraw events --- #
 
-class Canceling(Withdrawing):
+class OnCanceling(OnWithdrawing):
     """
     任务取消
     """
     pass
 
 
-class Quiting(Withdrawing):
+class OnQuiting(OnWithdrawing):
     """
     对话退出
     """
     pass
 
 
-class Failing(Withdrawing):
+class OnFailing(OnWithdrawing):
     """
     任务失败.
     """

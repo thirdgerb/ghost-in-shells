@@ -1,13 +1,14 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional, List, ClassVar, Type, Dict
 
+from ghoshell.ghost import Attention, Intention
 from ghoshell.ghost import Context, URL
 from ghoshell.ghost import CtxTool
-from ghoshell.ghost import Intending, Receiving, Activating, Preempting, Callback
+from ghoshell.ghost import OnReceiving, OnActivating, OnPreempting, OnCallback
+from ghoshell.ghost import OnWithdrawing, OnCanceling, OnFailing, OnQuiting
 from ghoshell.ghost import Operator
 from ghoshell.ghost import RuntimeTool
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
-from ghoshell.ghost import Withdrawing, Canceling, Failing, Quiting
 from ghoshell.messages import Tasked
 
 
@@ -93,7 +94,7 @@ class ReceiveInputOperator(AbsOperator):
         if not process.root:
             if ctx.input.url is not None:
                 # input 传入场景信息.
-                root = ctx.input.url.new_with()
+                root = ctx.input.url.copy_with()
             elif tasked is not None:
                 # 任务消息就是根节点.
                 root = RuntimeTool.new_task(
@@ -110,7 +111,7 @@ class ReceiveInputOperator(AbsOperator):
         if tasked is not None:
             # tasked 的情况, 只需要执行 tasked 的任务就可以了.
             # 这是一种特殊的消息, 通常是内部的消息.
-            return OnMessageTaskedOperator(tasked)
+            return TaskedMessageOperator(tasked)
 
         # 正常情况下, 要判断是不是 new
         # 如果是 new 的话, 要初始化根节点.
@@ -132,22 +133,23 @@ class ReceiveInputOperator(AbsOperator):
         awaiting_task = RuntimeTool.fetch_awaiting_task(ctx)
 
         # 目前认为需要分批匹配意图. 第一批是前序意图, 决定重定向方向.
-        intentions = CtxTool.context_forward_intentions(ctx, awaiting_task.level)
-        matched = CtxTool.match_intentions(ctx, intentions)
+        attentions = CtxTool.context_attentions(ctx)
+        matched = CtxTool.match_attentions(ctx, attentions)
+
         if matched is not None:
-            return IntendingOperator(matched.to, matched.fr, matched.matched)
+            return IntendingOperator(matched)
 
         # 第二批是后续意图, 用来激活后续任务
-        intentions = CtxTool.context_backward_intentions(ctx, awaiting_task.level)
-        matched = CtxTool.match_intentions(ctx, intentions)
+        attentions = CtxTool.context_attentions(ctx)
+        matched = CtxTool.match_attentions(ctx, attentions)
         if matched is not None:
-            return IntendingOperator(matched.to, matched.fr, matched.matched)
+            return IntendingOperator(matched)
 
         # 都没有匹配, 就尝试模糊匹配.
         if awaiting_task.level == TaskLevel.LEVEL_PUBLIC:
             matched = CtxTool.match_global_intentions(ctx)
             if matched is not None:
-                return IntendingOperator(matched.to, matched.fr, matched.matched)
+                return IntendingOperator(matched)
 
         #  所有意图匹配逻辑都没有命中, 往后走.
         return None
@@ -182,52 +184,50 @@ class IntendingOperator(AbsOperator):
     匹配到了意图并且执行跳转.
     """
 
-    def __init__(self, to: URL, fr: URL | None, params: Dict | None):
-        self.to = to
-        self.fr = fr
-        self.params = params
+    def __init__(self, matched: Intention):
+        self.matched = matched
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
-        if self.to.stage:
-            return self._intend_to_stage(ctx)
-        return self._match_think_intention(ctx)
-
-    def _intend_to_stage(self, ctx: "Context") -> Optional["Operator"]:
-        task = RuntimeTool.fetch_task_by_url(ctx, self.to, False)
-        # 只有任务存在的时候, 才能触发命中意图的任务.
-        # 否则不允许命中这种意图.
-        if task is not None:
-            event = Intending(task.tid, self.to.stage, self.fr, self.params)
-            return RuntimeTool.fire_event(ctx, event)
-        return None
-
-    def _match_think_intention(self, ctx: "Context") -> Optional["Operator"]:
-        url = self.to
-        url.stage = ""
-        if self.params:
-            url = url.new_with(args=self.params)
-
-        task = RuntimeTool.fetch_task_by_url(ctx, self.to, False)
-        # 任务没有初始化过. 使用 matched 作为参数, 进入任务.
+        if self.matched.target is None:
+            return None
+        target = self.matched.target
+        task = RuntimeTool.fetch_task_by_url(ctx, target, False)
         if task is None:
-            # 启动目标任务.
-            return ActivateOperator(url.new_with(args=self.params), self.fr, None)
+            if target.stage:
+                # 不允许前往一个新任务的内部节点.
+                return None
+            # 初始化一个新任务.
+            return self._match_new_thought(target, self.matched.params)
+        return self._intend_to_stage(ctx, task)
 
-        # 任务已经初始化过. 允许命中初始节点.
-        event = Intending(task.tid, url.stage, self.fr, self.params)
-        # 命中了都应该要返回, 无法处理才返回 None
-        return RuntimeTool.fire_event(ctx, event)
+    def _intend_to_stage(self, ctx: "Context", task: Task) -> Optional["Operator"]:
+        fr = self.matched.target
+        stage_resolver = CtxTool.force_fetch_stage(ctx, fr.resolver, fr.stage)
+        reaction_name = self.matched.reaction
+        reactions = stage_resolver.reactions()
+        if reaction_name is None or reaction_name not in reactions:
+            return None
+        reaction = reactions[reaction_name]
+
+        thought = RuntimeTool.fetch_thought_by_task(ctx, task)
+        return reaction.react(ctx, thought)
+
+    def _match_new_thought(self, target: URL, args: Dict | None) -> Optional["Operator"]:
+        if target.stage:
+            return None
+        target = target.copy_with(args=args)
+        # 启动目标任务.
+        return ActivateOperator(target, None, None)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         return UnhandledInputOperator()
 
     def destroy(self) -> None:
         del self.fr
-        del self.to
-        del self.params
+        del self.matched
 
 
 #
@@ -255,7 +255,7 @@ class IntendingOperator(AbsOperator):
 #         del self.fr
 
 
-class OnMessageTaskedOperator(AbsOperator):
+class TaskedMessageOperator(AbsOperator):
     """
     响应以传输的任务数据为消息的请求.
     """
@@ -276,13 +276,13 @@ class OnMessageTaskedOperator(AbsOperator):
         # 进入到下一个状态.
         match task.status:
             case TaskStatus.DEAD:
-                return CancelOperator(task.tid, None)
+                return CancelOperator(task.tid, tasked.stage)
             case TaskStatus.WAITING:
-                return AwaitOperator(task.tid, None)
+                return AwaitOperator(task.tid, tasked.stage, None, None)
             case TaskStatus.FINISHED:
                 return FinishOperator(task.tid, task.url.stage)
             case _:
-                return ScheduleOperator()
+                return ForwardOperator(task.tid, list(tasked.stage))
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         # 什么也不干.
@@ -294,49 +294,49 @@ class OnMessageTaskedOperator(AbsOperator):
 
 class ActivateOperator(AbsOperator):
 
-    def __init__(self, to: URL, fr: URL | None, tid: str | None):
+    def __init__(self, to: URL, fr: URL | None, target_tid: str | None):
         self.to = to
         self.fr = fr
-        self.tid = tid
+        self.target_tid = target_tid
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
-        if self.tid:
-            task = RuntimeTool.force_fetch_task(ctx, self.tid)
+        if self.target_tid:
+            task = RuntimeTool.force_fetch_task(ctx, self.target_tid)
         else:
             task = RuntimeTool.fetch_task_by_url(ctx, self.to, True)
         match task.status:
             case TaskStatus.NEW:
-                think = CtxTool.force_fetch_think(ctx, self.to.resolver)
-                if think.is_async():
-                    # 设置 task 为 yielding, 保留了一个指针.
-                    task.status = TaskStatus.YIELDING
-                    RuntimeTool.store_task(ctx, task)
-                    # 发送异步消息, 新开一个子进程.
-                    ctx.async_input(task.to_tasked(), None)
-                    # 正常回调任务, 当前任务已经 yielding.
-                    return ScheduleOperator()
+                # think = CtxTool.force_fetch_think(ctx, self.to.resolver)
+                # if think.is_async():
+                #     # 设置 task 为 yielding, 保留了一个指针.
+                #     task.status = TaskStatus.YIELDING
+                #     RuntimeTool.store_task(ctx, task)
+                #     # 发送异步消息, 新开一个子进程.
+                #     ctx.send(None).async_input(task.to_tasked())
+                #     # 正常回调任务, 当前任务已经 yielding.
+                #     return ScheduleOperator()
                 # 保证至少是 Running 状态.
                 task.status = TaskStatus.RUNNING
                 RuntimeTool.store_task(ctx, task)
 
-                event = Activating(task.tid, self.to.stage, self.fr)
+                event = OnActivating(task.tid, self.to.stage, self.fr)
                 return RuntimeTool.fire_event(ctx, event)
             case TaskStatus.FINISHED, TaskStatus.DEAD:
                 # 重启任务.
                 task.restart()
                 RuntimeTool.store_task(ctx, task)
-                event = Activating(task.tid, self.to.stage, self.fr)
+                event = OnActivating(task.tid, self.to.stage, self.fr)
                 return RuntimeTool.fire_event(ctx, event)
 
             # preempting
             case TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING:
-                event = Preempting(task.tid, task.url.stage, self.fr)
+                event = OnPreempting(task.tid, task.url.stage, self.fr)
                 return RuntimeTool.fire_event(ctx, event)
             case _:
-                event = Activating(task.tid, self.to.stage, self.fr)
+                event = OnActivating(task.tid, self.to.stage, self.fr)
                 return RuntimeTool.fire_event(ctx, event)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
@@ -346,7 +346,7 @@ class ActivateOperator(AbsOperator):
     def destroy(self) -> None:
         del self.to
         del self.fr
-        del self.tid
+        del self.target_tid
 
 
 class RewindOperator(AbsOperator):
@@ -360,7 +360,7 @@ class RewindOperator(AbsOperator):
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         ctx.runtime.rewind()
         if self.repeat:
-            return AwaitOperator(None, None)
+            return AwaitOperator(None, None, None, None)
         return None
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
@@ -372,9 +372,11 @@ class RewindOperator(AbsOperator):
 
 class AwaitOperator(AbsOperator):
 
-    def __init__(self, tid: str | None, stage: str | None):
+    def __init__(self, tid: str | None, stage: str | None, only: List[str] | None, exclude: List[str] | None):
         self.tid = tid
         self.stage = stage
+        self.only = only
+        self.exclude = exclude
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -389,20 +391,37 @@ class AwaitOperator(AbsOperator):
         runtime.store_process(process)
 
         task = RuntimeTool.fetch_task(ctx, tid)
-        # 变更当前状态.
-        if self.stage is not None:
-            task.url.stage = self.stage
+        if task.status == TaskStatus.WAITING and (self.stage is None or task.url.stage == self.stage):
+            # 不用变更状态.
+            return None
 
+        # 获取 attentions
         stage = CtxTool.force_fetch_stage(ctx, task.url.resolver, task.url.stage)
-        attentions = stage.on_await(ctx)
-        for url in attentions:
-            self_think = task.url.resolver
-            # 不允许调用别的任务的子状态. 在这里主动清空掉.
-            # 类似面向对象, 只能调用入口代码.
-            if url.stage != "" and url.resolver != self_think:
-                url.stage = ""
 
-        task.attentions = attentions
+        reactions = stage.reactions()
+        reaction_names = set(reactions.keys())
+        if len(reaction_names) == 0:
+            return None
+        if self.only is not None:
+            reaction_names = reaction_names & set(self.only)
+        if self.exclude is not None:
+            reaction_names = reaction_names - set(self.exclude)
+
+        attentions = []
+        for reaction_name in reaction_names:
+            reaction = reactions.get(reaction_name, None)
+            if reaction is None:
+                continue
+            intentions = reaction.intentions(ctx)
+            url_dict = task.url.dict()
+            attention = Attention(
+                to=url_dict,
+                intentions=[intention.dict() for intention in intentions],
+                reaction=reaction_name,
+                level=reaction.level(),
+            )
+            attentions.append(attention)
+        task.await_at(self.stage, attentions)
         RuntimeTool.store_task(ctx, task)
         # 任务结束.
         return None
@@ -412,6 +431,9 @@ class AwaitOperator(AbsOperator):
 
     def destroy(self) -> None:
         del self.tid
+        del self.exclude
+        del self.stage
+        del self.only
 
 
 class ForwardOperator(AbsOperator):
@@ -440,7 +462,7 @@ class ForwardOperator(AbsOperator):
         _next = task.forward()
         if _next is not None:
             # 启动目标节点.
-            return ActivateOperator(task.url.new_with(stage=_next), task.url, task.tid)
+            return ActivateOperator(task.url.copy_with(stage=_next), task.url, task.tid)
         # 结束当前 task, 就在当前位置.
         return FinishOperator(task.tid, task.url.stage)
 
@@ -513,7 +535,7 @@ class UnhandledInputOperator(AbsOperator):
     @classmethod
     def _fallback_to_task(cls, ctx: "Context", task: Task) -> Optional[Operator]:
         # 当前任务.  fallback
-        event = Receiving(task.tid, task.url.stage, None)
+        event = OnReceiving(task.tid, task.url.stage, None)
         return RuntimeTool.fire_event(ctx, event)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
@@ -528,7 +550,7 @@ class WithdrawOperator(AbsOperator, metaclass=ABCMeta):
     """
     """
     status: ClassVar[int]
-    wrapper: Type[Withdrawing]
+    wrapper: Type[OnWithdrawing]
 
     def __init__(
             self,
@@ -574,17 +596,17 @@ class WithdrawOperator(AbsOperator, metaclass=ABCMeta):
 
 class CancelOperator(WithdrawOperator):
     status = TaskStatus.CANCELING
-    wrapper = Canceling
+    wrapper = OnCanceling
 
 
 class FailOperator(WithdrawOperator):
     status = TaskStatus.FAILING
-    wrapper = Failing
+    wrapper = OnFailing
 
 
 class QuitOperator(WithdrawOperator):
     status = TaskStatus.CANCELING
-    wrapper = Quiting
+    wrapper = OnQuiting
 
     def _intercept(self, ctx: Context) -> Optional[Operator]:
         intercepted = super()._intercept(ctx)
@@ -634,7 +656,7 @@ class ScheduleOperator(AbsOperator):
         if TaskStatus.is_final(root.status):
             # 如果有父进程, 就回调父进程.
             if process.parent_id:
-                ctx.async_input(root.to_tasked(), pid=process.parent_id, trace=None)
+                ctx.send_at(None).async_input(root.to_tasked(), process_id=process.parent_id, trace=None)
 
         process.quiting = True
         ctx.runtime.store_process(process)
@@ -643,7 +665,7 @@ class ScheduleOperator(AbsOperator):
     @classmethod
     def _preempt(cls, ctx: Context, tid: str) -> Optional[Operator]:
         task = RuntimeTool.fetch_task(ctx, tid)
-        event = Preempting(task.tid, task.url.stage, None)
+        event = OnPreempting(task.tid, task.url.stage, None)
         return RuntimeTool.fire_event(ctx, event)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
@@ -668,7 +690,7 @@ class ResetOperator(AbsOperator):
         runtime.store_process(process)
 
         task = RuntimeTool.fetch_root_task(ctx)
-        event = Activating(task.tid, task.url.stage, None)
+        event = OnActivating(task.tid, task.url.stage, None)
         return RuntimeTool.fire_event(ctx, event)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
@@ -720,7 +742,7 @@ class DependOnOperator(AbsOperator):
             case TaskStatus.FINISHED:
                 # callback 事件
                 result = RuntimeTool.task_result(ctx, target_task)
-                event = Callback(self_task.tid, self_task.url.stage, target_task.url.new_with(), result)
+                event = OnCallback(self_task.tid, self_task.url.stage, target_task.url.copy_with(), result)
                 return RuntimeTool.fire_event(ctx, event)
             case TaskStatus.DEAD:
                 # cancel 事件
@@ -760,3 +782,45 @@ class RestartOperator(AbsOperator):
 
     def destroy(self) -> None:
         del self.tid
+
+
+class YieldToOperator(AbsOperator):
+
+    def __init__(self, tid: str, stage: str, is_callback: bool):
+        self.tid = tid
+        self.stage = stage
+        self.is_callback = is_callback
+
+    def _intercept(self, ctx: "Context") -> Optional["Operator"]:
+        return None
+
+    def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
+        task = RuntimeTool.force_fetch_task(ctx, self.tid)
+        tasked = task.to_tasked()
+        tasked.stage = self.stage
+        if self.is_callback:
+            parent_id = ctx.runtime.current_process().parent_id
+            # 无法回调, 当成同步请求运行.
+            if parent_id is None:
+                return ForwardOperator(task.tid, [self.stage])
+
+            # 发送异步消息.
+            thought = RuntimeTool.fetch_thought_by_task(ctx, task)
+            ctx.send_at(thought).async_input(tasked, process_id=parent_id)
+            # 直接进入回收状态.
+            task.status = TaskStatus.DEAD
+        else:
+            thought = RuntimeTool.fetch_thought_by_task(ctx, task)
+            ctx.send_at(thought).async_input(tasked)
+            # 变更自身状态.
+            task.status = TaskStatus.YIELDING
+        RuntimeTool.store_task(ctx, task)
+        return None
+
+    def _fallback(self, ctx: "Context") -> Optional["Operator"]:
+        return ScheduleOperator()
+
+    def destroy(self) -> None:
+        del self.tid
+        del self.stage
+        del self.is_callback

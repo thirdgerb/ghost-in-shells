@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, List, Dict, ClassVar
+from typing import Optional, List, Dict
 
 from pydantic import BaseModel
 
@@ -23,16 +23,42 @@ class Intention(BaseModel):
 
     每一种预测的意图, 都应该通过不同的解析机制来解决.
     """
-    KIND: ClassVar[str] = ""
-    to: URL
+    kind: str
     config: Dict
     # 私有意图只有在当前任务中能被识别和匹配.
-    private: bool = False
-    matched: Dict | None = None
-    fr: URL | None = None
+    params: Dict | None = None
+
+    # 关联.
+    target: URL | None = None
+    reaction: str | None = None
 
 
-class Attention(metaclass=ABCMeta):
+class Attention(BaseModel):
+    fr: URL
+    intentions: List[Intention]
+    reaction: str
+    level: int = 0
+
+
+class Attend(metaclass=ABCMeta):
+    """
+    工具
+    """
+
+    @abstractmethod
+    def to_stages(self, *stages) -> Attend:
+        pass
+
+    @abstractmethod
+    def to_think(self, think_name: str, args: Dict | None) -> Attend:
+        pass
+
+    @abstractmethod
+    def destroy(self) -> None:
+        pass
+
+
+class Focus(metaclass=ABCMeta):
     """
     工程化的注意力机制
     在运行中接受到各种事件, 比如 api/command/设备事件等等
@@ -40,7 +66,7 @@ class Attention(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def clone(self, clone_id: str) -> "Attention":
+    def clone(self, clone_id: str) -> "Focus":
         pass
 
     @abstractmethod

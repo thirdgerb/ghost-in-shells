@@ -96,13 +96,16 @@ class Output(BaseModel):
     is_async: bool = False
 
     @classmethod
-    def new(cls, mid: str, _input: Input, trace: Trace | None = None) -> Output:
+    def new(cls, mid: str, _input: Input, trace: Trace | None = None, tid: str | None = None) -> Output:
         if trace is None:
             trace = _input.trace.dict()
+        payload = {}
+        if tid:
+            payload["tid"] = tid
         return Output(
             mid=mid,
             input_mid=_input.mid,
             trace=trace,
-            payload={},
+            payload=payload,
             is_async=_input.is_async or trace is not None,
         )

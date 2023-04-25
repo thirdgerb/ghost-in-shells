@@ -3,14 +3,14 @@ from typing import Optional
 from ghoshell.ghost import *
 
 
-class SendingImpl(Sending):
+class SendingImpl(Sender):
 
-    def __init__(self, this: Thought, ctx: Context):
-        self.this = this
+    def __init__(self, tid: str, ctx: Context):
+        self.tid = tid
         self.ctx = ctx
         self._output_buffer: Output | None = None
 
-    def output(self, *messages: "Message", trace: Trace | None = None) -> "Sending":
+    def output(self, *messages: "Message", trace: Trace | None = None) -> "Sender":
 
         if trace is not None:
             self._deliver_sync_output()
@@ -34,18 +34,18 @@ class SendingImpl(Sending):
         if self._output_buffer is None:
             # refresh
             mid = self.ctx.session.new_message_id()
-            self._output_buffer = Output.new(mid, self.ctx.input, trace)
+            self._output_buffer = Output.new(mid, self.ctx.input, trace, self.tid)
 
     def async_input(
             self,
             message: Message,
-            pid: str | None = None,
+            process_id: str | None = None,
             trace: Optional["Trace"] = None,
             tid: str | None = None,
-    ) -> None:
+    ) -> Sender:
         self_id = self.ctx.clone.clone_id
-        if pid is None:
-            pid = self.ctx.session.new_process_id()
+        if process_id is None:
+            process_id = self.ctx.session.new_process_id()
         if tid is None:
             tid = ""
         if trace is None:
@@ -56,7 +56,7 @@ class SendingImpl(Sending):
                 shell_id=inpt.trace.shell_id,
                 shell_kind=inpt.trace.shell_kind,
                 session_id=inpt.trace.session_id,
-                process_id=pid,
+                process_id=process_id,
                 subject_id=inpt.trace.subject_id,
             )
         else:
@@ -76,7 +76,7 @@ class SendingImpl(Sending):
             is_async=True,
         )
         self.ctx.async_input(async_input)
-        return
+        return self
 
     def destroy(self) -> None:
         # deliver
@@ -84,5 +84,5 @@ class SendingImpl(Sending):
 
         # del
         del self._output_buffer
-        del self.this
+        del self.tid
         del self.ctx

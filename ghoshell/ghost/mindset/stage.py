@@ -4,8 +4,8 @@ from abc import abstractmethod
 from typing import List
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.intention import Intention
 from ghoshell.ghost.mindset.events import *
+from ghoshell.ghost.mindset.intention import Intention
 from ghoshell.ghost.mindset.operator import Operator
 from ghoshell.ghost.mindset.thought import Thought
 from ghoshell.ghost.url import URL
@@ -24,20 +24,47 @@ class Stage(metaclass=ABCMeta):
 
     @abstractmethod
     def intentions(self, ctx: Context) -> List[Intention] | None:
+        """
+        可被命中的意图. 用于重定向.
+        """
         pass
 
     @abstractmethod
-    def on_await(self, ctx: Context) -> List[URL] | None:
+    def reactions(self) -> Dict[str, Reaction]:
         """
-        只有 await 时才会调用的方法.
+        当 Stage 进入 Waiting 状态时, 注册的各种响应逻辑.
+        和多任务调度无关. 用特殊的方式实现.
         """
         pass
 
     @abstractmethod
     def on_event(self, ctx: "Context", this: Thought, event: Event) -> Operator | None:
         """
-        如果已经被激活过, 则不会再被激活.
+        触发调度事件
         """
+        pass
+
+
+class Reaction(metaclass=ABCMeta):
+    """
+    Stage 在 WAITING 状态可以做的动作, 类似面向对象的 methods
+    """
+
+    @abstractmethod
+    def level(self) -> int:
+        """
+        动作的级别, 对标 TaskLevel
+        Private: 只有当前任务是 process.awaiting 时才可以响应.
+
+        """
+        pass
+
+    @abstractmethod
+    def intentions(self, ctx: Context) -> List[Intention]:
+        pass
+
+    @abstractmethod
+    def react(self, ctx: Context, this: Thought) -> Operator:
         pass
 
 #

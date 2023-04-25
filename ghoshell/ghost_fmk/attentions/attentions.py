@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional, List, Dict
 
-from ghoshell.ghost import Attention, Context, Intention
+from ghoshell.ghost import Focus, Context, Intention
 
 
 class AttentionHandler(metaclass=ABCMeta):
@@ -23,7 +23,7 @@ class AttentionHandler(metaclass=ABCMeta):
         pass
 
 
-class AttentionImpl(Attention):
+class AttentionImpl(Focus):
     """
     一个最简单的实现.
     """
@@ -35,7 +35,7 @@ class AttentionImpl(Attention):
         for driver in drivers:
             self.register_driver(driver)
 
-    def clone(self) -> "Attention":
+    def clone(self) -> "Focus":
         return self
 
     def kinds(self) -> List[str]:
@@ -57,7 +57,7 @@ class AttentionImpl(Attention):
             return None
         arr = []
         for meta in metas:
-            if meta.KIND != kind:
+            if meta.kind != kind:
                 continue
             arr.append(meta)
         if len(arr) == 0:
@@ -67,7 +67,7 @@ class AttentionImpl(Attention):
     def register_global_intentions(self, *metas: Intention) -> None:
         meta_group = {}
         for meta in metas:
-            kind = meta.KIND
+            kind = meta.kind
             if kind not in meta_group:
                 meta_group[kind] = []
             meta_group[kind].append(meta)

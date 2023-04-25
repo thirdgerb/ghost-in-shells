@@ -8,9 +8,9 @@ if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
     from ghoshell.ghost.mindset.operator import OperationKernel
     from ghoshell.ghost.mindset import Mindset
-    from ghoshell.ghost.intention import Attention
+    from ghoshell.ghost.mindset.intention import Focus
     from ghoshell.ghost.url import URL
-    from ghoshell.ghost.intention import Attention
+    from ghoshell.ghost.mindset.intention import Focus
 
 
 class Ghost(metaclass=ABCMeta):
@@ -66,7 +66,7 @@ class Ghost(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def attention(self) -> "Attention":
+    def focus(self) -> "Focus":
         """
         机器人状态机当前保留的工程化注意力机制
         与算法不同, 注意的可能是命令行, API, 事件等复杂信息.
@@ -220,7 +220,7 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def attention(self) -> "Attention":
+    def focus(self) -> "Focus":
         pass
 
     @abstractmethod

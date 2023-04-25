@@ -4,14 +4,14 @@ from typing import Optional
 from ghoshell.ghost.io import Message, Trace
 
 
-class Sending(metaclass=ABCMeta):
+class Sender(metaclass=ABCMeta):
     """
     输出消息的工具类封装.
     主要用途: 提供各种语法糖.
     """
 
     @abstractmethod
-    def output(self, *messages: "Message", trace: Trace | None = None) -> "Sending":
+    def output(self, *messages: "Message", trace: Trace | None = None) -> "Sender":
         """
         输出一个消息.
         """
@@ -21,8 +21,12 @@ class Sending(metaclass=ABCMeta):
     def async_input(
             self,
             message: Message,
-            pid: str | None = None,
+            process_id: str | None = None,
             trace: Optional["Trace"] = None,
             tid: str | None = None,
-    ) -> None:
+    ) -> "Sender":
+        pass
+
+    @abstractmethod
+    def destroy(self) -> None:
         pass

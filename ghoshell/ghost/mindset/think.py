@@ -6,7 +6,7 @@ from typing import Optional, Dict, List, Any
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.intention import Intention
+from ghoshell.ghost.mindset.intention import Intention
 from ghoshell.ghost.mindset.stage import Stage
 from ghoshell.ghost.mindset.thought import Thought
 from ghoshell.ghost.url import URL
@@ -45,15 +45,6 @@ class Think(BaseModel, metaclass=ABCMeta):
 
     @abstractmethod
     def description(self, thought: Thought) -> Any:
-        pass
-
-    @abstractmethod
-    def is_async(self) -> bool:
-        """
-        当前任务是否是异步任务.
-        如果是异步任务, 会自动进入子进程去执行.
-        对标 Python 的概念, async 相当于开启了一个 Thread
-        """
         pass
 
     @abstractmethod

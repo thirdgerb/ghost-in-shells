@@ -25,7 +25,7 @@ class UniformResolverLocator(BaseModel):
     def new(cls, resolver: str, stage: str, args: Dict):
         return URL(resolver=resolver, stage=stage, args=args)
 
-    def new_with(self, stage: str | None = None, args: Dict | None = None) -> "URL":
+    def copy_with(self, stage: str | None = None, args: Dict | None = None) -> "URL":
         if stage is None:
             stage = self.stage
         if args is None:
@@ -36,10 +36,18 @@ class UniformResolverLocator(BaseModel):
             args=args,
         )
 
-    def new_with_stages(self, *stages: str) -> List["URL"]:
+    def to_dict(self, stage: str | None = None, args: Dict | None = None) -> Dict:
+        result = self.dict()
+        if stage is not None:
+            result["stage"] = stage
+        if args is not None:
+            result["args"] = args.copy()
+        return result
+
+    def new_stages(self, *stages: str) -> List["URL"]:
         result = []
         for stage in stages:
-            url = self.new_with(stage=stage)
+            url = self.copy_with(stage=stage)
             result.append(url)
         return result
 

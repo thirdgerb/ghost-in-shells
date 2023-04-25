@@ -15,7 +15,7 @@ class CloneImpl(Clone, metaclass=ABCMeta):
         self._config = config
         # 尽可能把工程方法放到 ghost 里.
         self._mindset = ghost.mindset.clone(clone_id)
-        self._attention = ghost.attention.clone(clone_id)
+        self._attention = ghost.focus.clone(clone_id)
 
     @property
     def clone_id(self) -> str:
@@ -27,14 +27,14 @@ class CloneImpl(Clone, metaclass=ABCMeta):
 
     @property
     def root(self) -> "URL":
-        return self._config.root.new_with()
+        return self._config.root.copy_with()
 
     @property
     def mindset(self) -> "Mindset":
         return self._mindset
 
     @property
-    def attention(self) -> "Attention":
+    def focus(self) -> "Focus":
         return self._attention
 
     def destroy(self) -> None:

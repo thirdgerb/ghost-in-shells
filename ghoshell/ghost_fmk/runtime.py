@@ -147,8 +147,8 @@ class RuntimeImpl(Runtime):
 
         # gc 的任务不保存了.
         for task in gc_tasks:
-            if task.tid in stored_tasks:
-                del stored_tasks[task.tid]
+            if task.target_tid in stored_tasks:
+                del stored_tasks[task.target_tid]
 
         # 保存 process 的数据.
         process_data = process.dict()

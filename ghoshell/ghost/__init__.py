@@ -1,15 +1,16 @@
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.exceptions import *
 from ghoshell.ghost.ghost import Ghost, Clone, AsyncGhost
-from ghoshell.ghost.intention import Attention, Intention
 from ghoshell.ghost.io import *
-from ghoshell.ghost.mindset import Event, Activating, Callback, Preempting, Intending, Withdrawing, Receiving
-from ghoshell.ghost.mindset import Failing, Canceling, Quiting
+from ghoshell.ghost.mindset import Event, OnActivating, OnCallback, OnPreempting, OnWithdrawing, \
+    OnReceiving
 from ghoshell.ghost.mindset import Mindset, Mind
+from ghoshell.ghost.mindset import OnFailing, OnCanceling, OnQuiting
 from ghoshell.ghost.mindset import Operator, OperationKernel
 from ghoshell.ghost.mindset import Think, Thought, Stage
+from ghoshell.ghost.mindset.intention import Focus, Intention, Attend, Attention
 from ghoshell.ghost.runtime import *
-from ghoshell.ghost.sending import Sending
+from ghoshell.ghost.sending import Sender
 from ghoshell.ghost.session import Session
 from ghoshell.ghost.tool import CtxTool, RuntimeTool
 from ghoshell.ghost.url import URL, UniformResolverLocator
@@ -20,9 +21,9 @@ __all__ = [
     # url
     "URL", "UniformResolverLocator",
     # context
-    "Context", "Sending", "Session",
+    "Context", "Sender", "Session",
     # intention
-    "Attention", "Intention",
+    "Focus", "Intention", "Attend", "Attention",
     # io
     "Input", "Output", "Trace", "Payload", "Message",
     # mindset
@@ -36,11 +37,11 @@ __all__ = [
     "StackoverflowException", "UnhandledException", "RuntimeException", "MindsetNotFoundException",
     # events
     "Event",
-    "Activating",
-    "Callback", "Preempting",
-    "Receiving",
-    "Intending", "Intending",
-    "Withdrawing", "Canceling", "Failing", "Quiting",
+    "OnActivating",
+    "OnCallback", "OnPreempting",
+    "OnReceiving",
+    "OnIntending",
+    "OnWithdrawing", "OnCanceling", "OnFailing", "OnQuiting",
     # tool
     "CtxTool", "RuntimeTool",
 ]

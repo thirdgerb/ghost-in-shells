@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional, Type
 
 from ghoshell.ghost import *
-from ghoshell.ghost.context import Sending, M
+from ghoshell.ghost.context import Sender, M
 from ghoshell.ghost_fmk.mind import MindImpl
 from ghoshell.ghost_fmk.sending import SendingImpl
 
@@ -36,10 +36,11 @@ class ContextImpl(Context):
     def clone(self) -> Clone:
         return self._clone
 
-    def send(self, _with: "Thought") -> Sending:
+    def send_at(self, _with: Optional["Thought"]) -> Sender:
         if self._messenger is not None:
             self._messenger.destroy()
-        self._messenger = SendingImpl(_with, self)
+        tid = _with.tid if _with else self.runtime.current_process().awaiting
+        self._messenger = SendingImpl(tid, self)
         return self._messenger
 
     @property
@@ -52,7 +53,11 @@ class ContextImpl(Context):
     def mind(self, this: Optional["Thought"]) -> "Mind":
         if self._minder is not None:
             self._minder.destroy()
-        self._minder = MindImpl(this)
+        if this is None:
+            awaiting = RuntimeTool.fetch_awaiting_task(self)
+            self._minder = MindImpl(awaiting.tid, awaiting.url.copy_with())
+        else:
+            self._minder = MindImpl(this.tid, this.url.copy_with())
         return self._minder
 
     def read(self, expect: Type[M]) -> M | None:

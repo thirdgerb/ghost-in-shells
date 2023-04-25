@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from typing import List
 
 from ghoshell.ghost.mindset.operator import Operator
-from ghoshell.ghost.mindset.thought import Thought
-from ghoshell.ghost.runtime import TASK_LEVEL
 from ghoshell.ghost.url import URL
 
 
@@ -12,44 +11,37 @@ class Mind(metaclass=ABCMeta):
 
     # ---- 思维重定向的命令 ---- #
 
-    def __init__(self, this: Thought):
-        this.attentions = None
-        self.this = this
-
-    def level(self, level: TASK_LEVEL) -> Mind:
-        self.this.level = level
-        return self
-
-    def overdue(self, overdue: int) -> Mind:
-        self.this.overdue = overdue
-        return self
-
-    def priority(self, priority: float) -> Mind:
-        self.this.priority = priority
-        return self
-
     @abstractmethod
     def forward(self, *stages: str) -> "Operator":
         pass
 
     @abstractmethod
-    def redirect_to(self, to: "URL") -> "Operator":
+    def redirect(self, to: "URL") -> "Operator":
         """
         从当前任务, 进入一个目标任务.
         自己会根据实际状态, 被系统调度或垃圾回收.
+
+        如果涉及到自身的状态变更, 更复杂的逻辑以后再实现
         """
         pass
 
     # ---- 中断命令 ---- #
 
     @abstractmethod
-    def awaits(self) -> "Operator":
+    def awaits(self, only: List[str] | None = None, exclude: List[str] | None = None) -> "Operator":
         """
         本来想用 await, 无奈 python 的系统关键字太多, 这是 python 一个巨大的缺点.
         wait 是挂起整个 Clone. 上下文也会同步休眠, 等待下一次 input 的唤醒.
 
         而实际上, 当前 Process 进入了 wait 状态, 可能 clone 还不会立刻释放 (unlock), 而是继续去处理异步消息.
         就看具体怎么实现了.
+        """
+        pass
+
+    @abstractmethod
+    def yield_to(self, stage: str, callback: bool = False) -> "Operator":
+        """
+        尝试启动一个状态, 但是 fallback
         """
         pass
 
@@ -135,5 +127,6 @@ class Mind(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
     def destroy(self) -> None:
-        del self.this
+        pass
