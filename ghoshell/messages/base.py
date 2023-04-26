@@ -37,8 +37,22 @@ class Message(BaseModel, metaclass=ABCMeta):
             return None
         return cls(**data)
 
+    def as_payload(self, tid: str = "") -> Payload:
+        p = Payload(tid=tid)
+        self.join(p)
+        return p
+
+    def as_payload_dict(self, tid: str = "") -> Dict:
+        return dict(
+            tid=tid,
+            body={self.KIND: self.dict()}
+        )
+
     def join(self, payload: Payload) -> bool:
-        if self.KIND in payload.body:
+        return self.join_body(payload.body)
+
+    def join_body(self, body: Dict) -> bool:
+        if self.KIND in body:
             return False
-        payload.body[self.KIND] = self.dict()
+        body[self.KIND] = self.dict()
         return True

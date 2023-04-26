@@ -7,3 +7,6 @@ class Text(Message):
 
     def __str__(self):
         return self.content
+
+    def is_empty(self) -> bool:
+        return not self.content

@@ -1,5 +1,5 @@
 from ghoshell.ghost import Mind
-from ghoshell.ghost_fmk._operators import *
+from ghoshell.ghost_fmk.operators import *
 
 
 class MindImpl(Mind):

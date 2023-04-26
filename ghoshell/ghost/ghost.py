@@ -99,7 +99,7 @@ class Ghost(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def respond(self, _input: "Input") -> List["Output"]:
+    def respond(self, _input: "Input") -> List["Output"] | None:
         """
         完成一轮的响应. 要支持没有任何响应.
         """

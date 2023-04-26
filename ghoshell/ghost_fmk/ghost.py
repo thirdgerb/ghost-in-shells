@@ -8,8 +8,8 @@ from ghoshell.ghost import RuntimeException
 from ghoshell.ghost_fmk.clone import CloneImpl
 from ghoshell.ghost_fmk.config import GhostConfig
 from ghoshell.ghost_fmk.context import ContextImpl
-from ghoshell.ghost_fmk.middleware import IMiddleware, ExceptionHandlerMiddleware, GHOST_PIPE, GHOST_PIPELINE
-from ghoshell.messages import Messenger, Input, Output
+from ghoshell.ghost_fmk.middleware import CtxMiddleware, ExceptionHandlerMiddleware, CtxPipe, CtxPipeline
+from ghoshell.messages import Input, Output
 from ghoshell.utils import create_pipeline
 
 
@@ -25,14 +25,19 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     Ghost 框架实现的内核
     """
 
-    # ghost 运行各种中间件.
-    middleware: List[IMiddleware] = [
-        ExceptionHandlerMiddleware(),
-    ]
+    # ghost 初始化时, 向 ioc 容器注册.
+    providers: List[Provider] = []
 
+    # 启动流程. 想用这种方式解耦掉系统文件读取等逻辑.
     bootstrapper: List[Bootstrapper] = []
 
-    providers: List[Provider] = []
+    # 初始化 context 时, 注册到 context 级别的 ioc
+    context_providers: List[Provider] = []
+
+    # ghost 运行各种中间件.
+    middleware: List[CtxMiddleware] = [
+        ExceptionHandlerMiddleware(),
+    ]
 
     def __init__(
             self,
@@ -40,7 +45,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             container: Container,
             root_path: str,
             config: GhostConfig,
-            messenger: Messenger,
+            # messenger: Messenger,
     ):
         self._name = name
         self._root_path = root_path
@@ -49,11 +54,27 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         self._mindset: Mindset | None = None
         self._focus: Focus | None = None
         self._memory: Memory | None = None
-        self._messenger: Messenger = messenger
+        # self._messenger: Messenger = messenger
+
+    def boostrap(self) -> "Ghost":
+        self._init_container()
+        # bootstrapper
+        for boot in self.bootstrapper:
+            boot.bootstrap(self)
+
+        # 注册所有的 provider
+        for provider in self.providers:
+            self._container.register(provider)
+        return self
+
+    def _init_container(self):
+        self._container.set(Ghost, self)
+        self._container.set(GhostConfig, self._config)
+        for provider in self.providers:
+            self._container.register(provider)
 
     # ---- abstract ---- #
 
-    @abstractmethod
     def new_context(self, inpt: Input) -> Context:
         """
         机器人构建上下文, 最核心的能力
@@ -63,7 +84,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
 
         clone = self.new_clone(inpt.trace.clone_id)
         container = Container(self._container)
-
         # instance
         ctx = ContextImpl(
             inpt=inpt,
@@ -71,10 +91,11 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             container=container,
             config=self._config
         )
-
-        # bound
+        # bound instances
         container.set(Clone, clone)
         container.set(Context, ctx)
+        for provider in self.context_providers:
+            container.register(provider)
         return ctx
 
     @abstractmethod
@@ -84,13 +105,15 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     def app_path(self) -> str:
         return self._root_path
 
-    def respond(self, inpt: Input) -> List[Output]:
+    def respond(self, inpt: Input) -> List[Output] | None:
         """
         核心方法: 处理输入 inpt
         """
         try:
             ctx = self.new_context(inpt)
             return self._react(ctx)
+        except Exception:
+            return None
         finally:
             # todo: handle exception
             pass
@@ -113,16 +136,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     @property
     def container(self) -> "Container":
         return self._container
-
-    def boostrap(self) -> "Ghost":
-        # bootstrapper
-        for boot in self.bootstrapper:
-            boot.bootstrap(self)
-
-        # 注册所有的 provider
-        for provider in self.providers:
-            self._container.register(provider)
-        return self
 
     @property
     def mindset(self) -> "Mindset":
@@ -157,7 +170,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         使用中间件实现一个管道
         """
         middleware = self.middleware if self.middleware else []
-        pipes: List[GHOST_PIPE] = []
+        pipes: List[CtxPipe] = []
         # 用 run 方法组成 pipes
         for m in middleware:
             pipe = m.new(self)
@@ -165,7 +178,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         # 返回 pipeline
         return create_pipeline(pipes, self._build_destination())
 
-    def _build_destination(self) -> GHOST_PIPELINE:
+    def _build_destination(self) -> CtxPipeline:
         """
         实现管道的最后一环.
         运行各种算子.
