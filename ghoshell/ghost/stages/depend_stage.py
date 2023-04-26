@@ -4,10 +4,10 @@
 # from typing import Optional, ClassVar, List
 #
 # from ghoshell.ghost.context import Context
-# from ghoshell.ghost.mindset.events import *
-# from ghoshell.ghost.mindset.listeners import Listener, ListenerFnWrapper
-# from ghoshell.ghost.mindset.stage import Stage
-# from ghoshell.ghost.mindset.thought import Thought
+# from ghoshell.ghost.intentions.events import *
+# from ghoshell.ghost.intentions.listeners import Listener, ListenerFnWrapper
+# from ghoshell.ghost.intentions.stage import Stage
+# from ghoshell.ghost.intentions.thought import Thought
 # from ghoshell.ghost.operator import Operator
 # from ghoshell.ghost.runtime import TASK_STATUS, TaskStatus
 # from ghoshell.ghost.url import URL

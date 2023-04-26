@@ -1,5 +1,5 @@
 from abc import ABCMeta
-from typing import Optional
+from typing import Optional, Dict
 
 
 def test_late_static_bound() -> None:
@@ -29,3 +29,7 @@ def test_optional_arg():
 
     assert fn() is None
 
+
+def test_isinstance_typehint():
+    a = {"a": "b"}
+    assert isinstance(a, Dict)

@@ -50,7 +50,7 @@ class CtxTool:
     #     metas = stage.intentions(ctx)
     #     if metas is None:
     #         return None
-    #     return ctx.clone.focus.match(ctx, *metas)
+    #     return ctx.clone.intentions.match(ctx, *metas)
 
     # ---- thought 相关方法 ----#
 
@@ -107,7 +107,7 @@ class CtxTool:
     @classmethod
     def group_intentions(cls, grouped: GroupedIntentions, intentions: List[Intention]) -> GroupedIntentions:
         for intention in intentions:
-            kind = intention.kind
+            kind = intention.KIND
             if kind not in grouped:
                 grouped[kind] = []
             grouped[kind].append(intention)
@@ -118,8 +118,7 @@ class CtxTool:
             cls,
             ctx: "Context",
     ) -> Optional[Intention]:
-        attentions = ctx.clone.attentions
-        return attentions.global_match(ctx)
+        return ctx.clone.focus.global_match(ctx)
 
     # @classmethod
     # def context_fallback_intentions(cls, ctx: "Context", level: int) -> List[Attention]:
@@ -206,48 +205,48 @@ class CtxTool:
     def current_process(cls, ctx: Context) -> Process:
         return ctx.runtime.current_process()
 
-    @classmethod
-    def _add_task_intentions(
-            cls,
-            ctx: Context,
-            result: GroupedIntentions,
-            task: Task,
-            private: bool,
-            forward: bool,
-    ) -> GroupedIntentions:
-
-        fr = None
-        if forward:
-            fr = task.url
-            url_list = task.attentions
-        else:
-            url_list = [task.url]
-
-        if not url_list:
-            return result
-
-        for target in url_list:
-            stage = CtxTool.force_fetch_stage(ctx, target.resolver, target.stage)
-
-            # 从 stage 里获取 intention
-            intentions = stage.intentions(ctx)
-            if not intentions:
-                continue
-            #  初始化 intentions
-            for intention in intentions:
-                # 添加好关联路径.
-                intention.target = fr
-
-            # 从 intentions 组装成为 GroupedIntentions
-            for meta in intentions:
-                # 私有意图无法在非私有场景使用.
-                if meta.private and not private:
-                    continue
-                kind = meta.kind
-                if kind not in result:
-                    result[kind] = []
-                result[kind].append(meta)
-        return result
+    # @classmethod
+    # def _add_task_intentions(
+    #         cls,
+    #         ctx: Context,
+    #         result: GroupedIntentions,
+    #         task: Task,
+    #         private: bool,
+    #         forward: bool,
+    # ) -> GroupedIntentions:
+    #
+    #     fr = None
+    #     if forward:
+    #         fr = task.url
+    #         url_list = task.intentions
+    #     else:
+    #         url_list = [task.url]
+    #
+    #     if not url_list:
+    #         return result
+    #
+    #     for target in url_list:
+    #         stage = CtxTool.force_fetch_stage(ctx, target.resolver, target.stage)
+    #
+    #         # 从 stage 里获取 intention
+    #         intentions = stage.intentions(ctx)
+    #         if not intentions:
+    #             continue
+    #         #  初始化 intentions
+    #         for intention in intentions:
+    #             # 添加好关联路径.
+    #             intention.target = fr
+    #
+    #         # 从 intentions 组装成为 GroupedIntentions
+    #         for meta in intentions:
+    #             # 私有意图无法在非私有场景使用.
+    #             if meta.private and not private:
+    #                 continue
+    #             kind = meta.kind
+    #             if kind not in result:
+    #                 result[kind] = []
+    #             result[kind].append(meta)
+    #     return result
 
 
 class RuntimeTool:
@@ -294,6 +293,7 @@ class RuntimeTool:
     @classmethod
     def fetch_thought_by_task(cls, ctx: Context, task: Task) -> Thought:
         # 初始化 thought. 这个 thought 里应该包含正确的 tid.
+        task = ctx.runtime.instance_task(task)
         thought = cls.new_thought(ctx, task.url)
         thought = cls.merge_task_to_thought(task, thought)
         return thought
@@ -435,8 +435,8 @@ class RuntimeTool:
     # @classmethod
     # def fetch_task(cls, ctx: Context, url: url, or_create: bool = True) -> Optional[Task]:
     #     clone = ctx.clone
-    #     mindset = clone.mind
-    #     think = mindset.fetch(url.think)
+    #     intentions = clone.mind
+    #     think = intentions.fetch(url.think)
     #     if think is None:
     #         return None
     #     tid = think.new_task_id(ctx, url.args)

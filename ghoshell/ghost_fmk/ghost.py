@@ -9,7 +9,7 @@ from ghoshell.ghost_fmk.clone import CloneImpl
 from ghoshell.ghost_fmk.config import GhostConfig
 from ghoshell.ghost_fmk.context import ContextImpl
 from ghoshell.ghost_fmk.middleware import IMiddleware, ExceptionHandlerMiddleware, GHOST_PIPE, GHOST_PIPELINE
-from ghoshell.messenger import Messenger, Input, Output
+from ghoshell.messages import Messenger, Input, Output
 from ghoshell.utils import create_pipeline
 
 
@@ -62,11 +62,20 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             raise RuntimeException("todo xxxx")
 
         clone = self.new_clone(inpt.trace.clone_id)
-        return ContextImpl(
+        container = Container(self._container)
+
+        # instance
+        ctx = ContextImpl(
             inpt=inpt,
             clone=clone,
-
+            container=container,
+            config=self._config
         )
+
+        # bound
+        container.set(Clone, clone)
+        container.set(Context, ctx)
+        return ctx
 
     @abstractmethod
     def new_operation_kernel(self) -> "OperationKernel":

@@ -7,7 +7,7 @@ from ghoshell.ghost.url import URL
 # 事件体系是 Runtime 和 Think 之间的纽带.
 # Runtime 的运行轨迹基于 Operator, 主要解决 Task 与 Task 之间的调度.
 # 而 Event 则解决调度过程与每个 Think 之间的互动.
-# 响应 Event 的是 mindset Stage
+# 响应 Event 的是 intentions Stage
 
 
 class Event(metaclass=ABCMeta):
@@ -27,7 +27,7 @@ class Event(metaclass=ABCMeta):
         del self.fr
 
 
-class OnReceiving(Event):
+class OnReceived(Event):
     pass
 
 
@@ -51,7 +51,7 @@ class OnCallback(Event):
         super().destroy()
 
 
-class OnPreempting(Event):
+class OnPreempted(Event):
     """
     从中断的状态中恢复.
     """

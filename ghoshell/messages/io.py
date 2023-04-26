@@ -5,13 +5,18 @@ from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost.url import URL
-from ghoshell.messages import *
+from ghoshell.messages.base import Payload
 
 
 class Trace(BaseModel):
     # 消息对应的 clone id
     # 可以为空, 为空的话 ghost 应该有办法根据其它字段匹配一个.
-    clone_id: str = ""
+    clone_id: str
+
+    # session 的唯一 id.
+    # 理论上不同的 shell 之间的 session_id 也不能混合.
+    # 只有在一个 shell 对应唯一的一个 ghost 时, 才可以将两者完全互通.
+    session_id: str
 
     # shell 的 id. 对齐 shell 的 session.
     # 举个例子, 如果 shell 是一个 IM
@@ -20,11 +25,6 @@ class Trace(BaseModel):
 
     # shell 的类型
     shell_kind: str = ""
-
-    # session 的唯一 id.
-    # 理论上不同的 shell 之间的 session_id 也不能混合.
-    # 只有在一个 shell 对应唯一的一个 ghost 时, 才可以将两者完全互通.
-    session_id: str = ""
 
     # 对话的进程 id. 一个 session 可以同时运行多个进程. 默认为空.
     process_id: str = ""

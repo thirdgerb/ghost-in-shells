@@ -96,7 +96,7 @@ class MindsetImpl(Mindset):
 #     """
 #     基于 dict 实现的 mind set.
 #     显然, 只能作为 demo 使用.
-#     真实的 mindset 应该要实现分布式配置中心.
+#     真实的 intentions 应该要实现分布式配置中心.
 #     """
 #
 #     def __init__(self):

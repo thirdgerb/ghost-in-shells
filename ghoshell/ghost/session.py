@@ -24,12 +24,15 @@ class Session(metaclass=ABCMeta):
     def new_process_id(self) -> str:
         pass
 
+    def current_process_id(self) -> str:
+        pass
+
     @abstractmethod
     def new_message_id(self) -> str:
         pass
 
     @abstractmethod
-    def set(self, key: str, value: Dict) -> None:
+    def set(self, key: str, value: Dict) -> bool:
         pass
 
     @abstractmethod

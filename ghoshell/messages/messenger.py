@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import List, Callable
 
-from ghoshell.messenger import Input, Output
+from ghoshell.messages.io import Input, Output
 
 
 class Messenger(metaclass=ABCMeta):

@@ -8,8 +8,8 @@ from __future__ import annotations
 #         self._attentions: List[Attention] = []
 #
 #     def to_stages(self, *stages) -> Attend:
-#         mindset = self.ctx.clone.mindset
-#         think = mindset.force_fetch(self.this.url.resolver)
+#         intentions = self.ctx.clone.intentions
+#         think = intentions.force_fetch(self.this.url.resolver)
 #         fr = self.this.url.dict()
 #         for stage_name in stages:
 #             stage = think.fetch_stage(stage_name)
@@ -27,8 +27,8 @@ from __future__ import annotations
 #         return self
 #
 #     def to_think(self, think_name: str, args: Dict | None) -> Attend:
-#         mindset = self.ctx.clone.mindset
-#         think = mindset.force_fetch(think_name)
+#         intentions = self.ctx.clone.intentions
+#         think = intentions.force_fetch(think_name)
 #         intentions = think.intentions(self.ctx)
 #         fr = self.this.url.to_dict(args=args)
 #         if intentions is not None:
@@ -41,7 +41,7 @@ from __future__ import annotations
 #             self._attentions.append(attention)
 #         return self
 #
-#     def focus(self) -> List[Attention] | None:
+#     def intentions(self) -> List[Attention] | None:
 #         if len(self._attentions) == 0:
 #             return None
 #         result = self._attentions

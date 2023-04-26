@@ -1,21 +1,28 @@
+from __future__ import annotations
+
 from argparse import ArgumentParser
 from typing import Dict, List, Any, Optional
 
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost import Intention, Context
-from ghoshell.ghost_fmk.focus.focus import FocusHandler
+from ghoshell.ghost_fmk.focus import FocusHandler
 from ghoshell.messages import Text
+
+COMMAND_INTENTION = "command_line"
 
 
 class Argument(BaseModel):
-    name: str = ""
-    short: str = ""
+    """
+    命令的入参. 详见 CommandConfig.
+    由于 pydantic 问题, 必须按顺序定义.
+    """
+    name: str
     description: str = ""
+    short: str = ""
     default: Any = None
     nargs: int | str | None = None
     choices: List[Any] | None = None
-    type: Any | None = None
 
     def is_valid(self) -> bool:
         if len(self.name) <= 0:
@@ -24,11 +31,17 @@ class Argument(BaseModel):
 
 
 class CommandConfig(BaseModel):
+    """
+    命令行的配置.
+    """
     name: str = ""
     description: str = ""
     epilog: str = ""
-    argument: Argument | None = None
+    argument: Optional[Argument] = Field(default_factory=lambda: None)
     options: List[Argument] = Field(default_factory=lambda: [])
+
+    def to_intention(self) -> Intention:
+        return Intention(KIND=COMMAND_INTENTION, config=self.dict())
 
 
 class CommandOutput(BaseModel):
@@ -37,8 +50,11 @@ class CommandOutput(BaseModel):
     params: Dict = {}
 
 
-class CommandLine(Intention):
-    kind = "command_line"
+class CommandIntention(Intention):
+    """
+    用来解析命令行的意图
+    """
+    KIND = COMMAND_INTENTION
     config: CommandConfig
     params: CommandOutput | None = None
 
@@ -68,10 +84,10 @@ class CommandDriver(FocusHandler):
 
     def __init__(self, prefix: str):
         self.prefix = prefix[0]
-        self.global_commands: Dict[str, CommandLine] = {}
+        self.global_commands: Dict[str, CommandIntention] = {}
 
     def kind(self) -> str:
-        return CommandLine.KIND
+        return CommandIntention.KIND
 
     def match(self, ctx: Context, *metas: Intention) -> Optional[Intention]:
         text = ctx.read(Text)
@@ -81,18 +97,18 @@ class CommandDriver(FocusHandler):
             return None
         command_lines = []
         for meta in metas:
-            if isinstance(meta, CommandLine):
+            if isinstance(meta, CommandIntention):
                 command_lines.append(meta)
         return self.match_raw_text(text.content, *command_lines)
 
-    def match_raw_text(self, text: str, *metas: CommandLine) -> Optional[CommandLine]:
+    def match_raw_text(self, text: str, *metas: CommandIntention) -> Optional[CommandIntention]:
         prefix = text[0]
         if prefix != self.prefix:
             return None
 
         commands = {}
         for meta in metas:
-            if isinstance(meta, CommandLine):
+            if isinstance(meta, CommandIntention):
                 commands[meta.config.name] = meta
 
         line = text[1:]
@@ -105,11 +121,11 @@ class CommandDriver(FocusHandler):
         result = self._parse_command(matched_meta, arguments)
         if result is None:
             return None
-        matched = CommandLine(**matched_meta.dict())
+        matched = CommandIntention(**matched_meta.dict())
         matched.result = result
         return matched
 
-    def _parse_command(self, command: CommandLine, arguments: str) -> CommandOutput | None:
+    def _parse_command(self, command: CommandIntention, arguments: str) -> CommandOutput | None:
         # todo
         config = command.config
         parser = _ArgumentParserWrapper(
@@ -173,7 +189,7 @@ class CommandDriver(FocusHandler):
             "default": "default",
             "choices": "choices",
             "nargs": "nargs",
-            "type": "type",
+            # "type": "type",
         }
         for key in mapping:
             if key not in origin:
@@ -187,7 +203,7 @@ class CommandDriver(FocusHandler):
 
     def register_global_intentions(self, *intentions: Intention) -> None:
         for intention in intentions:
-            if isinstance(intention, CommandLine):
+            if isinstance(intention, CommandIntention):
                 self.global_commands[intention.config.name] = intention
 
     def wildcard_match(self, ctx: Context) -> Optional[Intention]:

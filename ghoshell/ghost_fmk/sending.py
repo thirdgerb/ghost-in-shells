@@ -1,6 +1,7 @@
 from typing import Optional
 
 from ghoshell.ghost import *
+from ghoshell.messages import *
 
 
 class SendingImpl(Sender):
@@ -17,11 +18,11 @@ class SendingImpl(Sender):
 
         for message in messages:
             self._refresh_sync_output(trace)
-            success = message.join_payload(self._output_buffer.payload)
+            success = message.join(self._output_buffer.payload)
             if not success:
                 self._deliver_sync_output()
                 self._refresh_sync_output(trace)
-                message.join_payload(self._output_buffer.payload)
+                message.join(self._output_buffer.payload)
         return self
 
     def _deliver_sync_output(self) -> None:

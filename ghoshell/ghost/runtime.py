@@ -68,6 +68,15 @@ class TaskStatus:
     #     """
     #     return status in (cls.DEPENDING, cls.YIELDING)
     #
+
+    @classmethod
+    def is_able_to_gc(cls, status: TASK_STATUS) -> bool:
+        return status == cls.CANCELING or status == cls.FAILING or status == cls.DEAD
+
+    @classmethod
+    def is_sleeping(cls, status: TASK_STATUS) -> bool:
+        return status == cls.DEPENDING or status == cls.YIELDING or status == cls.PREEMPTING
+
     @classmethod
     def is_final(cls, status: TASK_STATUS) -> bool:
         """
@@ -81,11 +90,11 @@ class TaskLevel:
     任务 Task 的隔离级别. 目前有三种隔离级别. 对标面向对象的类(class) 中的三种级别.
     """
 
-    # Private, 封闭域, Process 只能专注于当前任务的 focus
+    # Private, 封闭域, Process 只能专注于当前任务的 intentions
     LEVEL_PRIVATE: TASK_LEVEL = 0
-    # Protected, 半封闭域, Process 里 task 链上的 task 都可以作为 focus.
+    # Protected, 半封闭域, Process 里 task 链上的 task 都可以作为 intentions.
     LEVEL_PROTECTED: TASK_LEVEL = 1
-    # 开放域. 任何全局意图都可以作为 focus, 反过来说就没有 focus 了.
+    # 开放域. 任何全局意图都可以作为 intentions, 反过来说就没有 intentions 了.
     LEVEL_PUBLIC: TASK_LEVEL = 2
 
     @classmethod
@@ -155,6 +164,8 @@ class Task(BaseModel):
 
     attentions: List[Attention] | None = None
 
+    instanced: bool = False
+
     def to_tasked(self) -> Tasked:
         """
         返回出可传输, 可保存的 task 数据.
@@ -166,6 +177,7 @@ class Task(BaseModel):
             args=self.url.args.copy(),
             vars=self.vars,
             tid=self.tid,
+            overdue=self.overdue,
         )
 
     def merge_tasked(self, tasked: Tasked):
@@ -174,8 +186,9 @@ class Task(BaseModel):
         """
         # 重置状态.
         self.url.stage = tasked.stage
+        self.status = tasked.status
         self.vars = tasked.vars
-        # self.status = tasked.status
+        self.overdue = tasked.overdue
 
     @property
     def is_long_term(self) -> bool:
@@ -191,7 +204,7 @@ class Task(BaseModel):
         表示任务本身可以是否可以被遗忘.
         如果是可被遗忘的, 则当任务被中断时, 就会进入静默的垃圾回收过程.
         """
-        return TaskStatus.RUNNING == self.status and self.priority < 0
+        return self.priority < 0
 
     def insert(self, stages: List[str]) -> None:
         """
@@ -432,6 +445,16 @@ class Process(BaseModel):
         return [item.tid for item in preempting]
 
     @property
+    def callbacks(self) -> Set[str]:
+        callbacks = set()
+        for task in self.tasks:
+            if not task.callbacks:
+                continue
+            for tid in task.callbacks:
+                callbacks.add(tid)
+        return callbacks
+
+    @property
     def waiting(self) -> List[str]:
         """
         取出所有的运行中任务.
@@ -563,69 +586,6 @@ class Process(BaseModel):
             idx += 1
         self.__indexes = indexes
 
-    # def gc(self, max_tasks: int = 30) -> List[Task]:
-    #     """
-    #     垃圾回收.
-    #     需要反复进化的复杂逻辑.
-    #     """
-    #     gc: List[Task] = []
-    #     alive: List[Task] = []
-    #     depended_by = self.depended_by_map
-    #     reversed_tasks = [ptr for ptr in reversed(self.tasks)]
-    #     # 检查基本状态.
-    #     for ptr in reversed_tasks:
-    #         tid = ptr.tid
-    #         if self._is_not_able_to_gc(tid):
-    #             alive.append(ptr)
-    #         if ptr.status == TaskStatus.DEPENDING and ptr.depending not in depended_by:
-    #             # 依赖一个任务, 但任务并不存在.
-    #             gc.append(ptr)
-    #             del depended_by[tid]
-    #         elif tid in depended_by:
-    #             # 如果被依赖中.
-    #             alive.append(ptr)
-    #         elif TaskStatus.is_able_to_gc(ptr.status):
-    #             #  明确可以 gc 的节点.
-    #             gc.append(ptr)
-    #         elif ptr.is_forgettable:
-    #             # 可以被遗忘的任务. 直接从栈里拿掉.
-    #             continue
-    #         else:
-    #             # 正常的节点.
-    #             alive.append(ptr)
-    #
-    #     # 如果没有超过栈深, 直接返回.
-    #     if len(alive) < max_tasks:
-    #         self.tasks = alive
-    #         self._reset_indexes()
-    #         return gc
-    #
-    #     # 否则用 lru 思路层层 gc
-    #     count = 0
-    #     result = []
-    #     for task in alive:
-    #         count += 1
-    #         tid = task.tid
-    #         if self._is_not_able_to_gc(tid):
-    #             result.append(task)
-    #         elif count > max_tasks:
-    #             continue
-    #         else:
-    #             result.append(task)
-    #         # todo 还需要更多的 gc 逻辑, 这里先这样了.
-    #     self.tasks = result
-    #     self._reset_indexes()
-    #
-    #     # 二次清洗.
-    #     # 再检查一次关联性的遗忘.
-    #     more = self.gc(max_tasks)
-    #     gc.append(*more)
-    #     self.__indexes = None
-    #     return gc
-    #
-    # def _is_not_able_to_gc(self, tid: str):
-    #     return tid != self.root and tid != self.awaiting
-
 
 class Runtime(metaclass=ABCMeta):
     """
@@ -684,7 +644,7 @@ class Runtime(metaclass=ABCMeta):
         return process
 
     @abstractmethod
-    def gc_process(self, process: Process) -> None:
+    def remove_process(self, process: Process) -> None:
         """
         提供一个算法, 用来将 process 里的数据进行精简
         这个方法通常在 finish 方法中被调用.
@@ -705,6 +665,10 @@ class Runtime(metaclass=ABCMeta):
         """
         添加一个 Task, 通常在 finish 的时候才会保存.
         """
+        pass
+
+    @abstractmethod
+    def instance_task(self, ptr: Task) -> Task:
         pass
 
     @abstractmethod

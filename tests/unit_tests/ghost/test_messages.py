@@ -1,4 +1,4 @@
-from ghoshell.ghost import Input
+from ghoshell.messages import Input
 
 
 def test_basic_text():

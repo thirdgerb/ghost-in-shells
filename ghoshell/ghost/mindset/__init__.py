@@ -15,8 +15,8 @@ __all__ = [
     "Stage",
     "Focus", "FocusDriver", "Intention", "Attention",
     "Event",
-    "OnActivating", "OnCallback", "OnReceiving", "OnWithdrawing", "OnCanceling", "OnFailing",
+    "OnActivating", "OnCallback", "OnReceived", "OnWithdrawing", "OnCanceling", "OnFailing",
     "OnQuiting",
-    "OnPreempting",
+    "OnPreempted",
     "Operator", "OperationKernel",
 ]

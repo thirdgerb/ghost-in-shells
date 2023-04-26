@@ -17,7 +17,7 @@ class Thought(metaclass=ABCMeta):
     这个 This 需要每个 Think 能力自定义一个协议, 主要是 variables 需要一个协议.
 
     thought 的生命周期: task => thought => task
-    thought 是 task 与 mindset 互动时的中间态数据, 用来做强类型提示.
+    thought 是 task 与 intentions 互动时的中间态数据, 用来做强类型提示.
     """
     tid: str = ""
     url: URL | None = None

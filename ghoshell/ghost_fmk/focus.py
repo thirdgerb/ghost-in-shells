@@ -33,7 +33,7 @@ class FocusImpl(Focus):
         # 保证有序.
         self.driver_kinds: List[str] = []
         for driver in drivers:
-            self.register_driver(driver)
+            self.register(driver)
 
     def clone(self, clone_id: str) -> "Focus":
         return self
@@ -57,7 +57,7 @@ class FocusImpl(Focus):
             return None
         arr = []
         for meta in metas:
-            if meta.kind != kind:
+            if meta.KIND != kind:
                 continue
             arr.append(meta)
         if len(arr) == 0:
@@ -67,7 +67,7 @@ class FocusImpl(Focus):
     def register_global_intentions(self, *metas: Intention) -> None:
         meta_group = {}
         for meta in metas:
-            kind = meta.kind
+            kind = meta.KIND
             if kind not in meta_group:
                 meta_group[kind] = []
             meta_group[kind].append(meta)

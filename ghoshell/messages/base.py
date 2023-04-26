@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABCMeta
 from typing import ClassVar, Optional, Dict
 
@@ -29,13 +31,13 @@ class Message(BaseModel, metaclass=ABCMeta):
     KIND: ClassVar[str] = ""
 
     @classmethod
-    def from_payload(cls, payload: Payload) -> Optional["Message"]:
+    def read(cls, payload: Payload) -> Optional["Message"]:
         data = payload.body.get(cls.KIND, None)
         if data is None:
             return None
         return cls(**data)
 
-    def join_payload(self, payload: Payload) -> bool:
+    def join(self, payload: Payload) -> bool:
         if self.KIND in payload.body:
             return False
         payload.body[self.KIND] = self.dict()

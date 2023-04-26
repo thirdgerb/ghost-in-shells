@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, List
 
 from ghoshell.container import Container
-from ghoshell.messenger import Input, Output
+from ghoshell.messages import Input, Output
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context

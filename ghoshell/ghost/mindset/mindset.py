@@ -43,9 +43,9 @@ class Mindset(metaclass=ABCMeta):
     @abstractmethod
     def register_sub_mindset(self, mindset: Mindset) -> None:
         """
-        注册子级 mindset
-        父级里查不到, 就到 sub mindset 里查
-        这样的话, 就可以实现 mindset 的继承和重写.
+        注册子级 intentions
+        父级里查不到, 就到 sub intentions 里查
+        这样的话, 就可以实现 intentions 的继承和重写.
         Clone 可以因此拥有和 Ghost 不同的 Mindset
         """
         pass

@@ -114,7 +114,7 @@ class Mind(metaclass=ABCMeta):
         对于不可恢复的异常, 也要有一整套恢复办法.
 
         典型的例子是 task 数据结构变化, 导致记忆回复时会产生 RuntimeException
-        或者 mindset 做了无法向前兼容的改动, 导致 runtime 记忆出错.
+        或者 intentions 做了无法向前兼容的改动, 导致 runtime 记忆出错.
         """
         pass
 

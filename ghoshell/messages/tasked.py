@@ -20,4 +20,6 @@ class Tasked(Message):
     status: int
     args: Dict
     vars: Dict
-    # tid: str | None = None
+    overdue: int
+    # tid 不一定有用.
+    tid: str | None = None

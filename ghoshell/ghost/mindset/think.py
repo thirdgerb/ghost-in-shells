@@ -6,7 +6,6 @@ from typing import Optional, Dict, List, Any
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.mindset.focus import Intention
 from ghoshell.ghost.mindset.stage import Stage
 from ghoshell.ghost.mindset.thought import Thought
 from ghoshell.ghost.url import URL
@@ -91,14 +90,14 @@ class Think(BaseModel, metaclass=ABCMeta):
         获取 stage
         """
         pass
-
-    @abstractmethod
-    def intentions(self, ctx: Context) -> Optional[List["Intention"]]:
-        """
-        可以命中当前状态的各种 Intention
-        可以被封装成为一个 Reaction
-        """
-        pass
+    #
+    # @abstractmethod
+    # def intentions(self, ctx: Context) -> Optional[List["Intention"]]:
+    #     """
+    #     可以命中当前状态的各种 Intention
+    #     可以被封装成为一个 Reaction
+    #     """
+    #     pass
 
 
 class ThinkDriver(metaclass=ABCMeta):

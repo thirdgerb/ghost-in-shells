@@ -1,7 +1,8 @@
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Iterator, Dict
+from typing import Optional, Iterator, Dict, List
 
 from ghoshell.ghost.mindset import ThinkMeta
+from ghoshell.messages import Tasked
 
 
 class ThinkMetaDriver(metaclass=ABCMeta):
@@ -20,6 +21,15 @@ class ThinkMetaDriver(metaclass=ABCMeta):
 
 
 class RuntimeDriver(metaclass=ABCMeta):
+
+    @abstractmethod
+    def get_current_process_id(self, session_id: str) -> str | None:
+        pass
+
+    @abstractmethod
+    def set_current_process_id(self, session_id: str, process_id: str) -> None:
+        pass
+
     @abstractmethod
     def get_process_data(self, session_id: str, process_id: str) -> Dict | None:
         pass
@@ -29,11 +39,11 @@ class RuntimeDriver(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_task_data(self, session_id: str, process_id: str, task_id: str) -> Dict | None:
+    def get_task_data(self, session_id: str, process_id: str, task_id: str) -> Tasked | None:
         pass
 
     @abstractmethod
-    def save_task_data(self, session_id: str, process_id: str, data: Dict[str, TaskData]):
+    def save_task_data(self, session_id: str, process_id: str, data: Dict[str, Tasked]):
         pass
 
     @abstractmethod

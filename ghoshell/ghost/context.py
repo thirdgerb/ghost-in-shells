@@ -3,15 +3,15 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Any, Optional, TYPE_CHECKING, List, TypeVar, Type
 
-from ghoshell.messages import Message
+from ghoshell.messages import Message, Input, Output
 
 if TYPE_CHECKING:
     from ghoshell.ghost.ghost import Clone
     from ghoshell.ghost.mindset import Thought, Mind
-    from ghoshell.messenger import Input, Output
     from ghoshell.ghost.sending import Sender
     from ghoshell.ghost.session import Session
     from ghoshell.ghost.runtime import Runtime
+    from ghoshell.container import Container
 
 M = TypeVar('M', bound=Message)
 
@@ -24,6 +24,11 @@ class Context(metaclass=ABCMeta):
     @property
     @abstractmethod
     def clone(self) -> "Clone":
+        pass
+
+    @property
+    @abstractmethod
+    def container(self) -> "Container":
         pass
 
     @property
@@ -56,7 +61,6 @@ class Context(metaclass=ABCMeta):
         """
         以 Thought 为基础, 发出各种消息体给 Shell
         再由 Shell 发送出去.
-        返回的 Messenger 是语法糖.
         """
         pass
 
@@ -122,7 +126,11 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def finish(self, failed: bool = False) -> None:
+    def fail(self) -> None:
+        pass
+
+    @abstractmethod
+    def finish(self) -> None:
         """
         上下文运行完成后,
         需要考虑 python 的特点, 要主动清理记忆

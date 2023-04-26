@@ -23,7 +23,7 @@ class Intention(BaseModel):
 
     每一种预测的意图, 都应该通过不同的解析机制来解决.
     """
-    kind: str
+    KIND: str
     config: Dict
     # 私有意图只有在当前任务中能被识别和匹配.
     params: Dict | None = None
@@ -63,7 +63,7 @@ class Focus(metaclass=ABCMeta):
     """
     工程化的注意力机制
     在运行中接受到各种事件, 比如 api/command/设备事件等等
-    通过 focus 机制可以快速定位事件的处理者(task resolver => Thinking)
+    通过 intentions 机制可以快速定位事件的处理者(task resolver => Thinking)
     """
 
     @abstractmethod

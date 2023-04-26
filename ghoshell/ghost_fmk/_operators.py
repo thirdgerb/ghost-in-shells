@@ -4,7 +4,7 @@ from typing import Optional, List, ClassVar, Type, Dict
 from ghoshell.ghost import Attention, Intention
 from ghoshell.ghost import Context, URL
 from ghoshell.ghost import CtxTool
-from ghoshell.ghost import OnReceiving, OnActivating, OnPreempting, OnCallback
+from ghoshell.ghost import OnReceived, OnActivating, OnPreempted, OnCallback
 from ghoshell.ghost import OnWithdrawing, OnCanceling, OnFailing, OnQuiting
 from ghoshell.ghost import Operator
 from ghoshell.ghost import RuntimeTool
@@ -333,7 +333,7 @@ class ActivateOperator(AbsOperator):
 
             # preempting
             case TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING:
-                event = OnPreempting(task.tid, task.url.stage, self.fr)
+                event = OnPreempted(task.tid, task.url.stage, self.fr)
                 return RuntimeTool.fire_event(ctx, event)
             case _:
                 event = OnActivating(task.tid, self.to.stage, self.fr)
@@ -395,7 +395,7 @@ class AwaitOperator(AbsOperator):
             # 不用变更状态.
             return None
 
-        # 获取 focus
+        # 获取 intentions
         stage = CtxTool.force_fetch_stage(ctx, task.url.resolver, task.url.stage)
 
         reactions = stage.reactions()
@@ -535,7 +535,7 @@ class UnhandledInputOperator(AbsOperator):
     @classmethod
     def _fallback_to_task(cls, ctx: "Context", task: Task) -> Optional[Operator]:
         # 当前任务.  fallback
-        event = OnReceiving(task.tid, task.url.stage, None)
+        event = OnReceived(task.tid, task.url.stage, None)
         return RuntimeTool.fire_event(ctx, event)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
@@ -665,7 +665,7 @@ class ScheduleOperator(AbsOperator):
     @classmethod
     def _preempt(cls, ctx: Context, tid: str) -> Optional[Operator]:
         task = RuntimeTool.fetch_task(ctx, tid)
-        event = OnPreempting(task.tid, task.url.stage, None)
+        event = OnPreempted(task.tid, task.url.stage, None)
         return RuntimeTool.fire_event(ctx, event)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:

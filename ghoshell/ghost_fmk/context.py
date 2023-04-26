@@ -1,9 +1,15 @@
 from typing import List, Dict, Any, Optional, Type
 
+from ghoshell.container import Container
+from ghoshell.contracts import Cache
 from ghoshell.ghost import *
-from ghoshell.ghost.context import Sender, M
+from ghoshell.ghost_fmk.config import GhostConfig
+from ghoshell.ghost_fmk.contracts import RuntimeDriver
 from ghoshell.ghost_fmk.mind import MindImpl
+from ghoshell.ghost_fmk.runtime import RuntimeImpl
 from ghoshell.ghost_fmk.sending import SendingImpl
+from ghoshell.ghost_fmk.session import SessionImpl
+from ghoshell.messages import *
 
 
 class ContextImpl(Context):
@@ -12,10 +18,17 @@ class ContextImpl(Context):
             self,
             inpt: Input,
             clone: Clone,
-            session: Session,
-            runtime: Runtime,
+            container: Container,
+            config: GhostConfig,
+            # session: Session,
+            # runtime: Runtime,
     ):
         self._clone = clone
+        self._container = container
+        self._config = config
+
+        self._session: Session | None = None
+        self._runtime: Runtime | None = None
 
         # 初始化 input
         self._origin_input = inpt
@@ -27,14 +40,16 @@ class ContextImpl(Context):
         self._cache: Dict[str, Any] = {}
         self._async_inputs_buffer: List[Input] = []
         self._minder: MindImpl | None = None
-        self._session = session
-        self._runtime = runtime
         self._outputs_buffer = []
         self._messenger: SendingImpl | None = None
+        self._failed: bool = False
 
     @property
     def clone(self) -> Clone:
         return self._clone
+
+    def container(self) -> "Container":
+        return self._container
 
     def send_at(self, _with: Optional["Thought"]) -> Sender:
         if self._messenger is not None:
@@ -60,8 +75,8 @@ class ContextImpl(Context):
             self._minder = MindImpl(this.tid, this.url.copy_with())
         return self._minder
 
-    def read(self, expect: Type[M]) -> M | None:
-        return expect.from_payload(self.input.payload)
+    def read(self, expect: Type[Message]) -> Message | None:
+        return expect.read(self.input.payload)
 
     def async_input(self, _input: Input) -> None:
         _input.is_async = True
@@ -90,14 +105,50 @@ class ContextImpl(Context):
 
     @property
     def runtime(self) -> "Runtime":
+        if self._runtime is None:
+            driver = self._container.force_fetch(RuntimeDriver)
+            trace = self._input.trace
+
+            def new_process_id() -> str:
+                return self.session.new_process_id()
+
+            runtime = RuntimeImpl(
+                driver,
+                self._config,
+                self._clone.clone_id,
+                trace.session_id,
+                trace.process_id,
+                new_process_id,
+            )
+            self._container.set(Runtime, runtime)
+            self._runtime = runtime
         return self._runtime
 
     @property
     def session(self) -> "Session":
+        if self._session is None:
+            cache = self._container.force_fetch(Cache)
+            trace = self._input.trace
+            session = SessionImpl(
+                cache,
+                clone_id=self._clone.clone_id,
+                session_id=trace.session_id,
+                expire=self._config.session_overdue,
+            )
+            self._container.set(Session, session)
+            self._session = session
         return self._session
 
-    def finish(self, failed: bool = False) -> None:
+    def fail(self):
+        self._failed = True
+        # 清空数据.
+        self._input = self._origin_input.copy()
+        self._async_inputs_buffer = []
+        self._outputs_buffer = []
 
+    def finish(self) -> None:
+        if self._failed:
+            return
         # destroy temporary instance
         if self._messenger is not None:
             self._messenger.destroy()
@@ -108,14 +159,16 @@ class ContextImpl(Context):
         # self.session.save_input(self._input)
         # for output in self._outputs_buffer:
         #     self.session.save_output(output)
-
-        self._runtime.finish()
+        self.runtime.finish()
 
     def destroy(self) -> None:
-        self._runtime.destroy()
-        self._session.destroy()
+        if self._runtime is not None:
+            self._runtime.destroy()
+        if self._session is not None:
+            self._session.destroy()
         # del
         del self._clone
+        del self._container
         del self._session
         del self._runtime
         del self._origin_input

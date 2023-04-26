@@ -5,9 +5,9 @@
 #
 # from ghoshell.ghost import Intention
 # from ghoshell.ghost.context import Context
-# from ghoshell.ghost.mindset import Stage, Listener
-# from ghoshell.ghost.mindset.events import *
-# from ghoshell.ghost.mindset.thought import Thought
+# from ghoshell.ghost.intentions import Stage, Listener
+# from ghoshell.ghost.intentions.events import *
+# from ghoshell.ghost.intentions.thought import Thought
 # from ghoshell.ghost.operator import Operator
 # from ghoshell.ghost.runtime import TASK_STATUS, TaskStatus
 # from ghoshell.ghost.url import URL
