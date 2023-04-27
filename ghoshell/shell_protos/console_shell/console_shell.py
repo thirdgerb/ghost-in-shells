@@ -99,5 +99,14 @@ class ConsoleShell(ShellKernel):
         if err is not None:
             self.app.print(Markdown(f"# Error Occur {err.errcode} \n\n\n{err.errmsg}"))
 
+    def _markdown_output(self, text: str) -> Markdown:
+        lines = text.split("\n\n")
+        result = ["----"]
+        for line in lines:
+            line = "\n\n".join(line.split("\n"))
+            result.append(line)
+        result.append("----")
+        return Markdown("\n\n".join(result))
+
     def messenger(self, _input: Input | None) -> Messenger:
         return self._messenger

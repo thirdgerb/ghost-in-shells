@@ -25,6 +25,10 @@ class Container:
         """
         self.__instances[contract] = instance
 
+    def bound(self, contract: Type[Contract]) -> bool:
+        return contract in self.__instances or contract in self.__providers or \
+            (self.__parent is not None and self.__parent.bound(contract))
+
     def get(self, contract: Type[Contract], params: Dict | None = None) -> Contract | None:
         """
         获取一个实例.

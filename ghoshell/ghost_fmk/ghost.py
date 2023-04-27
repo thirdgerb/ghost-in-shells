@@ -1,15 +1,20 @@
+import sys
+import traceback
 import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Callable, List
 
 from ghoshell.container import Container, Provider
+from ghoshell.contracts import Cache
 from ghoshell.ghost import Ghost, Clone, Context, OperationKernel
 from ghoshell.ghost import Mindset, Focus, Memory
 from ghoshell.ghost import RuntimeException, GhostException
 from ghoshell.ghost_fmk.clone import CloneImpl
 from ghoshell.ghost_fmk.config import GhostConfig
 from ghoshell.ghost_fmk.context import ContextImpl
+from ghoshell.ghost_fmk.contracts import ThinkMetaDriver
 from ghoshell.ghost_fmk.middleware import CtxMiddleware, ExceptionHandlerMiddleware, CtxPipe, CtxPipeline
+from ghoshell.ghost_fmk.providers import CacheRuntimeDriverProvider, MindsetProvider, FocusProvider, MemoryProvider
 from ghoshell.messages import Input, Output, Error
 from ghoshell.utils import create_pipeline
 
@@ -26,19 +31,8 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     Ghost 框架实现的内核
     """
 
-    # ghost 初始化时, 向 ioc 容器注册.
-    providers: List[Provider] = []
-
     # 启动流程. 想用这种方式解耦掉系统文件读取等逻辑.
     bootstrapper: List[Bootstrapper] = []
-
-    # 初始化 context 时, 注册到 context 级别的 ioc
-    context_providers: List[Provider] = []
-
-    # ghost 运行各种中间件.
-    middleware: List[CtxMiddleware] = [
-        ExceptionHandlerMiddleware(),
-    ]
 
     def __init__(
             self,
@@ -65,16 +59,55 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         for boot in self.bootstrapper:
             boot.bootstrap(self)
 
-        # 注册所有的 provider
-        for provider in self.providers:
-            self._container.register(provider)
+        for depending in self._depend_contracts():
+            if not self._container.bound(depending):
+                raise GhostException(f"ghost depending contract {depending} is not bound")
         return self
 
     def _init_container(self):
         self._container.set(Ghost, self)
         self._container.set(GhostConfig, self._config)
-        for provider in self.providers:
+        for provider in self._ghost_providers():
             self._container.register(provider)
+        for provider in self._contracts_providers():
+            self._container.register(provider)
+
+    @classmethod
+    def _context_middleware(cls) -> List[CtxMiddleware]:
+        return [
+            ExceptionHandlerMiddleware(),
+        ]
+
+    @classmethod
+    def _depend_contracts(cls) -> List:
+        return [
+            Cache,
+            ThinkMetaDriver,
+        ]
+
+    @classmethod
+    @abstractmethod
+    def _contracts_providers(cls) -> List[Provider]:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def _context_providers(cls) -> List[Provider]:
+        """
+        context 初始化时执行的 providers
+        """
+        pass
+
+    def _ghost_providers(self) -> List[Provider]:
+        """
+        ghost 启动的时候执行的 providers
+        """
+        return [
+            CacheRuntimeDriverProvider(),
+            MindsetProvider(),
+            FocusProvider(),
+            MemoryProvider(),
+        ]
 
     # ---- abstract ---- #
 
@@ -97,7 +130,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         # bound instances
         container.set(Clone, clone)
         container.set(Context, ctx)
-        for provider in self.context_providers:
+        for provider in self._context_providers():
             container.register(provider)
         return ctx
 
@@ -115,9 +148,11 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         try:
             ctx = self.new_context(inpt)
             return self._react(ctx)
+        except GhostException as e:
+            return [self._failure_message(_input=inpt, err=e)]
         except Exception as e:
-            message = Error(errmsg=e.__repr__())
-            return [self._failure_message(_input=inpt, err=message)]
+            ex = GhostException(message=e.__repr__())
+            return [self._failure_message(_input=inpt, err=ex)]
         finally:
             # todo: handle exception
             pass
@@ -132,15 +167,15 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             return ctx.get_outputs()
         except GhostException as e:
             ctx.fail()
-            message = Error(errcode=e.CODE, errmsg=e.message)
-            return [self._failure_message(_input=ctx.input, err=message)]
+            return [self._failure_message(_input=ctx.input, err=e)]
         finally:
             ctx.finish()
 
-    @classmethod
-    def _failure_message(cls, _input: Input, err: Error) -> Output:
+    def _failure_message(self, _input: Input, err: GhostException) -> Output:
+        trace = "\n".join(traceback.format_exception(*sys.exc_info(), limit=self._config.exception_traceback_limit))
+        msg = Error(errcode=err.CODE, errmsg=f"{err.message}\n\n{trace}")
         _output = Output.new(uuid.uuid4().hex, _input)
-        err.join(_output.payload)
+        msg.join(_output.payload)
         return _output
 
     @property
@@ -183,10 +218,9 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         """
         使用中间件实现一个管道
         """
-        middleware = self.middleware if self.middleware else []
         pipes: List[CtxPipe] = []
         # 用 run 方法组成 pipes
-        for m in middleware:
+        for m in self._context_middleware():
             pipe = m.new(self)
             pipes.append(pipe)
         # 返回 pipeline

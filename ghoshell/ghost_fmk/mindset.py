@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from typing import Optional, Iterator, List, Dict
 
 from ghoshell.ghost import Mindset, Think
@@ -75,14 +74,13 @@ class MindsetImpl(Mindset):
                 names.add(name)
                 yield think
 
-    @abstractmethod
     def register_meta(self, meta: ThinkMeta) -> None:
         """
         注册一个 thinking
         当然, Mindset 可以有自己的实现, 从某个配置体系中获取.
         或者合并多个 Mindset.
         """
-        self._think_metas_driver.register_meta(meta)
+        self._think_metas_driver.register_meta(meta, self._clone_id)
 
     def destroy(self) -> None:
         if self._clone_id is not None:

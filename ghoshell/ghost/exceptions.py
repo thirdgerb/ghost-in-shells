@@ -14,7 +14,7 @@ class GhostException(Exception):
 
     def __init__(self, message):
         self.message: str = message
-        super(GhostException).__init__(message)
+        super().__init__(message)
 
 
 class StackoverflowException(GhostException):

@@ -15,9 +15,11 @@ def main():
     )
     container = Container()
     container.set(GhostConfig, config)
+    container.register(MockMessageQueueProvider())
+
     pwd = os.getcwd()
     ghost = MockGhost(container, pwd)
-    ghost.container.register(MockMessageQueueProvider())
+    ghost.boostrap()
     shell = ConsoleShell(ghost.container)
     shell.run_as_app()
 
