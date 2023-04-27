@@ -7,7 +7,7 @@ from ghoshell.ghost_fmk.config import GhostConfig
 class CloneImpl(Clone, metaclass=ABCMeta):
 
     def __init__(self, ghost: Ghost, clone_id: str, config: GhostConfig):
-        self._ghost_name = ghost.name
+        self._ghost = ghost
         self._clone_id = clone_id
         # 对 Ghost 级别的容器做了二次封装, 方便注册 clone 级别的单例.
         # 注册的动作应该在 Ghost.new_clone(clone_id) 方法里实现.
@@ -23,8 +23,8 @@ class CloneImpl(Clone, metaclass=ABCMeta):
         return self._clone_id
 
     @property
-    def ghost_name(self) -> str:
-        return self._ghost_name
+    def ghost(self) -> Ghost:
+        return self._ghost
 
     @property
     def root(self) -> "URL":
@@ -50,6 +50,7 @@ class CloneImpl(Clone, metaclass=ABCMeta):
         self._memory.destroy()
 
         # 删除持有.
+        del self._ghost
         del self._config
         del self._focus
         del self._mindset

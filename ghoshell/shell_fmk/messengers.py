@@ -1,36 +1,10 @@
-from abc import ABCMeta, abstractmethod
+import uuid
 from typing import Callable, Optional, List
 
 from ghoshell.ghost import Ghost
-from ghoshell.messages import Output, Input
+from ghoshell.messages import Output, Input, Error
 from ghoshell.shell import Messenger
-
-
-class MessageQueue(metaclass=ABCMeta):
-
-    @abstractmethod
-    def push_input(self, _input: Input) -> None:
-        pass
-
-    @abstractmethod
-    def push_output(self, _output: Output) -> None:
-        pass
-
-    @abstractmethod
-    async def pop_input(self) -> Input:
-        pass
-
-    @abstractmethod
-    async def pop_output(self) -> Output:
-        pass
-
-    @abstractmethod
-    def ack_output(self, output_id: str, success: bool) -> None:
-        pass
-
-    @abstractmethod
-    def ack_input(self, input_id: str, success: bool) -> None:
-        pass
+from ghoshell.shell_fmk.contracts import MessageQueue
 
 
 class SyncGhostMessenger(Messenger):
@@ -42,16 +16,20 @@ class SyncGhostMessenger(Messenger):
     def send(self, _input: Input) -> Optional[List[Output]]:
         try:
             outputs = self._ghost.respond(_input)
-            if outputs is None:
-                return None
+
             result = []
             for _output in outputs:
                 if _output.is_async:
                     self._queue.push_output(_output)
                 else:
-                    result.append(result)
+                    result.append(_output)
             return result
         # todo catch exceptions
+        except Exception as e:
+            err = Error(errmsg=e.__repr__())
+            _output = Output.new(uuid.uuid4().hex, _input)
+            err.join(_output.payload)
+            return [_output]
         finally:
             pass
 

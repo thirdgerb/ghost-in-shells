@@ -1,5 +1,7 @@
 import asyncio
+from typing import Dict, Type
 
+from ghoshell.container import Provider, Container, Contract
 from ghoshell.messages import Output, Input
 from ghoshell.shell_fmk.messengers import MessageQueue
 
@@ -33,3 +35,14 @@ class MockMessageQueue(MessageQueue):
 
     def ack_input(self, input_id: str, success: bool) -> None:
         pass
+
+
+class MockMessageQueueProvider(Provider):
+    def singleton(self) -> bool:
+        return True
+
+    def contract(self) -> Type[Contract]:
+        return MessageQueue
+
+    def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
+        return MockMessageQueue()

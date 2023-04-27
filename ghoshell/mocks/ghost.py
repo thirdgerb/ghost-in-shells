@@ -26,17 +26,14 @@ class OperatorMock(OperationKernel):
         pass
 
 
-class GhostMock(GhostKernel):
-    def __init__(self):
+class MockGhost(GhostKernel):
+    def __init__(self, container: Container, root_path: str):
+        config = container.force_fetch(GhostConfig)
         super().__init__(
             "mock_ghost",
-            container=Container(),
-            root_path="mock",
-            config=GhostConfig(
-                root_url=dict(
-                    resolver="test"
-                )
-            )
+            container=container,
+            root_path=root_path.rstrip("/"),
+            config=config,
         )
 
     def new_operation_kernel(self) -> "OperationKernel":

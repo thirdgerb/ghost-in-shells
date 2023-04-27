@@ -8,13 +8,13 @@ from prompt_toolkit.shortcuts import PromptSession
 from rich.console import Console
 from rich.markdown import Markdown
 
+from ghoshell.container import Container
 from ghoshell.ghost import Ghost
 from ghoshell.messages import *
 from ghoshell.shell import Messenger
 from ghoshell.shell_fmk import InputMiddleware, OutputMiddleware
 from ghoshell.shell_fmk import ShellKernel, Bootstrapper
-from ghoshell.shell_fmk import SyncGhostMessenger, MockMessageQueue
-from ghoshell.shell_protos.console_shell.pipelines import InputTestMiddleware
+from ghoshell.shell_fmk import SyncGhostMessenger, MessageQueue
 
 
 class ConsoleShell(ShellKernel):
@@ -25,20 +25,25 @@ class ConsoleShell(ShellKernel):
 
     # 输入处理
     input_middlewares: ClassVar[List[InputMiddleware]] = [
-        InputTestMiddleware()
+        # InputTestMiddleware()
     ]
 
     # 输出处理
     output_middlewares: ClassVar[List[OutputMiddleware]] = [
     ]
 
-    def __init__(self, ghost: Ghost):
-        messenger = SyncGhostMessenger(ghost, queue=MockMessageQueue())
+    def __init__(self, container: Container):
+        # message_queue = ghost
+        shell_container = Container(container)
+        ghost = container.force_fetch(Ghost)
+        message_queue = container.force_fetch(MessageQueue)
+        messenger = SyncGhostMessenger(ghost, queue=message_queue)
+
         self.session_id = str(uuid.uuid4().hex)
         self.user_id = str(uuid.uuid4().hex)
         self.app = Console()
         self.ghost = ghost
-        super().__init__(ghost.container, messenger)
+        super().__init__(shell_container, messenger)
 
     def kind(self) -> str:
         return "command_shell"
@@ -88,8 +93,11 @@ class ConsoleShell(ShellKernel):
 
     def deliver(self, _output: Output) -> None:
         text = Text.read(_output.payload)
-        if text is not None and not text.is_empty():
-            self.app.print(Markdown(text.content))
+        if text is not None:
+            self.app.print(Markdown("----\n\n" + text.content + "\n\n----"))
+        err = Error.read(_output.payload)
+        if err is not None:
+            self.app.print(Markdown(f"# Error Occur {err.errcode} \n\n\n{err.errmsg}"))
 
     def messenger(self, _input: Input | None) -> Messenger:
         return self._messenger

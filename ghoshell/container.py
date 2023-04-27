@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Type, Dict, Any, TypeVar
+from typing import Type, Dict, TypeVar
 
 Contract = TypeVar('Contract', bound=object)
 
@@ -19,7 +19,7 @@ class Container:
         self.__parent = parent
         self.__providers: Dict[Type[Contract], Provider] = {}
 
-    def set(self, contract: Type[Contract], instance: Contract) -> Any:
+    def set(self, contract: Type[Contract], instance: Contract) -> None:
         """
         设置一个实例, 不会污染父容器.
         """
@@ -48,7 +48,8 @@ class Container:
 
     def register(self, provider: Provider) -> None:
         contract = provider.contract()
-        del self.__instances[contract]
+        if contract in self.__instances:
+            del self.__instances[contract]
         self.__providers[contract] = provider
 
     def fetch(self, contract: Type[Contract]) -> Contract | None:

@@ -1,15 +1,16 @@
+import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Callable, List
 
 from ghoshell.container import Container, Provider
 from ghoshell.ghost import Ghost, Clone, Context, OperationKernel
 from ghoshell.ghost import Mindset, Focus, Memory
-from ghoshell.ghost import RuntimeException
+from ghoshell.ghost import RuntimeException, GhostException
 from ghoshell.ghost_fmk.clone import CloneImpl
 from ghoshell.ghost_fmk.config import GhostConfig
 from ghoshell.ghost_fmk.context import ContextImpl
 from ghoshell.ghost_fmk.middleware import CtxMiddleware, ExceptionHandlerMiddleware, CtxPipe, CtxPipeline
-from ghoshell.messages import Input, Output
+from ghoshell.messages import Input, Output, Error
 from ghoshell.utils import create_pipeline
 
 
@@ -54,6 +55,8 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         self._mindset: Mindset | None = None
         self._focus: Focus | None = None
         self._memory: Memory | None = None
+        container.set(Ghost, self)
+        container.set(GhostConfig, config)
         # self._messenger: Messenger = messenger
 
     def boostrap(self) -> "Ghost":
@@ -112,8 +115,9 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         try:
             ctx = self.new_context(inpt)
             return self._react(ctx)
-        except Exception:
-            return None
+        except Exception as e:
+            message = Error(errmsg=e.__repr__())
+            return [self._failure_message(_input=inpt, err=message)]
         finally:
             # todo: handle exception
             pass
@@ -126,8 +130,18 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             pipeline = self._build_pipeline()
             ctx = pipeline(ctx)
             return ctx.get_outputs()
+        except GhostException as e:
+            ctx.fail()
+            message = Error(errcode=e.CODE, errmsg=e.message)
+            return [self._failure_message(_input=ctx.input, err=message)]
         finally:
             ctx.finish()
+
+    @classmethod
+    def _failure_message(cls, _input: Input, err: Error) -> Output:
+        _output = Output.new(uuid.uuid4().hex, _input)
+        err.join(_output.payload)
+        return _output
 
     @property
     def name(self) -> str:

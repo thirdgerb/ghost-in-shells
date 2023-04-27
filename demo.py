@@ -1,10 +1,24 @@
 #!/usr/bin/env python
-from ghoshell.ghost_fmk.mocks import GhostMock
+import os.path
+
+from ghoshell.container import Container
+from ghoshell.ghost_fmk import GhostConfig
+from ghoshell.mocks import MockGhost, MockMessageQueueProvider
 from ghoshell.shell_protos import ConsoleShell
 
 
 def main():
-    shell = ConsoleShell(GhostMock())
+    config = GhostConfig(
+        root_url=dict(
+            resolver="test"
+        )
+    )
+    container = Container()
+    container.set(GhostConfig, config)
+    pwd = os.getcwd()
+    ghost = MockGhost(container, pwd)
+    ghost.container.register(MockMessageQueueProvider())
+    shell = ConsoleShell(ghost.container)
     shell.run_as_app()
 
 

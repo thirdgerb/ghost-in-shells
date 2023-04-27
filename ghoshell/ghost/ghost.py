@@ -145,7 +145,7 @@ class Clone(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def ghost_name(self) -> str:
+    def ghost(self) -> Ghost:
         """
         机器人的"灵魂"，不同的 Ghost 可能使用同样的灵魂，比如"微软小冰"等
         """

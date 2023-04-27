@@ -9,8 +9,8 @@ from ghoshell.shell import Shell, Messenger
 from ghoshell.utils import create_pipeline
 
 # input 处理管道
-InputPipeline = Callable[[Input], Tuple[Input, Optional[Output]]]
-InputPipe = Callable[[Input, InputPipeline], Tuple[Input, Optional[Output]]]
+InputPipeline = Callable[[Input], Tuple[Input, List[Output] | None]]
+InputPipe = Callable[[Input, InputPipeline], Tuple[Input, List[Output] | None]]
 
 # output 处理管道
 OutputPipeline = Callable[[Output], Output]
@@ -117,7 +117,7 @@ class ShellKernel(Shell, metaclass=ABCMeta):
 
     # ----- inner methods ----- #
 
-    def on_input(self, _input: Input) -> Tuple[Input, Optional[Output]]:
+    def on_input(self, _input: Input) -> Tuple[Input, List[Output] | None]:
         """
         用管道的方式来处理 input
         todo: try catch
@@ -127,13 +127,13 @@ class ShellKernel(Shell, metaclass=ABCMeta):
             for mdw in self.input_middlewares:
                 pipes.append(mdw.new(self))
 
-            def destination(_input: Input) -> Tuple[Input, Optional[Output]]:
+            def destination(_input: Input) -> Tuple[Input, List[Output] | None]:
                 return _input, None
 
             pipeline = create_pipeline(pipes, destination)
-            _input, _output = pipeline(_input)
+            _input, _outputs = pipeline(_input)
             # 解决入参的 shell_env 封装问题.
-            return _input, _output
+            return _input, _outputs
         finally:
             # todo ?
             pass
@@ -172,20 +172,21 @@ class ShellKernel(Shell, metaclass=ABCMeta):
             if _input is None:
                 # 默认无法处理的事件. 不做任何响应.
                 return
-            _input, _output = self.on_input(_input)
-            if _output is not None:
+            _input, _outputs = self.on_input(_input)
+            if _outputs is not None:
                 # 被拦截了.
-                self.on_output(_output)
+                for _output in _outputs:
+                    self.on_output(_output)
                 return
 
             # 发送给 Ghost
             messenger = self.messenger(_input)
-            _output = messenger.send(_input)
-            if _output is None:
+            _outputs = messenger.send(_input)
+            if _outputs is None:
                 # todo: 没想明白, 为 None 的时候应该是处理出问题了.
                 pass
             else:
-                for _output in _output:
+                for _output in _outputs:
                     self.on_output(_output)
                 return
         finally:

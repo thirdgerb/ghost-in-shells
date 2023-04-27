@@ -34,6 +34,9 @@ class Cache(metaclass=ABCMeta):
     def get_member(self, key: str, member: str) -> str | None:
         pass
 
+    def remove_member(self, key: str, *member: str) -> int:
+        pass
+
     @abstractmethod
     def remove(self, *keys: str) -> int:
         pass

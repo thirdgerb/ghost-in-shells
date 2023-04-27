@@ -107,5 +107,5 @@ class Output(BaseModel):
             input_mid=_input.mid,
             trace=trace,
             payload=payload,
-            is_async=_input.is_async or trace is not None,
+            is_async=_input.is_async,
         )
