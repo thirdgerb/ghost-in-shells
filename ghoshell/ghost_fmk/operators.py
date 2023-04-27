@@ -4,6 +4,7 @@ from typing import Optional, List, ClassVar, Type, Dict
 from ghoshell.ghost import Attention, Intention
 from ghoshell.ghost import Context, URL
 from ghoshell.ghost import CtxTool
+from ghoshell.ghost import GhostException
 from ghoshell.ghost import OnReceived, OnActivating, OnPreempted, OnCallback
 from ghoshell.ghost import OnWithdrawing, OnCanceling, OnFailing, OnQuiting
 from ghoshell.ghost import Operator
@@ -19,19 +20,24 @@ class AbsOperator(Operator, metaclass=ABCMeta):
     """
 
     def run(self, ctx: "Context") -> Optional["Operator"]:
-        """
-        用一个标准流程来约定 Operator 的开发方式.
-        """
-        # 先看是否有拦截发生, 如果发生了拦截, 则 operator 不会真正执行.
-        interceptor = self._intercept(ctx)
-        if interceptor is not None:
-            return interceptor
-        # 运行 operator 的事件.
-        result_op = self._run_operation(ctx)
-        if result_op is not None:
-            return result_op
-        # 如果运行事件没结果, 就往后走.
-        return self._fallback(ctx)
+        try:
+            """
+            用一个标准流程来约定 Operator 的开发方式.
+            """
+            # 先看是否有拦截发生, 如果发生了拦截, 则 operator 不会真正执行.
+            interceptor = self._intercept(ctx)
+            if interceptor is not None:
+                return interceptor
+            # 运行 operator 的事件.
+            result_op = self._run_operation(ctx)
+            if result_op is not None:
+                return result_op
+            # 如果运行事件没结果, 就往后走.
+            return self._fallback(ctx)
+        except GhostException as e:
+            raise e
+        except Exception as e:
+            raise
 
     @abstractmethod
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
@@ -53,6 +59,15 @@ class AbsOperator(Operator, metaclass=ABCMeta):
         如果没有任何中断, 则继续往后运行.
         """
         pass
+
+    def __repr__(self):
+        return f"`{self.__class__.__name__}:\n{self._desc()}`"
+
+    def _desc(self) -> str:
+        lines = []
+        for key in self.__dict__:
+            lines.append(f"{key}:{self.__dict__[key]}")
+        return "\n".join(lines)
 
 
 class ChainOperator(Operator):
@@ -79,6 +94,12 @@ class ChainOperator(Operator):
 
     def destroy(self) -> None:
         del self.chain
+
+    def __repr__(self):
+        result = [f"{self.__class__.__name__}:"]
+        for op in self.chain:
+            result.append(str(op))
+        return "\n".join(result)
 
 
 class ReceiveInputOperator(AbsOperator):
@@ -178,6 +199,9 @@ class ReceiveInputOperator(AbsOperator):
     def destroy(self) -> None:
         return
 
+    def _desc(self) -> str:
+        return ""
+
 
 class IntendingOperator(AbsOperator):
     """
@@ -226,8 +250,10 @@ class IntendingOperator(AbsOperator):
         return UnhandledInputOperator()
 
     def destroy(self) -> None:
-        del self.fr
         del self.matched
+
+    def _desc(self) -> str:
+        return f"matched:{self.matched}"
 
 
 #
@@ -291,6 +317,9 @@ class TaskedMessageOperator(AbsOperator):
     def destroy(self) -> None:
         del self.tasked
 
+    def _desc(self) -> str:
+        return f"tasked:{self.tasked}"
+
 
 class ActivateOperator(AbsOperator):
 
@@ -298,6 +327,9 @@ class ActivateOperator(AbsOperator):
         self.to = to
         self.fr = fr
         self.target_tid = target_tid
+
+    def _desc(self) -> str:
+        return f"to:{self.to}\nfr:{self.fr}\ntid:{self.target_tid}"
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -354,6 +386,9 @@ class RewindOperator(AbsOperator):
     def __init__(self, repeat: bool = False):
         self.repeat = repeat
 
+    def _desc(self) -> str:
+        return f"repeat:{self.repeat}"
+
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
 
@@ -377,6 +412,9 @@ class AwaitOperator(AbsOperator):
         self.stage = stage
         self.only = only
         self.exclude = exclude
+
+    def _desc(self) -> str:
+        return f"tid:{self.tid}\nstage:{self.stage}\nonly:{self.only}\nexclude:{self.exclude}"
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -444,6 +482,9 @@ class ForwardOperator(AbsOperator):
     def __init__(self, tid: str, stages: List[str]):
         self.tid = tid
         self.stages = stages
+
+    def _desc(self) -> str:
+        return f"tid:{self.tid}\nstages:{self.stages}"
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None

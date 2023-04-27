@@ -94,16 +94,20 @@ class ConsoleShell(ShellKernel):
     def deliver(self, _output: Output) -> None:
         text = Text.read(_output.payload)
         if text is not None:
-            self.app.print(Markdown("----\n\n" + text.content + "\n\n----"))
+            if text.markdown:
+                self.app.print(self._markdown_output(text.content))
+            else:
+                self.app.print(text.content)
+
         err = Error.read(_output.payload)
         if err is not None:
-            self.app.print(Markdown(f"# Error Occur {err.errcode} \n\n\n{err.errmsg}"))
+            self.app.print(self._markdown_output(f"# Error Occur {err.errcode} \n\n\n{err.errmsg}"))
 
     def _markdown_output(self, text: str) -> Markdown:
         lines = text.split("\n\n")
         result = ["----"]
         for line in lines:
-            line = "\n\n".join(line.split("\n"))
+            # line = "\n\n".join(line.split("\n"))
             result.append(line)
         result.append("----")
         return Markdown("\n\n".join(result))

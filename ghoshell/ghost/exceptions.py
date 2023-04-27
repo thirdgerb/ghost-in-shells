@@ -51,3 +51,11 @@ class BusyException(GhostException):
     系统忙碌.
     """
     CODE: int = 409
+
+
+class OperatorException(GhostException):
+    CODE: int = 522
+
+    def __init__(self, operator: str, message: str):
+        message = f"{message} at operator: {operator}"
+        super().__init__(message)

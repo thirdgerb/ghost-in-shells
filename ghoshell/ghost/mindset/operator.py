@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Optional, TYPE_CHECKING
 
-from ghoshell.ghost.exceptions import RuntimeException
+from ghoshell.ghost.exceptions import RuntimeException, OperatorException
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
@@ -30,9 +30,6 @@ class Operator(metaclass=ABCMeta):
         方便 python 回收垃圾
         """
         pass
-
-    def __str__(self):
-        return self.__class__.__name__
 
 
 class OperationKernel(metaclass=ABCMeta):
@@ -91,7 +88,8 @@ class OperationKernel(metaclass=ABCMeta):
                 # 原始 op 销毁.
                 op.destroy()
                 op = after
-        # todo: catch
+        except Exception as e:
+            raise OperatorException(str(op), str(e))
         finally:
             self.save_records()
 
