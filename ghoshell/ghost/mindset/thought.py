@@ -58,6 +58,29 @@ class Thought(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
     def destroy(self) -> None:
+        del self.url
+        del self.tid
+        del self.level
+        del self.status
+        del self.priority
+
+    @abstractmethod
+    def _destroy(self) -> None:
         pass
+
+
+class DictThought(Thought):
+    data: Dict = {}
+
+    def prepare(self, args: Dict) -> None:
+        return
+
+    def set_variables(self, variables: Dict) -> None:
+        self.data = variables
+
+    def vars(self) -> Dict | None:
+        return self.data
+
+    def _destroy(self) -> None:
+        del self.data

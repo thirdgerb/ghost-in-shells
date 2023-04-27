@@ -71,7 +71,7 @@ class UniformResolverLocator(BaseModel):
                 args_str += f"&{key}={self.args[key]}"
 
         template = f"{self.resolver}::{self.stage}?{extra_str}::{args_str}"
-        return hashlib.md5(template).hexdigest()
+        return hashlib.md5(template.encode()).hexdigest()
 
     # def is_same(self, other: "url") -> bool:
     #     return (other.ghost == "" or self.ghost == "" or self.ghost == other.ghost) \

@@ -7,7 +7,8 @@ from ghoshell.ghost.mindset import Event, OnActivating, OnCallback, OnPreempted,
 from ghoshell.ghost.mindset import Mindset, Mind
 from ghoshell.ghost.mindset import OnFailing, OnCanceling, OnQuiting
 from ghoshell.ghost.mindset import Operator, OperationKernel
-from ghoshell.ghost.mindset import Think, Thought, Stage
+from ghoshell.ghost.mindset import Stage, Reaction
+from ghoshell.ghost.mindset import Think, Thought, ThinkMeta, ThinkDriver, DictThought
 from ghoshell.ghost.mindset.focus import Focus, Intention, Attention, FocusDriver
 from ghoshell.ghost.runtime import *
 from ghoshell.ghost.sending import Sender
@@ -27,7 +28,9 @@ __all__ = [
     # memory
     "Memory", "MemoryDriver", "Memo",
     # intentions
-    "Mindset", "Mind", "Think", "Thought", "Stage",
+    "Mindset", "Mind", "Think", "ThinkMeta", "ThinkDriver",
+    "Stage", "Reaction",
+    "Thought", "DictThought",
     # operator
     "Operator", "OperationKernel",
     # runtime

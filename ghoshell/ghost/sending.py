@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional
 
-from ghoshell.messages import Message, Trace
+from ghoshell.messages import *
 
 
 class Sender(metaclass=ABCMeta):
@@ -16,6 +16,15 @@ class Sender(metaclass=ABCMeta):
         输出一个消息.
         """
         pass
+
+    def text(self, *lines: str, markdown: bool = False) -> "Sender":
+        content = "\n\n".join(lines)
+        message = Text(
+            content=content,
+            markdown=markdown,
+        )
+        self.output(message)
+        return self
 
     @abstractmethod
     def async_input(

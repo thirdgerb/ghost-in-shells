@@ -353,8 +353,8 @@ class Process(BaseModel):
     # 表示进程是否是退出状态.
     quiting: bool = False
 
-    __indexes: Optional[Dict[str, int]] = None
-    __status_list_indexes: Optional[Dict[int, List[str]]] = None
+    tid_indexes: Optional[Dict[str, int]] = None
+    status_list_indexes: Optional[Dict[int, List[str]]] = None
 
     @classmethod
     def new_process(cls, sid: str, pid: str | None = None, parent_id: str | None = None) -> "Process":
@@ -476,16 +476,16 @@ class Process(BaseModel):
         return self._get_tid_by_status(TaskStatus.FINISHED)
 
     def _get_tid_by_status(self, status: TASK_STATUS) -> List[str]:
-        if self.__status_list_indexes is None:
+        if self.status_list_indexes is None:
             status_indexes = {}
             for task in self.tasks:
                 status = task.status
                 if status not in status_indexes:
                     status_indexes[status] = []
                 status_indexes[status].append(task.tid)
-            self.__status_list_indexes = status_indexes
+            self.status_list_indexes = status_indexes
 
-        return self.__status_list_indexes.get(status, [])
+        return self.status_list_indexes.get(status, [])
 
     @property
     def is_new(self) -> bool:
@@ -502,9 +502,9 @@ class Process(BaseModel):
         """
         取出来一个任务的指针.
         """
-        if self.__indexes is None or len(self.__indexes) == 0:
+        if self.tid_indexes is None or len(self.tid_indexes) == 0:
             self.__reset_indexes()
-        indexes = self.__indexes
+        indexes = self.tid_indexes
         if tid not in indexes:
             return None
         idx = indexes[tid]
@@ -516,8 +516,6 @@ class Process(BaseModel):
         每次要重置索引.
         """
         for task in tasks:
-            if not self.root:
-                self.root = task.tid
             self._store_single_task(task)
         self.__clear()
 
@@ -526,11 +524,21 @@ class Process(BaseModel):
         当前任务插入到头部.
         每次重拍一下.
         """
+        tid = ptr.tid
+        if not self.root:
+            self.root = tid
+        if not self.awaiting:
+            self.awaiting = tid
+
+        if self.tid_indexes is not None and tid in self.tid_indexes:
+            order = self.tid_indexes[tid]
+            self.tasks[order] = ptr
+            return
         tasks = [ptr]
-        storing_id = ptr.tid
-        for task in self.tasks:
-            if task.tid != storing_id:
-                tasks.append(task)
+        for ptr in self.tasks:
+            if ptr.tid == tid:
+                continue
+            tasks.append(ptr)
         self.tasks = tasks
 
     def await_at(self, tid: str):
@@ -550,8 +558,8 @@ class Process(BaseModel):
         self.__clear()
 
     def __clear(self) -> None:
-        self.__indexes = None
-        self.__status_list_indexes = None
+        self.tid_indexes = None
+        self.status_list_indexes = None
 
     def fallback(self) -> Task | None:
         canceling = self.canceling
@@ -579,12 +587,12 @@ class Process(BaseModel):
         return None
 
     def __reset_indexes(self) -> None:
-        indexes = {}
+        tid_indexes = {}
         idx = 0
         for task in self.tasks:
-            indexes[task.tid] = idx
+            tid_indexes[task.tid] = idx
             idx += 1
-        self.__indexes = indexes
+        self.tid_indexes = tid_indexes
 
 
 class Runtime(metaclass=ABCMeta):

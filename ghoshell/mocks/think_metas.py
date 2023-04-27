@@ -12,7 +12,8 @@ class ThinkMetaDriverMock(ThinkMetaDriver):
         self.__metas_order = []
 
     def fetch_local_meta(self, thinking: str, clone_id: str | None) -> Optional[ThinkMeta]:
-        return self.__metas.get(thinking, None)
+        got = self.__metas.get(thinking, None)
+        return got
 
     def iterate_think_metas(self, clone_id: str | None) -> Iterator[ThinkMeta]:
         for name in self.__metas_order:

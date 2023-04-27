@@ -44,6 +44,20 @@ class ConsoleShell(ShellKernel):
         self.app = Console()
         self.ghost = ghost
         super().__init__(shell_container, messenger)
+        self._welcome()
+
+    def _welcome(self) -> None:
+        self.app.print(Markdown("""
+----
+# Console Demo
+
+print "/exit" to quit
+
+log:
+- 2023-4-28: achieve "hello world"
+
+----
+"""))
 
     def kind(self) -> str:
         return "command_shell"
@@ -64,10 +78,6 @@ class ConsoleShell(ShellKernel):
         session = PromptSession("\n\n<<< ", )
         bindings = KeyBindings()
 
-        @bindings.add("c-p")
-        def key_post(prompt_event):
-            self.app.print(prompt_event)
-
         while True:
             try:
                 event = await session.prompt_async(multiline=False, key_bindings=bindings)
@@ -77,6 +87,9 @@ class ConsoleShell(ShellKernel):
                 exit(0)
 
     def on_event(self, prompt: str) -> Optional[Input]:
+        if prompt == "/exit":
+            self.app.print("Exit, Bye!")
+            exit(0)
         trace = dict(
             clone_id=self.session_id,
             session_id=self.session_id,

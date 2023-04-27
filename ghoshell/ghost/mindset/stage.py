@@ -44,6 +44,9 @@ class Stage(metaclass=ABCMeta):
         """
         pass
 
+    def __repr__(self):
+        return f"stage:[{self.url()}]"
+
 
 class Reaction(metaclass=ABCMeta):
     """
@@ -66,32 +69,3 @@ class Reaction(metaclass=ABCMeta):
     @abstractmethod
     def react(self, ctx: Context, this: Thought) -> Operator:
         pass
-
-#
-# class ReactionStage(Stage, metaclass=ABCMeta):
-#     """
-#     自身不会发生状态变更的特殊 Stage, 只是用来做响应.
-#     """
-#
-#     @abstractmethod
-#     def react(self, ctx: "Context", this: Thought, params: Dict | None):
-#         pass
-#
-#     def on_receive(self, ctx: "Context", this: Thought, event: Receiving) -> Operator | None:
-#         op = self.react(ctx, this, event.matched)
-#         if op is None:
-#             return ctx.mind(this).rewind()
-#         return op
-#
-#     def activate(self, ctx: "Context", this: Thought, event: Activating) -> Operator:
-#         # todo
-#         raise RuntimeException("todo")
-#
-#     def on_preempt(self, ctx: "Context", this: Thought, event: Preempting) -> Operator | None:
-#         return None
-#
-#     def on_callback(self, ctx: "Context", this: Thought, event: Callback) -> Operator | None:
-#         return None
-#
-#     def on_withdraw(self, ctx: "Context", this: Thought, event: Withdrawing) -> Operator | None:
-#         return None

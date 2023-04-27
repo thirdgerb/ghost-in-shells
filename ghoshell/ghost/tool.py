@@ -61,7 +61,7 @@ class CtxTool:
         """
         stage = cls.fetch_stage(ctx, think, stage)
         if stage is None:
-            raise MindsetNotFoundException("todo")
+            raise MindsetNotFoundException(f"force fetch think '{think}' with stage '{stage}' failed, not found")
         return stage
 
     @classmethod
@@ -327,8 +327,7 @@ class RuntimeTool:
     def force_fetch_task(cls, ctx: Context, tid: str) -> Task:
         task = cls.fetch_task(ctx, tid)
         if task is None:
-            # todo: todo
-            raise RuntimeException("todo")
+            raise RuntimeException(f"force fetch task with id {tid} failed")
         return task
 
     @classmethod
@@ -337,8 +336,7 @@ class RuntimeTool:
         process = runtime.current_process()
         task = runtime.fetch_task(process.root)
         if task is None:
-            # todo
-            raise RuntimeException("todo")
+            raise RuntimeException("fetch root task failed")
         return task
 
     @classmethod
@@ -347,8 +345,7 @@ class RuntimeTool:
         process = runtime.current_process()
         task = runtime.fetch_task(process.awaiting)
         if task is None:
-            # todo
-            raise RuntimeException("todo")
+            raise RuntimeException("fetch awaiting task failed")
         return task
 
     @classmethod
@@ -405,9 +402,7 @@ class RuntimeTool:
         tid = cls.new_task_id(ctx, url)
         return Task(
             tid=tid,
-            resolver=url.resolver,
-            stage="",
-            args=url.args.copy(),
+            url=url.dict(),
         )
 
     @classmethod

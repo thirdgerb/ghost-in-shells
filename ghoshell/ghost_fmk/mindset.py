@@ -15,6 +15,7 @@ class MindsetImpl(Mindset):
 
     def clone(self, clone_id: str) -> Mindset:
         mindset = MindsetImpl(self._think_metas_driver, clone_id)
+        mindset.register_sub_mindset(self)
         return mindset
 
     def fetch(self, thinking: str) -> Optional[Think]:
@@ -31,9 +32,9 @@ class MindsetImpl(Mindset):
 
     def _wrap_meta(self, meta: ThinkMeta) -> Think | None:
         driver = self._think_drivers.get(meta.driver, None)
-        if driver is not None:
-            return driver.from_meta(meta)
-        return None
+        if driver is None:
+            return None
+        return driver.from_meta(meta)
 
     def fetch_meta(self, thinking: str) -> Optional[ThinkMeta]:
         meta = self._think_metas_driver.fetch_local_meta(thinking, self._clone_id)

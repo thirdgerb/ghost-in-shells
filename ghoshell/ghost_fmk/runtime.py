@@ -232,7 +232,7 @@ class RuntimeImpl(Runtime):
             task.vars = None
 
         # 保存 process 的数据.
-        process_data = process.dict()
+        process_data = process.dict(exclude={"indexes", "status_list_indexes"})
         root_task = process.get_task(process.root)
         process_overdue = root_task.overdue
         if process_overdue <= 0:

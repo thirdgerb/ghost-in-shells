@@ -163,7 +163,7 @@ class ShellKernel(Shell, metaclass=ABCMeta):
         finally:
             pass
 
-    def tick(self, e: Any) -> None:
+    def tick(self, e: str) -> None:
         """
         响应一个普通事件.
         """

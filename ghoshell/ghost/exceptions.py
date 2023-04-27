@@ -57,5 +57,5 @@ class OperatorException(GhostException):
     CODE: int = 522
 
     def __init__(self, operator: str, message: str):
-        message = f"{message} at operator: {operator}"
+        message = f"{message}; at operator: {operator}"
         super().__init__(message)

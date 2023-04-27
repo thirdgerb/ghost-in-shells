@@ -37,7 +37,7 @@ class Mindset(metaclass=ABCMeta):
         """
         fetched = self.fetch(thinking)
         if fetched is None:
-            raise MindsetNotFoundException("todo message")
+            raise MindsetNotFoundException(f"mindset can not find think with name '{thinking}'")
         return fetched
 
     @abstractmethod

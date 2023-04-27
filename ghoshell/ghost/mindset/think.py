@@ -90,6 +90,7 @@ class Think(BaseModel, metaclass=ABCMeta):
         获取 stage
         """
         pass
+
     #
     # @abstractmethod
     # def intentions(self, ctx: Context) -> Optional[List["Intention"]]:
@@ -98,6 +99,9 @@ class Think(BaseModel, metaclass=ABCMeta):
     #     可以被封装成为一个 Reaction
     #     """
     #     pass
+
+    def __repr__(self):
+        return f"think:[{self.url()}]"
 
 
 class ThinkDriver(metaclass=ABCMeta):

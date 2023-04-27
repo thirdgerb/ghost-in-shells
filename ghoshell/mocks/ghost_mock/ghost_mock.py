@@ -6,6 +6,7 @@ from ghoshell.ghost_fmk.config import GhostConfig
 from ghoshell.ghost_fmk.ghost import GhostKernel, Bootstrapper
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
 from ghoshell.mocks.cache import MockCacheProvider
+from ghoshell.mocks.ghost_mock.bootstrappers import RegisterThinkDemosBootstrapper
 from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
 
 
@@ -33,6 +34,7 @@ class OperatorMock(OperationKernel):
 class MockGhost(GhostKernel):
     # 启动流程. 想用这种方式解耦掉系统文件读取等逻辑.
     bootstrapper: List[Bootstrapper] = [
+        RegisterThinkDemosBootstrapper(),
     ]
 
     def __init__(self, container: Container, root_path: str):
