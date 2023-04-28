@@ -1,9 +1,9 @@
 from ghoshell.ghost import Intention
-from ghoshell.ghost_fmk.intentions.command import CommandConfig, CommandIntention
+from ghoshell.ghost_fmk.intentions.command import Command, CommandIntention
 
 
 def test_command_intention():
-    intention = CommandConfig(name="foo").to_intention()
+    intention = Command(name="foo").to_intention()
     assert intention is not None
 
     parsed = Intention(**intention.dict())

@@ -67,5 +67,5 @@ class Reaction(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def react(self, ctx: Context, this: Thought) -> Operator:
+    def react(self, ctx: Context, this: Thought, params: Dict | None) -> Operator | None:
         pass

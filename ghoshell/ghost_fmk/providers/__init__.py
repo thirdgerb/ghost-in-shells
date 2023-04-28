@@ -9,6 +9,10 @@ from ghoshell.ghost_fmk.mindset import MindsetImpl, ThinkMetaDriver
 from ghoshell.ghost_fmk.runtime import CacheRuntimeDriver, Cache
 
 
+#
+# Ghost Framework 所依赖的 Providers 实现.
+#
+
 class CacheRuntimeDriverProvider(Provider):
     def singleton(self) -> bool:
         return True

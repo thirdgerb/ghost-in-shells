@@ -1,7 +1,5 @@
-from ghoshell.ghost_fmk.focus import FocusImpl, FocusHandler
-from ghoshell.ghost_fmk.intentions.command import CommandIntention, CommandDriver
+from ghoshell.ghost_fmk.intentions.command import CommandIntention, FocusOnCommandHandler, Command, CommandOutput
 
 __all__ = [
-    "FocusImpl", "FocusHandler",
-    "CommandIntention", "CommandDriver",
+    "Command", "CommandOutput", "CommandIntention", "FocusOnCommandHandler",
 ]

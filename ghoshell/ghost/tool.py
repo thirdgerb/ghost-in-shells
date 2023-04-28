@@ -39,19 +39,6 @@ class CtxTool:
         think = ctx.clone.mindset.force_fetch(task.url.resolver)
         return True, think.result(thought)
 
-    #
-    # @classmethod
-    # def match_stage_intention(cls, ctx: "Context", think: str, stage: str) -> Optional[Intention]:
-    #     """
-    #     尝试匹配一个 think.stage 的意图.
-    #     前提是意图存在.
-    #     """
-    #     stage = cls.force_fetch_stage(ctx, think, stage)
-    #     metas = stage.intentions(ctx)
-    #     if metas is None:
-    #         return None
-    #     return ctx.clone.intentions.match(ctx, *metas)
-
     # ---- thought 相关方法 ----#
 
     @classmethod
@@ -89,7 +76,7 @@ class CtxTool:
         for attention in attentions:
             for intention in attention.intentions:
                 # 标记索引.
-                intention.target = attention.fr
+                intention.target = attention.to
                 intention.reaction = attention.reaction
 
             grouped_intentions = cls.group_intentions(grouped_intentions, attention.intentions)
@@ -99,7 +86,7 @@ class CtxTool:
             if kind not in grouped_intentions:
                 continue
             intentions = grouped_intentions[kind]
-            matched = focus.match(ctx, kind, intentions)
+            matched = focus.match(ctx, kind, *intentions)
             if matched is not None:
                 return matched
         return None
@@ -107,7 +94,7 @@ class CtxTool:
     @classmethod
     def group_intentions(cls, grouped: GroupedIntentions, intentions: List[Intention]) -> GroupedIntentions:
         for intention in intentions:
-            kind = intention.KIND
+            kind = intention.kind
             if kind not in grouped:
                 grouped[kind] = []
             grouped[kind].append(intention)
@@ -179,7 +166,7 @@ class CtxTool:
             # awaiting 添加所有.
             result.append(*awaiting_task.attentions)
 
-        if root_task.tid != awaiting_task.tid and root_task.attentions is not None:
+        if root_task.tid and root_task.attentions is not None:
             for attention in root_task.attentions:
                 # root 非私有方法都可以添加进去, 而且是高优.
                 if attention.level != TaskLevel.LEVEL_PRIVATE:

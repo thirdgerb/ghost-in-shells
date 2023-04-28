@@ -6,7 +6,7 @@ from ghoshell.ghost import Intention
 
 
 class TextClassifier(Intention):
-    KIND = "text_classifier"
+    kind = "text_classifier"
 
     class Config(BaseModel):
         description: str = ""

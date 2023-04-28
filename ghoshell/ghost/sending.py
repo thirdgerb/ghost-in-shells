@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional
 
+from ghoshell.ghost.exceptions import RuntimeException
 from ghoshell.messages import *
 
 
@@ -25,6 +26,10 @@ class Sender(metaclass=ABCMeta):
         )
         self.output(message)
         return self
+
+    def err(self, line: str, code: int = RuntimeException.CODE) -> "Sender":
+        message = Error(errcode=code, errmsg=line)
+        return self.output(message)
 
     @abstractmethod
     def async_input(

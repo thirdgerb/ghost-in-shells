@@ -503,7 +503,7 @@ class Process(BaseModel):
         取出来一个任务的指针.
         """
         if self.tid_indexes is None or len(self.tid_indexes) == 0:
-            self.__reset_indexes()
+            self.reset_indexes()
         indexes = self.tid_indexes
         if tid not in indexes:
             return None
@@ -517,7 +517,7 @@ class Process(BaseModel):
         """
         for task in tasks:
             self._store_single_task(task)
-        self.__clear()
+        self.clear_cached_indexes()
 
     def _store_single_task(self, ptr: Task) -> None:
         """
@@ -551,13 +551,13 @@ class Process(BaseModel):
         """
         将进程重置到根任务上.
         """
-        root = self.get_task(self.root)
+        root = self.get_task(self.root).copy()
         root.restart()
         self.awaiting = self.root
         self.tasks = [root]
-        self.__clear()
+        self.clear_cached_indexes()
 
-    def __clear(self) -> None:
+    def clear_cached_indexes(self) -> None:
         self.tid_indexes = None
         self.status_list_indexes = None
 
@@ -586,7 +586,7 @@ class Process(BaseModel):
             return self.get_task(tid)
         return None
 
-    def __reset_indexes(self) -> None:
+    def reset_indexes(self) -> None:
         tid_indexes = {}
         idx = 0
         for task in self.tasks:

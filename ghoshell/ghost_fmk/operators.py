@@ -19,6 +19,9 @@ class AbsOperator(Operator, metaclass=ABCMeta):
     方便开发者建立思路, 划分边界.
     """
 
+    def __init__(self, fr: URL | None = None):
+        self.fr = fr
+
     def run(self, ctx: "Context") -> Optional["Operator"]:
         try:
             """
@@ -61,7 +64,7 @@ class AbsOperator(Operator, metaclass=ABCMeta):
         pass
 
     def __repr__(self):
-        return f"`{self.__class__.__name__}:\n{self._desc()}`"
+        return f"`{self.__class__.__name__} from {self.fr}: \n{self._desc()}`"
 
     def _desc(self) -> str:
         lines = []
@@ -143,7 +146,7 @@ class ReceiveInputOperator(AbsOperator):
             root_task = RuntimeTool.fetch_root_task(ctx)
             # 必须先激活根节点, 然后让它进入某个状态后, 开始 receive input.
             # todo: 激活的过程是否要
-            return ChainOperator([ActivateOperator(root_task.url, None, root_task.tid), ReceiveInputOperator()])
+            return ChainOperator([ActivateOperator(root_task.url, None, root_task.tid), ReceiveInputOperator(None)])
         return None
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
@@ -176,7 +179,7 @@ class ReceiveInputOperator(AbsOperator):
         return None
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
-        return UnhandledInputOperator()
+        return UnhandledInputOperator(None)
 
     @classmethod
     def _check_payload_tid(cls, ctx: Context) -> None:
@@ -197,7 +200,7 @@ class ReceiveInputOperator(AbsOperator):
         return
 
     def destroy(self) -> None:
-        return
+        del self.fr
 
     def _desc(self) -> str:
         return ""
@@ -210,6 +213,7 @@ class IntendingOperator(AbsOperator):
 
     def __init__(self, matched: Intention):
         self.matched = matched
+        super().__init__(None)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -237,7 +241,9 @@ class IntendingOperator(AbsOperator):
         reaction = reactions[reaction_name]
 
         thought = RuntimeTool.fetch_thought_by_task(ctx, task)
-        return reaction.react(ctx, thought)
+        # 这里就反映出 python 弱约束 + 强类型的痛苦了.
+        result = self.matched.dict(include={"params"})
+        return reaction.react(ctx, thought, result.get("params", None))
 
     def _match_new_thought(self, target: URL, args: Dict | None) -> Optional["Operator"]:
         if target.stage:
@@ -247,38 +253,14 @@ class IntendingOperator(AbsOperator):
         return ActivateOperator(target, None, None)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
-        return UnhandledInputOperator()
+        return UnhandledInputOperator(None)
 
     def destroy(self) -> None:
         del self.matched
+        del self.fr
 
     def _desc(self) -> str:
         return f"matched:{self.matched}"
-
-
-#
-# class RedirectOperator(AbsOperator):
-#
-#     def __init__(self, target: URL, fr: URL | None):
-#         self.target = target
-#         self.fr = fr
-#
-#     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
-#         # todo: 未来要做拦截?
-#         return None
-#
-#     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
-#         task = RuntimeTool.fetch_task_by_url(ctx, self.target, True)
-#         task.status = TaskStatus.RUNNING
-#         RuntimeTool.store_task(ctx, task)
-#         return ActivateOperator(self.target, self.fr)
-#
-#     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
-#         return None
-#
-#     def destroy(self) -> None:
-#         del self.target
-#         del self.fr
 
 
 class TaskedMessageOperator(AbsOperator):
@@ -288,6 +270,7 @@ class TaskedMessageOperator(AbsOperator):
 
     def __init__(self, tasked: Tasked):
         self.tasked = tasked
+        super().__init__(None)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -304,11 +287,11 @@ class TaskedMessageOperator(AbsOperator):
             case TaskStatus.DEAD:
                 return CancelOperator(task.tid, tasked.stage)
             case TaskStatus.WAITING:
-                return AwaitOperator(task.tid, tasked.stage, None, None)
+                return AwaitOperator(task.tid, tasked.stage, None, None, self.fr)
             case TaskStatus.FINISHED:
-                return FinishOperator(task.tid, task.url.stage)
+                return FinishOperator(task.tid, task.url.stage, self.fr)
             case _:
-                return ForwardOperator(task.tid, list(tasked.stage))
+                return ForwardOperator(task.tid, list(tasked.stage), self.fr)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         # 什么也不干.
@@ -316,6 +299,7 @@ class TaskedMessageOperator(AbsOperator):
 
     def destroy(self) -> None:
         del self.tasked
+        del self.fr
 
     def _desc(self) -> str:
         return f"tasked:{self.tasked}"
@@ -325,8 +309,8 @@ class ActivateOperator(AbsOperator):
 
     def __init__(self, to: URL, fr: URL | None, target_tid: str | None):
         self.to = to
-        self.fr = fr
         self.target_tid = target_tid
+        super().__init__(fr)
 
     def _desc(self) -> str:
         return f"to:{self.to}\nfr:{self.fr}\ntid:{self.target_tid}"
@@ -383,8 +367,9 @@ class ActivateOperator(AbsOperator):
 
 class RewindOperator(AbsOperator):
 
-    def __init__(self, repeat: bool = False):
+    def __init__(self, repeat: bool = False, fr: URL | None = None):
         self.repeat = repeat
+        super().__init__(fr)
 
     def _desc(self) -> str:
         return f"repeat:{self.repeat}"
@@ -395,7 +380,7 @@ class RewindOperator(AbsOperator):
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         ctx.runtime.rewind()
         if self.repeat:
-            return AwaitOperator(None, None, None, None)
+            return AwaitOperator(None, None, None, None, self.fr)
         return None
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
@@ -403,15 +388,24 @@ class RewindOperator(AbsOperator):
 
     def destroy(self) -> None:
         del self.repeat
+        del self.fr
 
 
 class AwaitOperator(AbsOperator):
 
-    def __init__(self, tid: str | None, stage: str | None, only: List[str] | None, exclude: List[str] | None):
+    def __init__(
+            self,
+            tid: str | None,
+            stage: str | None,
+            only: List[str] | None,
+            exclude: List[str] | None,
+            fr: URL | None = None,
+    ):
         self.tid = tid
         self.stage = stage
         self.only = only
         self.exclude = exclude
+        super().__init__(fr)
 
     def _desc(self) -> str:
         return f"tid:{self.tid}\nstage:{self.stage}\nonly:{self.only}\nexclude:{self.exclude}"
@@ -429,10 +423,6 @@ class AwaitOperator(AbsOperator):
         runtime.store_process(process)
 
         task = RuntimeTool.fetch_task(ctx, tid)
-        if task.status == TaskStatus.WAITING and (self.stage is None or task.url.stage == self.stage):
-            # 不用变更状态.
-            return None
-
         # 获取 intentions
         stage = CtxTool.force_fetch_stage(ctx, task.url.resolver, task.url.stage)
 
@@ -472,6 +462,7 @@ class AwaitOperator(AbsOperator):
         del self.exclude
         del self.stage
         del self.only
+        del self.fr
 
 
 class ForwardOperator(AbsOperator):
@@ -479,9 +470,10 @@ class ForwardOperator(AbsOperator):
     让当前任务向前运行.
     """
 
-    def __init__(self, tid: str, stages: List[str]):
+    def __init__(self, tid: str, stages: List[str], fr: URL | None = None):
         self.tid = tid
         self.stages = stages
+        super().__init__(fr)
 
     def _desc(self) -> str:
         return f"tid:{self.tid}\nstages:{self.stages}"
@@ -505,7 +497,7 @@ class ForwardOperator(AbsOperator):
             # 启动目标节点.
             return ActivateOperator(task.url.copy_with(stage=_next), task.url, task.tid)
         # 结束当前 task, 就在当前位置.
-        return FinishOperator(task.tid, task.url.stage)
+        return FinishOperator(task.tid, task.url.stage, self.fr)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -513,12 +505,14 @@ class ForwardOperator(AbsOperator):
     def destroy(self) -> None:
         del self.tid
         del self.stages
+        del self.fr
 
 
 class FinishOperator(AbsOperator):
-    def __init__(self, tid: str, stage: str):
+    def __init__(self, tid: str, stage: str, fr: URL | None = None):
         self.tid = tid
         self.stage = stage
+        super().__init__(fr)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -550,6 +544,7 @@ class FinishOperator(AbsOperator):
     def destroy(self) -> None:
         del self.tid
         del self.stage
+        del self.fr
 
 
 class UnhandledInputOperator(AbsOperator):
@@ -597,9 +592,11 @@ class WithdrawOperator(AbsOperator, metaclass=ABCMeta):
             self,
             tid: str,
             at_stage: str | None,
+            fr: URL | None = None
     ):
         self.tid = tid
         self.at_stage = at_stage
+        super().__init__(fr)
 
     def _intercept(self, ctx: Context) -> Optional[Operator]:
         # 检查流程是否被拦截
@@ -633,6 +630,7 @@ class WithdrawOperator(AbsOperator, metaclass=ABCMeta):
 
     def destroy(self) -> None:
         del self.tid
+        del self.fr
 
 
 class CancelOperator(WithdrawOperator):
@@ -684,7 +682,7 @@ class ScheduleOperator(AbsOperator):
                 return QuitOperator(tid, None)
             match fallback.status:
                 case TaskStatus.RUNNING:
-                    return ForwardOperator(tid, [])
+                    return ForwardOperator(tid, [], self.fr)
                 case _:
                     return self._preempt(ctx, tid)
 
@@ -738,13 +736,14 @@ class ResetOperator(AbsOperator):
         return None
 
     def destroy(self) -> None:
-        return
+        del self.fr
 
 
 class OpRestart(AbsOperator):
 
-    def __init__(self, tid: str):
+    def __init__(self, tid: str, fr: URL | None = None):
         self.tid = tid
+        super().__init__(fr)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -760,14 +759,16 @@ class OpRestart(AbsOperator):
 
     def destroy(self) -> None:
         del self.tid
+        del self.fr
 
 
 class DependOnOperator(AbsOperator):
 
-    def __init__(self, tid: str, stage: str, target: URL):
+    def __init__(self, tid: str, stage: str, target: URL, fr: URL):
         self.stage = stage
         self.tid = tid
         self.target = target
+        super().__init__(fr)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         """
@@ -801,12 +802,14 @@ class DependOnOperator(AbsOperator):
         del self.tid
         del self.stage
         del self.target
+        del self.fr
 
 
 class RestartOperator(AbsOperator):
 
-    def __init__(self, tid: str):
+    def __init__(self, tid: str, fr: URL | None = None):
         self.tid = tid
+        super().__init__(fr)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -823,14 +826,16 @@ class RestartOperator(AbsOperator):
 
     def destroy(self) -> None:
         del self.tid
+        del self.fr
 
 
 class YieldToOperator(AbsOperator):
 
-    def __init__(self, tid: str, stage: str, is_callback: bool):
+    def __init__(self, tid: str, stage: str, is_callback: bool, fr: URL | None = None):
         self.tid = tid
         self.stage = stage
         self.is_callback = is_callback
+        super().__init__(fr)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
         return None
@@ -843,7 +848,7 @@ class YieldToOperator(AbsOperator):
             parent_id = ctx.runtime.current_process().parent_id
             # 无法回调, 当成同步请求运行.
             if parent_id is None:
-                return ForwardOperator(task.tid, [self.stage])
+                return ForwardOperator(task.tid, [self.stage], self.fr)
 
             # 发送异步消息.
             thought = RuntimeTool.fetch_thought_by_task(ctx, task)
@@ -865,3 +870,4 @@ class YieldToOperator(AbsOperator):
         del self.tid
         del self.stage
         del self.is_callback
+        del self.fr

@@ -9,41 +9,41 @@ class MindImpl(Mind):
         self.url = url
 
     def forward(self, *stages: str) -> "Operator":
-        return ForwardOperator(self.tid, list(stages))
+        return ForwardOperator(self.tid, list(stages), self.url)
 
     def redirect(self, to: "URL") -> "Operator":
         return ActivateOperator(to, self.url, None)
 
     def yield_to(self, stage: str, callback: bool = False) -> "Operator":
-        return YieldToOperator(self.tid, stage, callback)
+        return YieldToOperator(self.tid, stage, callback, self.url)
 
     def awaits(self, only: List[str] | None = None, exclude: List[str] | None = None) -> "Operator":
-        return AwaitOperator(self.tid, self.url.stage, only, exclude)
+        return AwaitOperator(self.tid, self.url.stage, only, exclude, self.url)
 
     def depend_on(self, target: "URL") -> "Operator":
-        return DependOnOperator(self.tid, self.url.stage, target)
+        return DependOnOperator(self.tid, self.url.stage, target, self.url)
 
     def repeat(self) -> "Operator":
         # 不变更状态.
-        return AwaitOperator(self.tid, None, None, None)
+        return AwaitOperator(self.tid, None, None, None, self.url)
 
     def restart(self) -> "Operator":
-        return RestartOperator(self.tid)
+        return RestartOperator(self.tid, self.url)
 
     def rewind(self, repeat: bool = False) -> "Operator":
-        return RewindOperator(repeat=repeat)
+        return RewindOperator(repeat=repeat, fr=self.url)
 
     def reset(self) -> "Operator":
-        return ResetOperator()
+        return ResetOperator(self.url)
 
     def quit(self) -> "Operator":
-        return QuitOperator(self.tid, self.url.stage)
+        return QuitOperator(self.tid, self.url.stage, self.url)
 
     def cancel(self) -> "Operator":
-        return CancelOperator(self.tid, self.url.stage)
+        return CancelOperator(self.tid, self.url.stage, self.url)
 
     def fail(self) -> "Operator":
-        return FailOperator(self.tid, self.url.stage)
+        return FailOperator(self.tid, self.url.stage, self.url)
 
     def destroy(self) -> None:
         del self.tid

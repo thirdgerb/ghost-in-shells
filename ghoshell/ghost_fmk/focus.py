@@ -1,26 +1,6 @@
-from abc import ABCMeta, abstractmethod
 from typing import Optional, List, Dict
 
-from ghoshell.ghost import Focus, Context, Intention
-
-
-class FocusHandler(metaclass=ABCMeta):
-
-    @abstractmethod
-    def kind(self) -> str:
-        pass
-
-    @abstractmethod
-    def match(self, ctx: Context, *metas: Intention) -> Optional[Intention]:
-        pass
-
-    @abstractmethod
-    def register_global_intentions(self, *intentions: Intention) -> None:
-        pass
-
-    @abstractmethod
-    def wildcard_match(self, ctx: Context) -> Optional[Intention]:
-        pass
+from ghoshell.ghost import Focus, FocusDriver, Context, Intention
 
 
 class FocusImpl(Focus):
@@ -28,8 +8,8 @@ class FocusImpl(Focus):
     一个最简单的实现.
     """
 
-    def __init__(self, *drivers: FocusHandler):
-        self.driver_map: Dict[str, FocusHandler] = {}
+    def __init__(self, *drivers: FocusDriver):
+        self.driver_map: Dict[str, FocusDriver] = {}
         # 保证有序.
         self.driver_kinds: List[str] = []
         for driver in drivers:
@@ -41,7 +21,7 @@ class FocusImpl(Focus):
     def kinds(self) -> List[str]:
         return self.driver_kinds.copy()
 
-    def register(self, driver: FocusHandler) -> None:
+    def register(self, driver: FocusDriver) -> None:
         kind = driver.kind()
         if kind not in self.driver_map:
             self.driver_kinds.append(kind)
@@ -57,7 +37,7 @@ class FocusImpl(Focus):
             return None
         arr = []
         for meta in metas:
-            if meta.KIND != kind:
+            if meta.kind != kind:
                 continue
             arr.append(meta)
         if len(arr) == 0:
@@ -67,7 +47,7 @@ class FocusImpl(Focus):
     def register_global_intentions(self, *metas: Intention) -> None:
         meta_group = {}
         for meta in metas:
-            kind = meta.KIND
+            kind = meta.kind
             if kind not in meta_group:
                 meta_group[kind] = []
             meta_group[kind].append(meta)

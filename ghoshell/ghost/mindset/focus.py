@@ -23,7 +23,7 @@ class Intention(BaseModel):
 
     每一种预测的意图, 都应该通过不同的解析机制来解决.
     """
-    KIND: str
+    kind: str
     config: Dict
     # 私有意图只有在当前任务中能被识别和匹配.
     params: Dict | None = None
@@ -34,7 +34,7 @@ class Intention(BaseModel):
 
 
 class Attention(BaseModel):
-    fr: URL
+    to: URL
     intentions: List[Intention]
     reaction: str
     level: int = 0

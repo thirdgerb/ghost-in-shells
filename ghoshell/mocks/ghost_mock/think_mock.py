@@ -2,6 +2,7 @@ from typing import Optional, List, Dict, Any, ClassVar
 
 from ghoshell.ghost import *
 from ghoshell.ghost.mindset.stage import Reaction
+from ghoshell.ghost_fmk.reactions.commands import HelloWorldCmdReaction
 from ghoshell.ghost_fmk.stages import AwaitStage
 from ghoshell.messages import *
 
@@ -54,7 +55,9 @@ class HelloWorldStage(AwaitStage):
         return None
 
     def reactions(self) -> Dict[str, Reaction]:
-        return {}
+        return {
+            "helloworld": HelloWorldCmdReaction(),
+        }
 
     def on_received(self, ctx: "Context", this: Thought) -> Operator | None:
         text = ctx.read(Text)

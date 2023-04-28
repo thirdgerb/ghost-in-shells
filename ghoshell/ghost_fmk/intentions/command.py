@@ -5,11 +5,10 @@ from typing import Dict, List, Any, Optional
 
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost import Intention, Context
-from ghoshell.ghost_fmk.focus import FocusHandler
+from ghoshell.ghost import Intention, Context, RuntimeException, FocusDriver
 from ghoshell.messages import Text
 
-COMMAND_INTENTION = "command_line"
+CommandIntentionKind = "command_line"
 
 
 class Argument(BaseModel):
@@ -30,36 +29,43 @@ class Argument(BaseModel):
         return True
 
 
-class CommandConfig(BaseModel):
+class Command(BaseModel):
     """
     命令行的配置.
     """
     name: str = ""
-    description: str = ""
+    desc: str = ""
+    arg: Optional[Argument] = Field(default_factory=lambda: None)
+    opts: List[Argument] = Field(default_factory=lambda: [])
     epilog: str = ""
-    argument: Optional[Argument] = Field(default_factory=lambda: None)
-    options: List[Argument] = Field(default_factory=lambda: [])
 
-    def to_intention(self) -> Intention:
-        return Intention(KIND=COMMAND_INTENTION, config=self.dict())
+    def to_intention(self) -> CommandIntention:
+        return CommandIntention(kind=CommandIntentionKind, config=self.dict())
 
 
 class CommandOutput(BaseModel):
+    """
+    命令行输出的封装.
+    """
     error: bool
     message: str = ""
-    params: Dict = {}
+    params: Dict[str, str] = {}
 
 
 class CommandIntention(Intention):
     """
     用来解析命令行的意图
+    用 Command.to_intention 来生成.
     """
-    KIND = COMMAND_INTENTION
-    config: CommandConfig
+    kind: str = CommandIntentionKind
+    config: Command
     params: CommandOutput | None = None
 
 
 class _ArgumentParserWrapper(ArgumentParser):
+    """
+    对 argparse 库的兼容.
+    """
     error_occur: bool = False
     message: str = ""
 
@@ -80,14 +86,14 @@ class _ExitedException(Exception):
     pass
 
 
-class CommandDriver(FocusHandler):
+class FocusOnCommandHandler(FocusDriver):
 
     def __init__(self, prefix: str):
         self.prefix = prefix[0]
         self.global_commands: Dict[str, CommandIntention] = {}
 
     def kind(self) -> str:
-        return CommandIntention.KIND
+        return CommandIntentionKind
 
     def match(self, ctx: Context, *metas: Intention) -> Optional[Intention]:
         text = ctx.read(Text)
@@ -99,6 +105,10 @@ class CommandDriver(FocusHandler):
         for meta in metas:
             if isinstance(meta, CommandIntention):
                 command_lines.append(meta)
+            else:
+                # 二次包装.
+                line = CommandIntention(**meta.dict())
+                command_lines.append(line)
         return self.match_raw_text(text.content, *command_lines)
 
     def match_raw_text(self, text: str, *metas: CommandIntention) -> Optional[CommandIntention]:
@@ -111,54 +121,49 @@ class CommandDriver(FocusHandler):
             if isinstance(meta, CommandIntention):
                 commands[meta.config.name] = meta
 
-        line = text[1:]
-        seps = line.split(' ', 2)
-        name = seps[0]
-        if name not in commands:
+        command_line = text[len(self.prefix):]
+        seps = command_line.split(' ', 2)
+        command_name = seps[0]
+        if command_name not in commands:
             return None
-        matched_meta = commands[name]
+        matched_meta = commands[command_name]
         arguments = "" if len(seps) < 2 else seps[1].strip()
         result = self._parse_command(matched_meta, arguments)
         if result is None:
             return None
         matched = CommandIntention(**matched_meta.dict())
-        matched.result = result
+        matched.params = result
         return matched
 
     def _parse_command(self, command: CommandIntention, arguments: str) -> CommandOutput | None:
         # todo
         config = command.config
         parser = _ArgumentParserWrapper(
-            description=config.description,
+            description=config.desc,
             epilog=config.epilog,
             add_help=True,
             exit_on_error=True,
         )
 
-        if config.argument is not None:
-            argument = config.argument
+        if config.arg is not None:
+            argument = config.arg
             fn_args = self.parse_argument_args(argument, False)
             fn_kwargs = self.parse_argument_kwargs(argument)
             parser.add_argument(*fn_args, **fn_kwargs)
-        for option in config.options:
+        for option in config.opts:
             fn_args = self.parse_argument_args(option, True)
             fn_kwargs = self.parse_argument_kwargs(option)
             parser.add_argument(*fn_args, **fn_kwargs)
 
-        # parser.add_argument(
-        #     '-h', '--help',
-        #     action=_HelperAction,
-        #     default=SUPPRESS,
-        #     help='show this help message',
-        # )
-
         args = [i for i in filter(lambda i: i, arguments.split(' '))]
-        params = {}
         try:
             namespace, _ = parser.parse_known_args(args)
             params = namespace.__dict__
         except _ExitedException as e:
-            pass
+            """
+            发生了 argparse 认为的 退出错误. 
+            """
+            raise RuntimeException(str(e))
 
         result = CommandOutput(
             error=parser.error_occur,
