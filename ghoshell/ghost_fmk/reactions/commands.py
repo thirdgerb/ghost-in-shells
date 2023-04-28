@@ -44,6 +44,33 @@ class CommandReaction(Reaction, metaclass=ABCMeta):
         pass
 
 
+class ThoughtCmdReaction(CommandReaction):
+    def __init__(self):
+        cmd = Command(
+            name="thought",
+            desc="check out current thought",
+        )
+        super().__init__(cmd, TaskLevel.LEVEL_PUBLIC)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        ctx.send_at(this).json(this.dict())
+        return ctx.mind(this).rewind()
+
+
+class ProcessCmdReaction(CommandReaction):
+    def __init__(self):
+        cmd = Command(
+            name="process",
+            desc="check out current process",
+        )
+        super().__init__(cmd, TaskLevel.LEVEL_PUBLIC)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        process_data = ctx.runtime.current_process().dict()
+        ctx.send_at(this).json(process_data)
+        return ctx.mind(this).rewind()
+
+
 class HelloWorldCmdReaction(CommandReaction):
     """
     test only reaction

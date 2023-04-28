@@ -1,5 +1,6 @@
+import json
 from abc import ABCMeta, abstractmethod
-from typing import Optional
+from typing import Optional, Any
 
 from ghoshell.ghost.exceptions import RuntimeException
 from ghoshell.messages import *
@@ -26,6 +27,10 @@ class Sender(metaclass=ABCMeta):
         )
         self.output(message)
         return self
+
+    def json(self, value: Any, indent: int = 2) -> "Sender":
+        string = json.dumps(value, indent=indent)
+        return self.text(f"```json\n{string}\n```", markdown=True)
 
     def err(self, line: str, code: int = RuntimeException.CODE) -> "Sender":
         message = Error(errcode=code, errmsg=line)

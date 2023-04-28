@@ -22,12 +22,19 @@ class Thought(metaclass=ABCMeta):
     tid: str = ""
     url: URL | None = None
 
+    # 当前任务的过期时间. 如果
+    # overdue == 0, 表示跟随进程走, 随时可回收.
+    # overdue < 0, 表示任务是不过期的长程记忆.
+    # overdue > 0, 表示任务在 overdue 秒后过期.
     overdue: int = 0
 
+    # 当前任务的优先级, 影响到排序, 修改影响 task
     priority: float = 0
 
+    # 当前任务的开放度, 修改影响 task
     level: int = TaskLevel.LEVEL_PUBLIC
 
+    # 当前任务的状态. 传入值, 修改没有意义.
     status: int = TaskStatus.RUNNING
 
     def __init__(
@@ -57,6 +64,16 @@ class Thought(metaclass=ABCMeta):
         返回当前上下文中的变量.
         """
         pass
+
+    def dict(self):
+        return dict(
+            url=self.url.dict(),
+            tid=self.tid,
+            level=self.level,
+            status=self.status,
+            priority=self.priority,
+            vars=self.vars(),
+        )
 
     def destroy(self) -> None:
         del self.url

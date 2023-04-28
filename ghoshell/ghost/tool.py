@@ -170,7 +170,7 @@ class CtxTool:
             for attention in root_task.attentions:
                 # root 非私有方法都可以添加进去, 而且是高优.
                 if attention.level != TaskLevel.LEVEL_PRIVATE:
-                    result.append(*root_task.attentions)
+                    result.append(attention)
 
         # 封闭域任务, 不再继续增加注意目标.
         if awaiting_task_level == TaskLevel.LEVEL_PRIVATE:
