@@ -2,7 +2,7 @@ import json
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Any
 
-from ghoshell.ghost.exceptions import RuntimeException
+from ghoshell.ghost.exceptions import ErrMessageException
 from ghoshell.messages import *
 
 
@@ -32,7 +32,7 @@ class Sender(metaclass=ABCMeta):
         string = json.dumps(value, indent=indent)
         return self.text(f"```json\n{string}\n```", markdown=True)
 
-    def err(self, line: str, code: int = RuntimeException.CODE) -> "Sender":
+    def err(self, line: str, code: int = ErrMessageException.CODE) -> "Sender":
         message = Error(errcode=code, errmsg=line)
         return self.output(message)
 

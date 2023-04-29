@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from argparse import ArgumentParser
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, ClassVar
 
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost import Intention, Context, RuntimeException, FocusDriver
+from ghoshell.ghost import ErrMessageException
+from ghoshell.ghost import Intention, Context, FocusDriver
 from ghoshell.messages import Text
 
 CommandIntentionKind = "command_line"
@@ -79,21 +80,28 @@ class _ArgumentParserWrapper(ArgumentParser):
     def exit(self, status=0, message=None):
         if message:
             self.message = message
-        raise _ExitedException(message)
-
-
-class _ExitedException(Exception):
-    pass
+        pass
 
 
 class FocusOnCommandHandler(FocusDriver):
+    prefix: ClassVar[str] = "/"
 
-    def __init__(self, prefix: str):
-        self.prefix = prefix[0]
+    def __init__(self):
         self.global_commands: Dict[str, CommandIntention] = {}
 
     def kind(self) -> str:
         return CommandIntentionKind
+
+    @classmethod
+    def format_help_commands(cls, commands: List[Command]) -> str:
+        head = f"""
+current commands. use -h option on command to see details:
+
+"""
+        body_lines = [head]
+        for cmd in commands:
+            body_lines.append(f"- {cls.prefix}{cmd.name}: {cmd.desc}")
+        return "\n".join(body_lines)
 
     def match(self, ctx: Context, *metas: Intention) -> Optional[Intention]:
         text = ctx.read(Text)
@@ -112,6 +120,9 @@ class FocusOnCommandHandler(FocusDriver):
         return self.match_raw_text(text.content, *command_lines)
 
     def match_raw_text(self, text: str, *metas: CommandIntention) -> Optional[CommandIntention]:
+        """
+        匹配单个命令.
+        """
         prefix = text[0]
         if prefix != self.prefix:
             return None
@@ -119,6 +130,10 @@ class FocusOnCommandHandler(FocusDriver):
         commands = {}
         for meta in metas:
             if isinstance(meta, CommandIntention):
+                name = meta.config.name
+                if name in commands:
+                    # 顺序优先, 避免覆盖.
+                    continue
                 commands[meta.config.name] = meta
 
         command_line = text[len(self.prefix):]
@@ -142,8 +157,9 @@ class FocusOnCommandHandler(FocusDriver):
             description=config.desc,
             epilog=config.epilog,
             add_help=True,
-            exit_on_error=True,
+            exit_on_error=False,
         )
+        parser.prog = command.config.name
 
         if config.arg is not None:
             argument = config.arg
@@ -156,20 +172,17 @@ class FocusOnCommandHandler(FocusDriver):
             parser.add_argument(*fn_args, **fn_kwargs)
 
         args = [i for i in filter(lambda i: i, arguments.split(' '))]
-        try:
-            namespace, _ = parser.parse_known_args(args)
-            params = namespace.__dict__
-        except _ExitedException as e:
-            """
-            发生了 argparse 认为的 退出错误. 
-            """
-            raise RuntimeException(str(e))
+        namespace, _ = parser.parse_known_args(args)
+        params = namespace.__dict__
 
         result = CommandOutput(
             error=parser.error_occur,
             message=parser.message,
             params=params,
         )
+        if result.error:
+            raise ErrMessageException(result.message)
+
         return result
 
     @classmethod

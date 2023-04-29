@@ -92,6 +92,25 @@ class CtxTool:
         return None
 
     @classmethod
+    def context_intentions(
+            cls,
+            ctx: "Context",
+    ) -> GroupedIntentions:
+        """
+        从上下文的 attentions 中解析出 intentions
+        """
+        attentions = cls.context_attentions(ctx)
+        grouped_intentions: GroupedIntentions = {}
+        for attention in attentions:
+            for intention in attention.intentions:
+                # 标记索引.
+                intention.target = attention.to
+                intention.reaction = attention.reaction
+
+            grouped_intentions = cls.group_intentions(grouped_intentions, attention.intentions)
+        return grouped_intentions
+
+    @classmethod
     def group_intentions(cls, grouped: GroupedIntentions, intentions: List[Intention]) -> GroupedIntentions:
         for intention in intentions:
             kind = intention.kind

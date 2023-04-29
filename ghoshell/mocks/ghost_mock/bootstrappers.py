@@ -24,5 +24,7 @@ class RegisterFocusDriverBootstrapper(Bootstrapper):
         focus = ghost.focus
 
         # register command driver
-        command_driver = FocusOnCommandHandler("/")
+        command_driver = FocusOnCommandHandler()
+        ghost.container.set(FocusOnCommandHandler, command_driver)
+        # 注册一个单例.
         focus.register(command_driver)

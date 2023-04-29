@@ -48,6 +48,7 @@ class ContextImpl(Context):
     def clone(self) -> Clone:
         return self._clone
 
+    @property
     def container(self) -> "Container":
         return self._container
 

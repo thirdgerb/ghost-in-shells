@@ -58,6 +58,7 @@ class HelloWorldStage(AwaitStage):
             "/helloworld": HelloWorldCmdReaction(),
             "/thought": ThoughtCmdReaction(),
             "/process": ProcessCmdReaction(),
+            "/help": HelpCmdReaction(),
         }
 
     def on_received(self, ctx: "Context", this: Thought) -> Operator | None:

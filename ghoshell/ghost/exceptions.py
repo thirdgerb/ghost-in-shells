@@ -53,6 +53,13 @@ class BusyException(GhostException):
     CODE: int = 409
 
 
+class ErrMessageException(GhostException):
+    """
+    用来传递信息的 err
+    """
+    CODE: int = 403
+
+
 class OperatorException(GhostException):
     CODE: int = 522
 

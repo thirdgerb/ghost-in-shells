@@ -1,8 +1,9 @@
 from abc import ABCMeta, abstractmethod
 from typing import List, Dict, Type
 
-from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel
-from ghoshell.ghost_fmk.intentions import Command, CommandOutput, CommandIntention
+from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel, CtxTool
+from ghoshell.ghost_fmk.intentions import Command, CommandOutput, CommandIntention, CommandIntentionKind
+from ghoshell.ghost_fmk.intentions import FocusOnCommandHandler
 
 """
 默认的命令行 reactions.
@@ -33,6 +34,12 @@ class CommandReaction(Reaction, metaclass=ABCMeta):
             return ctx.mind(this).rewind()
         wrapper = self.wrapper()
         output = wrapper(**params)
+        if output.message:
+            if output.error:
+                ctx.send_at(this).err(output.message)
+            else:
+                ctx.send_at(this).text(output.message)
+            return ctx.mind(this).rewind()
         return self.on_output(ctx, this, output)
 
     @classmethod
@@ -68,6 +75,33 @@ class ProcessCmdReaction(CommandReaction):
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
         process_data = ctx.runtime.current_process().dict()
         ctx.send_at(this).json(process_data)
+        return ctx.mind(this).rewind()
+
+
+class HelpCmdReaction(CommandReaction):
+
+    def __init__(self):
+        cmd = Command(
+            name="help",
+            desc="check out all available commands",
+        )
+        super().__init__(cmd, TaskLevel.LEVEL_PUBLIC)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        handler = ctx.container.get(FocusOnCommandHandler)
+        if handler is None:
+            ctx.send_at(this).text("unknown command")
+            return ctx.mind(this).rewind()
+
+        grouped_intentions = CtxTool.context_intentions(ctx)
+        command_intentions = grouped_intentions.get(CommandIntentionKind, [])
+        commands: List[Command] = []
+        for intention in command_intentions:
+            cmd = CommandIntention(**intention.dict())
+            commands.append(cmd.config)
+        # 进行解析.
+        format_line = handler.format_help_commands(commands)
+        ctx.send_at(this).text(format_line, markdown=True)
         return ctx.mind(this).rewind()
 
 

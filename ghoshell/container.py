@@ -15,6 +15,9 @@ class Container:
     """
 
     def __init__(self, parent: Container | None = None):
+        if parent is not None:
+            if not isinstance(parent, Container):
+                raise AttributeError("container can only initialized with parent Container")
         self.__instances: Dict[Type[Contract], Contract] = {}
         self.__parent = parent
         self.__providers: Dict[Type[Contract], Provider] = {}

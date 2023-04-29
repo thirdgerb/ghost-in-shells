@@ -38,6 +38,7 @@ __all__ = [
     "TaskLevel", "TaskStatus",
     # exceptions
     "StackoverflowException", "UnhandledException", "RuntimeException", "MindsetNotFoundException",
+    "ErrMessageException",
     # events
     "Event",
     "OnActivating",
