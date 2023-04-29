@@ -37,7 +37,7 @@ class CtxTool:
             return False, None
         thought = RuntimeTool.fetch_thought_by_task(ctx, task)
         think = ctx.clone.mindset.force_fetch(task.url.resolver)
-        return True, think.result(thought)
+        return True, think.result(ctx, thought)
 
     # ---- thought 相关方法 ----#
 
@@ -398,7 +398,7 @@ class RuntimeTool:
         thought = cls.new_thought(ctx, url)
         thought = cls.merge_task_to_thought(task, thought)
         think = ctx.clone.mindset.force_fetch(url.resolver)
-        return think.result(thought)
+        return think.result(ctx, thought)
 
     @classmethod
     def new_task(cls, ctx: Context, url: URL) -> Task:
@@ -424,6 +424,10 @@ class RuntimeTool:
     def store_task(cls, ctx: Context, *tasks: Task) -> None:
         if len(tasks) > 0:
             ctx.runtime.store_task(*tasks)
+
+    @classmethod
+    def store_process(cls, ctx: Context, process: Process) -> None:
+        ctx.runtime.store_process(process)
 
     @classmethod
     def set_quiting(cls, ctx: Context, quiting: bool) -> None:

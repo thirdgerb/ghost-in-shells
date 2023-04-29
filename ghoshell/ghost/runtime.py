@@ -557,6 +557,10 @@ class Process(BaseModel):
         self.tasks = [root]
         self.clear_cached_indexes()
 
+    def reset_tasks(self, tasks: List[Task]) -> None:
+        self.tasks = tasks
+        self.reset_indexes()
+
     def clear_cached_indexes(self) -> None:
         self.tid_indexes = None
         self.status_list_indexes = None

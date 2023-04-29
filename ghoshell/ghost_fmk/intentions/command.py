@@ -18,7 +18,7 @@ class Argument(BaseModel):
     由于 pydantic 问题, 必须按顺序定义.
     """
     name: str
-    description: str = ""
+    desc: str = ""
     short: str = ""
     default: Any = None
     nargs: int | str | None = None
@@ -50,7 +50,7 @@ class CommandOutput(BaseModel):
     """
     error: bool
     message: str = ""
-    params: Dict[str, str] = {}
+    params: Dict[str, Any] = {}
 
 
 class CommandIntention(Intention):

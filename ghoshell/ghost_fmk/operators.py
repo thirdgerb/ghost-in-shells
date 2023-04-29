@@ -4,7 +4,6 @@ from typing import Optional, List, ClassVar, Type, Dict
 from ghoshell.ghost import Attention, Intention
 from ghoshell.ghost import Context, URL
 from ghoshell.ghost import CtxTool
-from ghoshell.ghost import GhostException
 from ghoshell.ghost import OnReceived, OnActivating, OnPreempted, OnCallback
 from ghoshell.ghost import OnWithdrawing, OnCanceling, OnFailing, OnQuiting
 from ghoshell.ghost import Operator
@@ -23,24 +22,23 @@ class AbsOperator(Operator, metaclass=ABCMeta):
         self.fr = fr
 
     def run(self, ctx: "Context") -> Optional["Operator"]:
-        try:
-            """
-            用一个标准流程来约定 Operator 的开发方式.
-            """
-            # 先看是否有拦截发生, 如果发生了拦截, 则 operator 不会真正执行.
-            interceptor = self._intercept(ctx)
-            if interceptor is not None:
-                return interceptor
-            # 运行 operator 的事件.
-            result_op = self._run_operation(ctx)
-            if result_op is not None:
-                return result_op
-            # 如果运行事件没结果, 就往后走.
-            return self._fallback(ctx)
-        except GhostException as e:
-            raise e
-        except Exception as e:
-            raise
+        """
+        用一个标准流程来约定 Operator 的开发方式.
+        """
+        # 先看是否有拦截发生, 如果发生了拦截, 则 operator 不会真正执行.
+        interceptor = self._intercept(ctx)
+        if interceptor is not None:
+            return interceptor
+        # 运行 operator 的事件.
+        result_op = self._run_operation(ctx)
+        if result_op is not None:
+            return result_op
+        # 如果运行事件没结果, 就往后走.
+        return self._fallback(ctx)
+        # except GhostException as e:
+        #     raise e
+        # except Exception as e:
+        #     raise
 
     @abstractmethod
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
@@ -450,6 +448,8 @@ class AwaitOperator(AbsOperator):
             )
             attentions.append(attention)
         task.await_at(self.stage, attentions)
+        # 变更 process 的 awaiting
+        process.awaiting = task.tid
         RuntimeTool.store_task(ctx, task)
         # 任务结束.
         return None
@@ -559,13 +559,14 @@ class UnhandledInputOperator(AbsOperator):
         if after is not None:
             return after
         # 让 root 级别的对话任务来做兜底.
-        root_task = RuntimeTool.fetch_root_task(ctx)
-        if root_task.tid == awaiting_task.tid:
-            return None
-
-        after = self._fallback_to_task(ctx, root_task)
-        if after is not None:
-            return after
+        # 不再 fallback 到 root 上.
+        # root_task = RuntimeTool.fetch_root_task(ctx)
+        # if root_task.tid == awaiting_task.tid:
+        #     return None
+        #
+        # after = self._fallback_to_task(ctx, root_task)
+        # if after is not None:
+        #     return after
         return None
 
     @classmethod

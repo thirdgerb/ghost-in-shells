@@ -33,7 +33,7 @@ class HelloWorldThink(Think, ThinkDriver):
     def new_thought(self, ctx: "Context", args: Dict) -> Thought:
         return DictThought(args.copy())
 
-    def result(self, this: Thought) -> Optional[Dict]:
+    def result(self, ctx: "Context", this: Thought) -> Optional[Dict]:
         return None
 
     def all_stages(self) -> List[str]:
@@ -59,27 +59,28 @@ class HelloWorldStage(AwaitStage):
             "/thought": ThoughtCmdReaction(),
             "/process": ProcessCmdReaction(),
             "/help": HelpCmdReaction(),
+            "/redirect": RedirectCmdReaction(),
         }
 
-    def on_received(self, ctx: "Context", this: Thought) -> Operator | None:
+    def on_received(self, ctx: "Context", this: Thought, _) -> Operator | None:
         text = ctx.read(Text)
         if text is not None:
             ctx.send_at(this).text(f"you said: {text}")
         ctx.send_at(this).text("I can only speak hello world! everyone!")
         return None
 
-    def on_activating(self, ctx: "Context", this: Thought) -> Operator | None:
+    def on_activating(self, ctx: "Context", this: Thought, _) -> Operator | None:
         ctx.send_at(this).text("hello world!")
         return ctx.mind(this).awaits()
 
-    def on_quiting(self, ctx: "Context", this: Thought) -> Operator | None:
+    def on_quiting(self, ctx: "Context", this: Thought, _) -> Operator | None:
         ctx.send_at(this).text("I'm quiting")
         return None
 
-    def on_canceling(self, ctx: "Context", this: Thought) -> Operator | None:
+    def on_canceling(self, ctx: "Context", this: Thought, _) -> Operator | None:
         ctx.send_at(this).text("I'm canceling!")
         return None
 
-    def on_preempt(self, ctx: "Context", this: Thought) -> Operator | None:
+    def on_preempt(self, ctx: "Context", this: Thought, _) -> Operator | None:
         ctx.send_at(this).text("preempted!")
         return None

@@ -90,6 +90,7 @@ log:
         if prompt == "/exit":
             self.app.print("Exit, Bye!")
             exit(0)
+        prompt = prompt.strip()
         trace = dict(
             clone_id=self.session_id,
             session_id=self.session_id,
@@ -114,7 +115,12 @@ log:
 
         err = Error.read(_output.payload)
         if err is not None:
-            self.app.print(self._markdown_output(f"# Error Occur {err.errcode} \n\n\n{err.errmsg}"))
+            where = ""
+            if err.at:
+                where = f"at {err.at}"
+            err_info = self._markdown_output(
+                f"# Error Occur {err.errcode}\n\n{err.errmsg} {where}\n\n{err.stack_info}")
+            self.app.print(err_info)
 
     def _markdown_output(self, text: str) -> Markdown:
         lines = text.split("\n\n")

@@ -1,3 +1,5 @@
+import sys
+import traceback
 import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Callable, List
@@ -169,8 +171,12 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         finally:
             ctx.finish()
 
-    def _failure_message(self, _input: Input, err: GhostException) -> Output:
-        msg = Error.wrap(err.CODE, err, self._config.exception_traceback_limit)
+    @classmethod
+    def _failure_message(cls, _input: Input, err: GhostException) -> Output:
+        stack_info = err.stack_info
+        if not stack_info:
+            stack_info = "\n".join(traceback.format_exception(*sys.exc_info(), limit=5))
+        msg = Error(errcode=err.CODE, errmsg=str(err), at=err.at, stack_info=stack_info)
         _output = Output.new(uuid.uuid4().hex, _input)
         msg.join(_output.payload)
         return _output

@@ -23,7 +23,7 @@ class ThinkMeta(BaseModel):
     config: Dict = Field(lambda: {})
 
 
-class Think(BaseModel, metaclass=ABCMeta):
+class Think(metaclass=ABCMeta):
     """
     ghost 拥有的思维模块
     """
@@ -67,7 +67,7 @@ class Think(BaseModel, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def result(self, this: Thought) -> Optional[Dict]:
+    def result(self, ctx: Context, this: Thought) -> Optional[Dict]:
         """
         当 Think 进入 finished 状态, 可以通过 result 方法返回一个结果.
         这个结果会被依赖当前 Think 的任务拿到

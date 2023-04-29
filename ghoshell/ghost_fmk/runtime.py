@@ -209,7 +209,7 @@ class RuntimeImpl(Runtime):
             else:
                 # 正常的节点.
                 alive.append(ptr)
-        process.reset()
+        process.reset_tasks(alive)
         # 重置 process.
         process.store_task(*reversed(alive))
         return gc

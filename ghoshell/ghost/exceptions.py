@@ -1,3 +1,7 @@
+import sys
+import traceback
+
+
 class GhostException(Exception):
     """
     ghoshell 为 ghost 定义的 exception
@@ -12,9 +16,18 @@ class GhostException(Exception):
 
     CODE: int = 500
 
-    def __init__(self, message):
+    def __init__(self, message: str, at: str = "", e: Exception = None):
         self.message: str = message
+        self.at = at
+        self.stack_info = ""
+        if e is not None:
+            stack_info = "\n".join(traceback.format_exception(e))
+            self.stack_info = stack_info
         super().__init__(message)
+
+    @classmethod
+    def get_stack_info(cls) -> str:
+        return "\n".join(traceback.format_exception(*sys.exc_info(), limit=3))
 
 
 class StackoverflowException(GhostException):
@@ -62,7 +75,3 @@ class ErrMessageException(GhostException):
 
 class OperatorException(GhostException):
     CODE: int = 522
-
-    def __init__(self, operator: str, message: str):
-        message = f"{message}; at operator: {operator}"
-        super().__init__(message)

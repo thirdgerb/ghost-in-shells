@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import List, Dict, Type
 
-from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel, CtxTool
+from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel, CtxTool, URL
 from ghoshell.ghost_fmk.intentions import Command, CommandOutput, CommandIntention, CommandIntentionKind
 from ghoshell.ghost_fmk.intentions import FocusOnCommandHandler
 
@@ -52,42 +52,62 @@ class CommandReaction(Reaction, metaclass=ABCMeta):
 
 
 class ThoughtCmdReaction(CommandReaction):
-    def __init__(self):
+    """
+    查看 Thought 的 reaction
+    """
+
+    def __init__(self, level: int = TaskLevel.LEVEL_PUBLIC):
         cmd = Command(
             name="thought",
             desc="check out current thought",
         )
-        super().__init__(cmd, TaskLevel.LEVEL_PUBLIC)
+        super().__init__(cmd, level)
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        """
+        todo: 实现 authentication
+        """
         ctx.send_at(this).json(this.dict())
         return ctx.mind(this).rewind()
 
 
 class ProcessCmdReaction(CommandReaction):
-    def __init__(self):
+    """
+    检查当前的进程.
+    """
+
+    def __init__(self, level: int = TaskLevel.LEVEL_PUBLIC):
         cmd = Command(
             name="process",
             desc="check out current process",
         )
-        super().__init__(cmd, TaskLevel.LEVEL_PUBLIC)
+        super().__init__(cmd, level)
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        """
+        todo: 实现 authentication
+        """
         process_data = ctx.runtime.current_process().dict()
         ctx.send_at(this).json(process_data)
         return ctx.mind(this).rewind()
 
 
 class HelpCmdReaction(CommandReaction):
+    """
+    help: 查看可行的命令.
+    """
 
-    def __init__(self):
+    def __init__(self, level: int = TaskLevel.LEVEL_PUBLIC):
         cmd = Command(
             name="help",
             desc="check out all available commands",
         )
-        super().__init__(cmd, TaskLevel.LEVEL_PUBLIC)
+        super().__init__(cmd, level)
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        """
+        todo: 实现 authentication
+        """
         handler = ctx.container.get(FocusOnCommandHandler)
         if handler is None:
             ctx.send_at(this).text("unknown command")
@@ -110,13 +130,54 @@ class HelloWorldCmdReaction(CommandReaction):
     test only reaction
     """
 
-    def __init__(self):
+    def __init__(self, level: int = TaskLevel.LEVEL_PUBLIC):
         cmd = Command(
             name="helloworld",
             desc="only for test, print helloworld only",
         )
-        super().__init__(cmd, TaskLevel.LEVEL_PUBLIC)
+        super().__init__(cmd, level)
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
         ctx.send_at(this).text("hello world! from /helloworld command")
         return ctx.mind(this).rewind()
+
+
+class RedirectCmdReaction(CommandReaction):
+    """
+    手动重定向
+    """
+
+    def __init__(self, level: int = TaskLevel.LEVEL_PUBLIC):
+        cmd = Command(
+            name="redirect",
+            desc="only for test, print helloworld only",
+            arg=dict(
+                name="think_name",
+                desc="value is mindset think name"
+            ),
+            opts=[
+                dict(
+                    name="stage_name",
+                    desc="value is stage name",
+                    short="s",
+                    default="",
+                ),
+            ],
+        )
+        super().__init__(cmd, level)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        think_name = output.params.get("think_name", None)
+        stage_name = output.params.get("stage_name", "")
+        if not think_name:
+            ctx.send_at(this).err("think name must not be empty")
+            return ctx.mind(this).rewind()
+        if think_name == this.url.resolver:
+            if not stage_name or stage_name == this.url.stage:
+                ctx.send_at(this).err(f"think name '{think_name}' is same as current")
+                return ctx.mind(this).rewind()
+            else:
+                # 重定向节点
+                return ctx.mind(this).forward(stage_name)
+        # 重定向思维.
+        return ctx.mind(this).redirect(URL(resolver=think_name))

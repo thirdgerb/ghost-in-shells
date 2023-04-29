@@ -51,7 +51,7 @@ class UniformResolverLocator(BaseModel):
             result.append(url)
         return result
 
-    def new_id(self, extra: Dict[str, str] = None, includes: set = None, args: bool = False) -> str:
+    def new_id(self, extra: Dict[str, str] = None, enums: set = None, args: bool = False) -> str:
         """
         提供一个默认的方法用来生成一个 id.
         """
@@ -60,9 +60,12 @@ class UniformResolverLocator(BaseModel):
             keys = extra.keys()
             sort = sorted(keys)
             for key in sort:
-                if includes is not None and key not in includes:
-                    continue
                 extra_str += f"&{key}={extra[key]}"
+        enums_str = "&enums[]="
+        if enums is not None:
+            keys = list(enums)
+            keys = sorted(keys)
+            enums_str += ",".join(keys)
         args_str = ""
         if args and self.args:
             keys = self.args.keys()
@@ -70,7 +73,7 @@ class UniformResolverLocator(BaseModel):
             for key in sort:
                 args_str += f"&{key}={self.args[key]}"
 
-        template = f"{self.resolver}::{self.stage}?{extra_str}::{args_str}"
+        template = f"{self.resolver}::{self.stage}?{extra_str}::{args_str}::{enums_str}"
         return hashlib.md5(template.encode()).hexdigest()
 
     # def is_same(self, other: "url") -> bool:

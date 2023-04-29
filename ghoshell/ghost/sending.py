@@ -32,8 +32,8 @@ class Sender(metaclass=ABCMeta):
         string = json.dumps(value, indent=indent)
         return self.text(f"```json\n{string}\n```", markdown=True)
 
-    def err(self, line: str, code: int = ErrMessageException.CODE) -> "Sender":
-        message = Error(errcode=code, errmsg=line)
+    def err(self, line: str, code: int = ErrMessageException.CODE, at: str = "") -> "Sender":
+        message = Error(errcode=code, errmsg=line, at=at)
         return self.output(message)
 
     @abstractmethod

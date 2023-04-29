@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Optional, TYPE_CHECKING
 
-from ghoshell.ghost.exceptions import RuntimeException, OperatorException, ErrMessageException
+from ghoshell.ghost.exceptions import OperatorException, ErrMessageException
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
@@ -82,19 +82,20 @@ class OperationKernel(metaclass=ABCMeta):
                 try:
                     after = op.run(ctx)
                 except ErrMessageException as e:
-                    ctx.send_at(None).err(e.message, e.CODE)
+                    ctx.send_at(None).err(e.message, e.CODE, at=e.at)
                     after = ctx.mind(None).rewind()
                 # 检查死循环问题. 每一轮 op 都需要是一个新的 op, 基本要求.
                 if after is op:
                     # todo: 写一个好点的 exception
-                    raise RuntimeException(message="operator loop from %s to %s" % (op, after))
+                    raise OperatorException(message="operator loop from %s to %s" % (op, after), at=str(op))
 
                 # 原始 op 销毁.
                 op.destroy()
                 op = after
-
+        except OperatorException as e:
+            raise e
         except Exception as e:
-            raise OperatorException(str(op), str(e))
+            raise OperatorException(message=str(e), at=str(op), e=e)
         finally:
             self.save_records()
 
