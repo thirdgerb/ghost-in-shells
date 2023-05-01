@@ -9,6 +9,7 @@ from ghoshell.ghost_fmk.mind import MindImpl
 from ghoshell.ghost_fmk.runtime import RuntimeImpl
 from ghoshell.ghost_fmk.sending import SendingImpl
 from ghoshell.ghost_fmk.session import SessionImpl
+from ghoshell.ghost_fmk.utils import InstanceCount
 from ghoshell.messages import *
 
 
@@ -43,6 +44,7 @@ class ContextImpl(Context):
         self._outputs_buffer = []
         self._messenger: SendingImpl | None = None
         self._failed: bool = False
+        InstanceCount.add(self.__class__.__name__)
 
     @property
     def clone(self) -> Clone:
@@ -55,7 +57,7 @@ class ContextImpl(Context):
     def send_at(self, _with: Optional["Thought"]) -> Sender:
         if self._messenger is not None:
             self._messenger.destroy()
-        tid = _with.tid if _with else self.runtime.current_process().awaiting
+        tid = _with.tid if _with else self.runtime.current_process().current
         self._messenger = SendingImpl(tid, self)
         return self._messenger
 
@@ -70,7 +72,7 @@ class ContextImpl(Context):
         if self._minder is not None:
             self._minder.destroy()
         if this is None:
-            awaiting = RuntimeTool.fetch_awaiting_task(self)
+            awaiting = RuntimeTool.fetch_current_task(self)
             self._minder = MindImpl(awaiting.tid, awaiting.url.copy_with())
         else:
             self._minder = MindImpl(this.tid, this.url.copy_with())
@@ -167,6 +169,9 @@ class ContextImpl(Context):
             self._runtime.destroy()
         if self._session is not None:
             self._session.destroy()
+        if self._container is not None:
+            self._container.destroy()
+
         # del
         del self._clone
         del self._container
@@ -180,3 +185,6 @@ class ContextImpl(Context):
         del self._cache
         del self._messenger
         del self._minder
+
+    def __del__(self):
+        InstanceCount.rm(self.__class__.__name__)

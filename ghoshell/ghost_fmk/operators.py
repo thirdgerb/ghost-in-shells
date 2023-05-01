@@ -9,7 +9,7 @@ from ghoshell.ghost import OnWithdrawing, OnCanceling, OnFailing, OnQuiting
 from ghoshell.ghost import Operator
 from ghoshell.ghost import RuntimeTool
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
-from ghoshell.messages import Tasked
+from ghoshell.messages import Tasked, Signal
 
 
 class AbsOperator(Operator, metaclass=ABCMeta):
@@ -152,12 +152,10 @@ class ReceiveInputOperator(AbsOperator):
         # 如果 payload tid 存在, 则消息希望命中目标任务. 需要调整任务的优先顺序.
         self._check_payload_tid(ctx)
 
-        awaiting_task = RuntimeTool.fetch_awaiting_task(ctx)
+        awaiting_task = RuntimeTool.fetch_current_task(ctx)
 
         # 目前认为需要分批匹配意图. 第一批是前序意图, 决定重定向方向.
         attentions = CtxTool.context_attentions(ctx)
-        CtxTool.logger(ctx).debug("attentions: %s" % attentions)
-
         matched = CtxTool.match_attentions(ctx, attentions)
 
         if matched is not None:
@@ -195,7 +193,7 @@ class ReceiveInputOperator(AbsOperator):
         if target_task.status != TaskStatus.WAITING:
             return
         process = ctx.runtime.current_process()
-        process.await_at(target_task.tid)
+        process.set_current(target_task.tid)
         ctx.runtime.store_process(process)
         return
 
@@ -423,7 +421,7 @@ class AwaitOperator(AbsOperator):
         process = runtime.current_process()
         # 变更 awaiting 任务.
         if tid is not None:
-            process.awaiting = tid
+            process.current = tid
         runtime.store_process(process)
 
         task = RuntimeTool.fetch_task(ctx, tid)
@@ -455,7 +453,7 @@ class AwaitOperator(AbsOperator):
             attentions.append(attention)
         task.await_at(self.stage, attentions)
         # 变更 process 的 awaiting
-        process.awaiting = task.tid
+        process.current = task.tid
         RuntimeTool.store_task(ctx, task)
         # 任务结束.
         return None
@@ -562,7 +560,7 @@ class UnhandledInputOperator(AbsOperator):
         pass
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
-        awaiting_task = RuntimeTool.fetch_awaiting_task(ctx)
+        awaiting_task = RuntimeTool.fetch_current_task(ctx)
         #  让 current 对话任务来做兜底
         after = self._fallback_to_task(ctx, awaiting_task)
         if after is not None:
@@ -611,8 +609,15 @@ class WithdrawOperator(AbsOperator, metaclass=ABCMeta):
     def _intercept(self, ctx: Context) -> Optional[Operator]:
         # 检查流程是否被拦截
         current_task = RuntimeTool.fetch_task(ctx, self.tid)
+        # 退出.
         if current_task is None:
             return None
+        # only working task's canceling can be intercepted
+        if not TaskStatus.is_working(current_task.status):
+            return None
+        if current_task.status == self.status:
+            return None
+
         # 可能是一个 None
         event = self.wrapper(current_task.tid, current_task.url.stage, None)
         # 如果没有被拦截, 就继续往后走.
@@ -626,13 +631,19 @@ class WithdrawOperator(AbsOperator, metaclass=ABCMeta):
             return None
 
         callbacks = current_task.done(TaskStatus.DEAD, self.at_stage)
+        RuntimeTool.store_task(ctx, current_task)
         # 保存变更.
         if not callbacks:
             return None
+
+        # 检查 callbacks
         callback_tasks = RuntimeTool.fetch_process_tasks_by_ids(ctx, list(callbacks))
         for task in callback_tasks:
             task.status = self.status
         RuntimeTool.store_task(*callback_tasks)
+        # 正常情况才走 schedule
+        p = ctx.runtime.current_process()
+        p.reset_indexes()
         return None
 
     def _fallback(self, ctx: Context) -> Optional[Operator]:
@@ -677,42 +688,46 @@ class ScheduleOperator(AbsOperator):
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         runtime = ctx.runtime
         process = runtime.current_process()
-        canceling = process.canceling
-        if len(canceling) > 0:
-            return CancelOperator(canceling[0], None)
-        failing = process.failing
-        if len(failing) > 0:
-            return FailOperator(failing[0], None)
 
         fallback = process.fallback()
-        tid = fallback.tid
-        if fallback is not None:
+        if fallback is not None and fallback.tid != process.root:
+            tid = fallback.tid
             # 退出过程中, 调度会退出每一个中间任务.
             if process.quiting:
                 return QuitOperator(tid, None)
-            match fallback.status:
-                case TaskStatus.RUNNING:
-                    return ForwardOperator(tid, [], self.fr)
-                case _:
-                    return self._preempt(ctx, tid)
+            else:
+                match fallback.status:
+                    case TaskStatus.CANCELING:
+                        return CancelOperator(tid, None)
+                    case TaskStatus.FAILING:
+                        return FailOperator(tid, None)
+                    case TaskStatus.RUNNING:
+                        return ForwardOperator(tid, [], self.fr)
+                    case _:
+                        return self._preempt(ctx, tid)
 
         root = RuntimeTool.fetch_root_task(ctx)
-        if root.status == TaskStatus.WAITING:
+        if TaskStatus.is_working(root.status):
             # 重新回到根节点.
             return self._preempt(ctx, process.root)
 
-        process = ctx.runtime.current_process()
         if TaskStatus.is_final(root.status):
             # 如果有父进程, 就回调父进程.
             if process.parent_id:
                 ctx.send_at(None).async_input(root.to_tasked(), process_id=process.parent_id, trace=None)
 
+        # quit 流程
+        process = ctx.runtime.current_process()
         process.quiting = True
-        ctx.runtime.store_process(process)
+        ctx.send_at(None).output(Signal.quit())
         return None
 
     @classmethod
     def _preempt(cls, ctx: Context, tid: str) -> Optional[Operator]:
+        process = ctx.runtime.current_process()
+        process.set_current(tid)
+        RuntimeTool.store_process(ctx, process)
+        # 触发事件.
         task = RuntimeTool.fetch_task(ctx, tid)
         event = OnPreempted(task.tid, task.url.stage, None)
         return RuntimeTool.fire_event(ctx, event)

@@ -28,6 +28,9 @@ class Sender(metaclass=ABCMeta):
         self.output(message)
         return self
 
+    def markdown(self, text: str) -> "Sender":
+        return self.text(text, markdown=True)
+
     def json(self, value: Any, indent: int = 2) -> "Sender":
         string = json.dumps(value, indent=indent, ensure_ascii=False)
         return self.text(f"```json\n{string}\n```", markdown=True)

@@ -1,17 +1,32 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, ClassVar
 
 from pydantic import BaseModel
 
 from ghoshell.ghost import *
-from ghoshell.ghost_fmk.stages import AwaitStage
+from ghoshell.llms.utils import fetch_prompter
+from ghoshell.messages import *
 
 
 class LLMUnitTestThinkConfig(BaseModel):
+    # 测试 id
     think_name: str
-    desc: str = ""
+    desc: str
+    # 测试结论.
+    conclusion: str = ""
+
+    class TestCase(BaseModel):
+        # 用例名
+        name: str
+        desc: str
+        # 用例的上下文
+        prompt: str
+        # 期待的回复
+        expect: str
+
+    tests: List[TestCase]
 
 
-class LLMUnitTestThink(Think, ThinkDriver):
+class LLMUnitTestThink(Think, ThinkDriver, Stage):
     """
     实现一个极简的单元测试用例, 方便自己重复测试各种 prompt.
     更好的实现是记录到本地缓存, 并且直接生成 Think. 先不着急实现这个 feature, 很容易.
@@ -59,25 +74,134 @@ class LLMUnitTestThink(Think, ThinkDriver):
         return None
 
     def all_stages(self) -> List[str]:
-        pass
+        names = set("")
+        for case in self._config.tests:
+            names.add(case.name)
+        return list(names)
 
     def fetch_stage(self, stage_name: str = "") -> Optional[Stage]:
-        pass
+        if stage_name == "":
+            return self
+        tests = {case.name: case for case in self._config.tests}
+        if stage_name in tests:
+            config = tests[stage_name]
+            return LLMUnitTestCaseStage(self._config.think_name, config)
+        return None
+
+    def intentions(self, ctx: Context) -> List[Intention] | None:
+        return None
+
+    def reactions(self) -> Dict[str, Reaction]:
+        return {}
+
+    def on_event(self, ctx: "Context", this: DictThought, event: Event) -> Operator | None:
+        if isinstance(event, OnActivating):
+            return self.on_activating(ctx, this)
+        if isinstance(event, OnReceived):
+            return self.on_receiving(ctx, this)
+        ctx.send_at(this).text(f"receive unhandled event {event}")
+        return ctx.mind(this).rewind()
+
+    activating_template: ClassVar[str] = """
+# LLMs UnitTest {name}
+
+desc: {desc}
+
+cases:
+{cases}
+
+instruction:
+
+- input [case name] shall run single test case
+- input "/help" see what commands can be useful
+- input "cancel" will cancel current unit test
+"""
+
+    def on_activating(self, ctx: Context, this: DictThought) -> Operator | None:
+        cases = []
+        activated = this.data.get("activated", False)
+        if not activated:
+            for case in self._config.tests:
+                line = f"- {case.name}: {case.desc}"
+                cases.append(line)
+            _format = {
+                "name": self._config.think_name,
+                "desc": self._config.desc,
+                "cases": "\n".join(cases)
+            }
+            _output = self.activating_template.format(**_format)
+            ctx.send_at(this).text(_output, markdown=True)
+            this.data["activated"] = True
+        return ctx.mind(this).awaits()
+
+    def on_receiving(self, ctx: Context, this: DictThought) -> Operator | None:
+        text = ctx.read(Text)
+        this.vars()
+        if text is None:
+            ctx.send_at(this).err("can only receive text message")
+            return ctx.mind(this).rewind()
+        if text.is_empty():
+            return ctx.mind(this).rewind()
+
+        content = text.content.strip()
+        tests = {case.name: case for case in self._config.tests}
+        if content == "cancel":
+            return ctx.mind(this).cancel()
+
+        if content in tests:
+            return ctx.mind(this).forward(content)
+
+        ctx.send_at(this).err(f"you said: {content} \n\ncan not handle")
+        return ctx.mind(this).repeat()
 
 
-class LLMUnitTestStage(AwaitStage):
+class LLMUnitTestCaseStage(Stage):
 
-    def on_received(self, ctx: "Context", this: Thought, e: OnReceived) -> Operator | None:
-        pass
+    def __init__(self, think: str, case: LLMUnitTestThinkConfig.TestCase):
+        self.think = think
+        self.config = case
 
-    def on_activating(self, ctx: "Context", this: Thought, e: OnActivating) -> Operator | None:
-        pass
+    def url(self) -> URL:
+        return URL(resolver=self.think, stage=self.config.name)
 
-    def on_quiting(self, ctx: "Context", this: Thought, e: OnQuiting) -> Operator | None:
-        pass
+    def intentions(self, ctx: Context) -> List[Intention] | None:
+        return None
 
-    def on_canceling(self, ctx: "Context", this: Thought, e: OnCanceling) -> Operator | None:
-        pass
+    def reactions(self) -> Dict[str, Reaction]:
+        return {}
 
-    def on_preempt(self, ctx: "Context", this: Thought, e: OnPreempted) -> Operator | None:
-        pass
+    def on_event(self, ctx: "Context", this: Thought, event: Event) -> Operator | None:
+        if isinstance(event, OnActivating):
+            return self.describe_test_case(ctx, this)
+        elif isinstance(event, OnReceived):
+            return self.run_test_case(ctx, this)
+        else:
+            return None
+
+    def describe_test_case(self, ctx: "Context", this: Thought) -> Operator:
+        prompt = self.config.prompt
+        ctx.send_at(this).markdown(f"""
+## run case {self.config.name}
+
+description: {self.config.desc}
+
+prompt:
+```
+{prompt}
+```
+""")
+        ctx.send_at(this).text("input any to continue")
+        return ctx.mind(this).awaits()
+
+    def run_test_case(self, ctx: Context, this: Thought) -> Operator:
+        prompter = fetch_prompter(ctx)
+        resp = prompter.prompt(self.config.prompt)
+        ctx.send_at(this).markdown(f"""
+## response
+
+{resp}
+
+## expect
+{self.config.expect}
+""")
+        return ctx.mind(this).restart()

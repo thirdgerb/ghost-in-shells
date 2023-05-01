@@ -38,7 +38,7 @@ class OperationKernel(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def record(self, op: Operator) -> None:
+    def record(self, ctx: "Context", op: Operator) -> None:
         """
         记录一个 op 的信息. 用于 debug.
         """
@@ -75,7 +75,7 @@ class OperationKernel(metaclass=ABCMeta):
             count = 0
             while op is not None:
                 self.is_stackoverflow(op, count)
-                self.record(op)
+                self.record(ctx, op)
                 count += 1
 
                 # 正式运行.

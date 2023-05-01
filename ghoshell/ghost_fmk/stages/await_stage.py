@@ -13,10 +13,8 @@ class AwaitStage(Stage, metaclass=ABCMeta):
             return self.on_activating(ctx, this, event)
         if isinstance(event, OnReceived):
             received = self.on_received(ctx, this, event)
-            # always awaits
             if received is None:
                 return ctx.mind(this).awaits()
-
         if isinstance(event, OnCanceling):
             op = self.on_canceling(ctx, this, event)
             if op is None:
@@ -36,7 +34,7 @@ class AwaitStage(Stage, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def on_activating(self, ctx: "Context", this: Thought, e: OnActivating) -> Operator | None:
+    def on_activating(self, ctx: "Context", this: Thought, e: Event) -> Operator | None:
         pass
 
     @abstractmethod

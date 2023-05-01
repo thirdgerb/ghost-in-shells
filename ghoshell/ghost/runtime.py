@@ -74,6 +74,11 @@ class TaskStatus:
         return status == cls.CANCELING or status == cls.FAILING or status == cls.DEAD
 
     @classmethod
+    def is_working(cls, status: TASK_STATUS) -> bool:
+        return status == cls.RUNNING or status == cls.WAITING or status == cls.PREEMPTING \
+            or status == cls.DEPENDING or status == cls.YIELDING
+
+    @classmethod
     def is_sleeping(cls, status: TASK_STATUS) -> bool:
         return status == cls.DEPENDING or status == cls.YIELDING or status == cls.PREEMPTING
 
@@ -330,7 +335,7 @@ class Process(BaseModel):
     root: str
 
     # 当前进行中的任务, 用来响应 Ghost 的 Input
-    awaiting: str
+    current: str
 
     # process 第多少轮次
     # 每接受一次 input 都是一个新的轮次.
@@ -367,7 +372,7 @@ class Process(BaseModel):
             sid=sid,
             pid=pid,
             root="",
-            awaiting="",
+            current="",
             parent_id=parent_id,
             tasks=[],
         )
@@ -381,9 +386,9 @@ class Process(BaseModel):
             sid=self.sid,
             pid=self.pid,
             root=self.root,
-            awaiting=self.awaiting,
+            current=self.current,
             parent_id=self.parent_id,
-            rount=self.round + 1,
+            round=self.round + 1,
             tasks=[task.copy() for task in self.tasks],
         )
 
@@ -410,6 +415,14 @@ class Process(BaseModel):
         如果上下文命中了一个等待任务, 应该进入到它依赖的对象.
         """
         return self._get_tid_by_status(TaskStatus.CANCELING)
+
+    @property
+    def dead(self) -> List[str]:
+        """
+        等待回调的任务, 依赖另一个任务的完成.
+        如果上下文命中了一个等待任务, 应该进入到它依赖的对象.
+        """
+        return self._get_tid_by_status(TaskStatus.DEAD)
 
     @property
     def failing(self) -> List[str]:
@@ -464,7 +477,7 @@ class Process(BaseModel):
         result = []
         # todo, 这样写感觉运行效率比较低, 内存开销增加. 不过问题不大.
         for tid in arr:
-            if tid != self.root and tid != self.awaiting:
+            if tid != self.root and tid != self.current:
                 result.append(tid)
         return result
 
@@ -515,37 +528,41 @@ class Process(BaseModel):
         将任务记录到 Process 中.
         每次要重置索引.
         """
+        if len(tasks) == 0:
+            return
+        exists = {ptr.tid: ptr for ptr in self.tasks}
+        orders = [ptr.tid for ptr in self.tasks]
+        done = set()
+        task_arr = []
         for task in tasks:
-            self._store_single_task(task)
+            tid = task.tid
+            if tid in done:
+                continue
+            if not self.root:
+                self.root = tid
+            if not self.current:
+                self.current = tid
+            task_arr.append(task)
+            done.add(tid)
+
+        for tid in orders:
+            if tid in done:
+                continue
+            ptr = exists[tid]
+            task_arr.append(ptr)
+            done.add(tid)
+
+        self.tasks = task_arr
         self.clear_cached_indexes()
 
-    def _store_single_task(self, ptr: Task) -> None:
-        """
-        当前任务插入到头部.
-        每次重拍一下.
-        """
-        tid = ptr.tid
-        if not self.root:
-            self.root = tid
-        if not self.awaiting:
-            self.awaiting = tid
-
-        if self.tid_indexes is not None and tid in self.tid_indexes:
-            order = self.tid_indexes[tid]
-            self.tasks[order] = ptr
-            return
-        tasks = [ptr]
-        for ptr in self.tasks:
-            if ptr.tid == tid:
-                continue
-            tasks.append(ptr)
-        self.tasks = tasks
-
-    def await_at(self, tid: str):
+    def set_current(self, tid: str):
         """
         将进程 await at 到一个任务上.
         """
-        self.awaiting = tid
+        task = self.get_task(tid)
+        if task is None:
+            raise RuntimeException(f"await at task [{tid}] is not stored")
+        self.current = tid
 
     def reset(self) -> None:
         """
@@ -553,7 +570,7 @@ class Process(BaseModel):
         """
         root = self.get_task(self.root).copy()
         root.restart()
-        self.awaiting = self.root
+        self.current = self.root
         self.tasks = [root]
         self.clear_cached_indexes()
 
@@ -573,11 +590,11 @@ class Process(BaseModel):
         if len(failing) > 0:
             return self.get_task(failing[0])
 
-        # running = self.running
-        # if len(running) > 0:
-        #     tid = running[0]
-        #     # running 的任务执行 forward
-        #     return self.get_task(tid)
+        running = self.running
+        if len(running) > 0:
+            tid = running[0]
+            # running 的任务执行 forward
+            return self.get_task(tid)
 
         preempting = self.preempting
         if len(preempting) > 0:
@@ -597,6 +614,17 @@ class Process(BaseModel):
             tid_indexes[task.tid] = idx
             idx += 1
         self.tid_indexes = tid_indexes
+
+    def brief(self) -> Dict:
+        brief = self.dict(exclude={"tasks", "tid_indexes", "status_list_indexes"})
+        brief["tasks"] = {ptr.tid: ptr.status for ptr in self.tasks}
+        return brief
+
+    def deep_copy(self) -> "Process":
+        self.reset_indexes()
+        # 偷懒
+        # todo: 实现一个干净一些的.
+        return Process(**self.dict())
 
 
 class Runtime(metaclass=ABCMeta):

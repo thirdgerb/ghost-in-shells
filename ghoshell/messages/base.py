@@ -56,3 +56,14 @@ class Message(BaseModel, metaclass=ABCMeta):
             return False
         body[self.KIND] = self.dict()
         return True
+
+
+class Signal(Message):
+    KIND: ClassVar[str] = "signal"
+    QUIT_CODE: ClassVar[int] = 0
+
+    code: int
+
+    @classmethod
+    def quit(cls) -> "Signal":
+        return Signal(code=Signal.QUIT_CODE)

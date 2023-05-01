@@ -1,3 +1,4 @@
+from logging import Logger
 from typing import List
 
 from ghoshell.container import Container, Provider
@@ -5,7 +6,8 @@ from ghoshell.ghost_fmk.bootstrapper import FileLoggerBootstrapper
 from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
 from ghoshell.ghost_fmk.providers import ContextLoggerProvider
-from ghoshell.llms import LLMConversationalThinkBootstrapper, LangChainOpenAIPromptProvider, LLMPrompt
+from ghoshell.llms import LLMConversationalThinkBootstrapper, LLMUnitTestsThinkBootstrapper
+from ghoshell.llms import LangChainOpenAIPromptProvider, LLMPrompter
 from ghoshell.mocks.cache import MockCacheProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
 from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
@@ -16,7 +18,9 @@ class OperatorMock(OperationKernel):
     def __init__(self, max_operators=10):
         self.max_operators = max_operators
 
-    def record(self, op: Operator) -> None:
+    def record(self, ctx: Context, op: Operator) -> None:
+        logger = ctx.container.force_fetch(Logger)
+        logger.debug(f"run operator: {op}")
         return
 
     def save_records(self) -> None:
@@ -48,6 +52,7 @@ class MockGhost(GhostKernel):
         RegisterThinkDemosBootstrapper(),
         RegisterFocusDriverBootstrapper(),
         conversational_bootstrapper,
+        LLMUnitTestsThinkBootstrapper(),
     ]
 
     def __init__(self, container: Container, root_path: str):
@@ -62,7 +67,7 @@ class MockGhost(GhostKernel):
     @classmethod
     def _depend_contracts(cls) -> List:
         contracts = super()._depend_contracts()
-        contracts.append(LLMPrompt)
+        contracts.append(LLMPrompter)
         return contracts
 
     @classmethod

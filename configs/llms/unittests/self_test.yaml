@@ -1,0 +1,7 @@
+desc: 测试大模型单元测试自身的单元测试 (dog face)
+conclusion: 测试后给自己的结论.
+tests:
+  - name: hello
+    desc: hello world
+    prompt: 你好
+    expect: 一个友好的回复.

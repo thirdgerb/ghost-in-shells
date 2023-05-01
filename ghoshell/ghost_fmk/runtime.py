@@ -7,6 +7,7 @@ from ghoshell.contracts import Cache
 from ghoshell.ghost import *
 from ghoshell.ghost_fmk.config import GhostConfig
 from ghoshell.ghost_fmk.contracts import RuntimeDriver
+from ghoshell.ghost_fmk.utils import InstanceCount
 from ghoshell.messages import Tasked
 
 
@@ -32,7 +33,7 @@ class RuntimeImpl(Runtime):
         # 缓存数据的初始化.
         self._cached_tasks: Dict[str, Dict[str, Task]] = {}
         self._cached_processes: Dict[str, Process | None] = {}
-        self._origin_processes_data: Dict[str, Dict | None] = {}
+        self._origin_processes_data: Dict[str, Process | None] = {}
         self._locked: Dict[str, bool] = {}
         self._finished: bool = False
 
@@ -46,6 +47,7 @@ class RuntimeImpl(Runtime):
             driver.set_current_process_id(self._session_id, pid)
         self._current_process_id = pid
         self._init_process(new_process)
+        InstanceCount.add(self.__class__.__name__)
 
     def _init_process(self, new_process: bool):
         # 从库里读.
@@ -65,15 +67,18 @@ class RuntimeImpl(Runtime):
     def get_process(self, pid: str | None = None) -> Process | None:
         pid = pid if pid else self._current_process_id
         if pid not in self._cached_processes:
-            process_data = self._get_origin_process(pid)
-            if process_data is None:
-                self._cached_processes[pid] = None
-            else:
-                process = Process(**process_data)
-                self._cached_processes[pid] = process
+            self._init_cached_process(pid)
         return self._cached_processes[pid]
 
-    def _get_origin_process(self, pid: str) -> Dict | None:
+    def _init_cached_process(self, pid: str) -> None:
+        process_data = self._get_origin_process(pid)
+        if process_data is None:
+            self._cached_processes[pid] = None
+        else:
+            process = process_data.new_round()
+            self._cached_processes[pid] = process
+
+    def _get_origin_process(self, pid: str) -> Process | None:
         if pid not in self._origin_processes_data:
             process_data = self._driver.get_process_data(self.session_id, pid)
             self._origin_processes_data[pid] = process_data
@@ -162,8 +167,7 @@ class RuntimeImpl(Runtime):
     def rewind(self, pid: str | None = None) -> None:
         if pid is None:
             pid = self._current_process_id
-        #  删除掉当前状态, 相当于清空了.
-        del self._cached_processes[pid]
+        self._init_cached_process(pid)
 
     def _save_all(self) -> None:
         if len(self._cached_processes) == 0:
@@ -183,7 +187,7 @@ class RuntimeImpl(Runtime):
         alive: List[Task] = []
 
         root_id = process.root
-        awaiting_id = process.awaiting
+        awaiting_id = process.current
         # callbacks = process.callbacks
         max_task = self._config.process_max_tasks
 
@@ -215,12 +219,6 @@ class RuntimeImpl(Runtime):
         return gc
 
     def _save_process(self, process: Process) -> None:
-
-        # 删除 process 记忆. 保留长程任务.
-        if process.quiting:
-            self._driver.remove_process(process.sid, process.pid)
-            return
-
         # 得到需要 gc 的 tasks
         gc_tasks = self._gc_process(process)
         # todo: gc 的 tasks 要干什么?
@@ -231,14 +229,22 @@ class RuntimeImpl(Runtime):
             task.instanced = False
             task.vars = None
 
+        # 重置掉多余数据.
+        process.clear_cached_indexes()
+
         # 保存 process 的数据.
-        process_data = process.dict(exclude={"indexes", "status_list_indexes"})
         root_task = process.get_task(process.root)
         process_overdue = root_task.overdue
         if process_overdue <= 0:
             process_overdue = self._config.process_default_overdue
-        self._driver.save_process_data(process.sid, process.pid, process_data, process_overdue)
+        process.clear_cached_indexes()
+
+        # 删除 process 记忆. 保留长程任务.
         self._driver.save_task_data(process.sid, process.pid, saving)
+        if process.quiting:
+            self._driver.remove_process(process.sid, process.pid)
+        else:
+            self._driver.save_process_data(process.sid, process.pid, process, process_overdue)
 
     def finish(self) -> None:
         if self._finished:
@@ -255,6 +261,9 @@ class RuntimeImpl(Runtime):
         del self._current_process_id
         del self._locked
         del self._finished
+
+    def __del__(self):
+        InstanceCount.rm(self.__class__.__name__)
 
 
 class CacheRuntimeDriver(RuntimeDriver):
@@ -287,15 +296,16 @@ class CacheRuntimeDriver(RuntimeDriver):
     def _get_locker_key(session_id: str, process_id: str):
         return f"runtime:session:{session_id}:process:{process_id}:locker"
 
-    def get_process_data(self, session_id: str, process_id: str) -> Dict | None:
+    def get_process_data(self, session_id: str, process_id: str) -> Process | None:
         key = self._get_process_key(session_id, process_id)
         val = self._cache.get(key)
         if val is not None:
-            return json.loads(val)
+            return Process(**json.loads(val))
         return None
 
-    def save_process_data(self, session_id: str, process_id: str, data: Dict, overdue: int):
-        saving = json.dumps(data)
+    def save_process_data(self, session_id: str, process_id: str, data: Process, overdue: int):
+        #  这里需要实现特殊的序列化逻辑为好.
+        saving = json.dumps(data.dict())
         key = self._get_process_key(session_id, process_id)
         overdue = overdue if overdue > 0 else 0
         self._cache.set(key, saving, overdue)

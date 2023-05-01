@@ -32,8 +32,8 @@ class CtxTool:
         return RuntimeTool.fetch_thought_by_task(ctx, task)
 
     @classmethod
-    def fetch_awaiting_thought(cls, ctx: "Context") -> Thought:
-        task = RuntimeTool.fetch_awaiting_task(ctx)
+    def fetch_current_thought(cls, ctx: "Context") -> Thought:
+        task = RuntimeTool.fetch_current_task(ctx)
         return RuntimeTool.fetch_thought_by_task(ctx, task)
 
     @classmethod
@@ -56,10 +56,10 @@ class CtxTool:
         """
         取出一个 think.stage, 不存在要抛出异常.
         """
-        stage = cls.fetch_stage(ctx, think, stage)
-        if stage is None:
+        stage_instance = cls.fetch_stage(ctx, think, stage)
+        if stage_instance is None:
             raise MindsetNotFoundException(f"force fetch think '{think}' with stage '{stage}' failed, not found")
-        return stage
+        return stage_instance
 
     @classmethod
     def force_fetch_think(cls, ctx: Context, think: str) -> "Think":
@@ -186,7 +186,7 @@ class CtxTool:
         # 第一步, 添加 root. root 永远有最高优先级.
         root_task = RuntimeTool.fetch_root_task(ctx)
         # 添加 awaiting 的注意目标.
-        awaiting_task = RuntimeTool.fetch_awaiting_task(ctx)
+        awaiting_task = RuntimeTool.fetch_current_task(ctx)
         # public, protected, private
         awaiting_task_level = awaiting_task.level
 
@@ -280,7 +280,7 @@ class RuntimeTool:
         基于 thought 触发一个 stage 的事件.
         """
         if event.fr is None:
-            awaiting = RuntimeTool.fetch_awaiting_task(ctx)
+            awaiting = RuntimeTool.fetch_current_task(ctx)
             event.fr = awaiting.url.copy_with()
 
         # 用 task 的信息补完 thought
@@ -356,10 +356,10 @@ class RuntimeTool:
         return task
 
     @classmethod
-    def fetch_awaiting_task(cls, ctx: Context) -> Task:
+    def fetch_current_task(cls, ctx: Context) -> Task:
         runtime = ctx.runtime
         process = runtime.current_process()
-        task = runtime.fetch_task(process.awaiting)
+        task = runtime.fetch_task(process.current)
         if task is None:
             raise RuntimeException("fetch awaiting task failed")
         return task

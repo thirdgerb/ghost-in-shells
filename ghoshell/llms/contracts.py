@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 
 
-class LLMPrompt(metaclass=ABCMeta):
+class LLMPrompter(metaclass=ABCMeta):
     """
     最基础的 text completions
     """

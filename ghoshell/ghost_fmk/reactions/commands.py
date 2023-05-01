@@ -4,6 +4,7 @@ from typing import List, Dict, Type
 from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel, CtxTool, URL
 from ghoshell.ghost_fmk.intentions import Command, CommandOutput, CommandIntention, CommandIntentionKind
 from ghoshell.ghost_fmk.intentions import FocusOnCommandHandler
+from ghoshell.ghost_fmk.utils import InstanceCount
 
 """
 默认的命令行 reactions.
@@ -56,10 +57,15 @@ class ThoughtCmdReaction(CommandReaction):
     查看 Thought 的 reaction
     """
 
-    def __init__(self, level: int = TaskLevel.LEVEL_PUBLIC):
+    def __init__(
+            self,
+            name: str = "thought",
+            desc: str = "check out current thought",
+            level: int = TaskLevel.LEVEL_PUBLIC,
+    ):
         cmd = Command(
-            name="thought",
-            desc="check out current thought",
+            name=name,
+            desc=desc,
         )
         super().__init__(cmd, level)
 
@@ -67,9 +73,34 @@ class ThoughtCmdReaction(CommandReaction):
         """
         todo: 实现 authentication
         """
-        thought = CtxTool.fetch_awaiting_thought(ctx)
+        thought = CtxTool.fetch_current_thought(ctx)
         ctx.send_at(this).json(thought.dict())
         return ctx.mind(this).rewind()
+
+
+class InstanceCountCmdReaction(CommandReaction):
+    """
+    检查当前的进程.
+    """
+
+    def __init__(
+            self,
+            name: str = "instance_count",
+            desc: str = "count singletons, check out python gc status",
+            level: int = TaskLevel.LEVEL_PUBLIC,
+    ):
+        cmd = Command(
+            name=name,
+            desc=desc,
+        )
+        super().__init__(cmd, level)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        """
+        todo: 实现 authentication
+        """
+        ctx.send_at(None).json(InstanceCount.count)
+        return ctx.mind(None).rewind()
 
 
 class ProcessCmdReaction(CommandReaction):
@@ -77,10 +108,15 @@ class ProcessCmdReaction(CommandReaction):
     检查当前的进程.
     """
 
-    def __init__(self, level: int = TaskLevel.LEVEL_PUBLIC):
+    def __init__(
+            self,
+            name: str = "process",
+            desc: str = "check out current process",
+            level: int = TaskLevel.LEVEL_PUBLIC,
+    ):
         cmd = Command(
-            name="process",
-            desc="check out current process",
+            name=name,
+            desc=desc,
         )
         super().__init__(cmd, level)
 
@@ -93,15 +129,76 @@ class ProcessCmdReaction(CommandReaction):
         return ctx.mind(None).rewind()
 
 
+class TaskCmdReaction(CommandReaction):
+
+    def __init__(
+            self,
+            name: str = "task",
+            desc: str = "check out current task data",
+            level: int = TaskLevel.LEVEL_PUBLIC,
+    ):
+        cmd = Command(
+            name=name,
+            desc=desc,
+        )
+        super().__init__(cmd, level)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        task = ctx.runtime.fetch_task(this.tid)
+        ctx.send_at(None).json(task.dict())
+        return ctx.mind(None).rewind()
+
+
+class QuitCmdReaction(CommandReaction):
+
+    def __init__(
+            self,
+            name: str = "quit",
+            desc: str = "quit current session",
+            level: int = TaskLevel.LEVEL_PUBLIC,
+    ):
+        cmd = Command(
+            name=name,
+            desc=desc,
+        )
+        super().__init__(cmd, level)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        return ctx.mind(None).quit()
+
+
+class CancelCmdReaction(CommandReaction):
+
+    def __init__(
+            self,
+            name: str = "cancel",
+            desc: str = "cancel current task",
+            level: int = TaskLevel.LEVEL_PUBLIC,
+    ):
+        cmd = Command(
+            name=name,
+            desc=desc,
+        )
+        super().__init__(cmd, level)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        return ctx.mind(None).cancel()
+
+
 class HelpCmdReaction(CommandReaction):
     """
     help: 查看可行的命令.
     """
 
-    def __init__(self, level: int = TaskLevel.LEVEL_PUBLIC):
-        cmd = Command(
+    def __init__(
+            self,
             name="help",
             desc="check out all available commands",
+            level: int = TaskLevel.LEVEL_PUBLIC,
+    ):
+        cmd = Command(
+            name=name,
+            desc=desc,
         )
         super().__init__(cmd, level)
 

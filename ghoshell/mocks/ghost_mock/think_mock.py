@@ -60,6 +60,10 @@ class HelloWorldStage(AwaitStage):
             "/process": ProcessCmdReaction(),
             "/help": HelpCmdReaction(),
             "/redirect": RedirectCmdReaction(),
+            "/task": TaskCmdReaction(),
+            "/cancel": CancelCmdReaction(),
+            "/quit": QuitCmdReaction(),
+            "/instance_count": InstanceCountCmdReaction(),
         }
 
     def on_received(self, ctx: "Context", this: Thought, _) -> Operator | None:
@@ -70,17 +74,17 @@ class HelloWorldStage(AwaitStage):
         return None
 
     def on_activating(self, ctx: "Context", this: Thought, _) -> Operator | None:
-        ctx.send_at(this).text("hello world!")
+        ctx.send_at(this).text(HelloWorldStage.__name__ + ":hello world!")
         return ctx.mind(this).awaits(to=URL(resolver="conversational"))
 
     def on_quiting(self, ctx: "Context", this: Thought, _) -> Operator | None:
-        ctx.send_at(this).text("I'm quiting")
+        ctx.send_at(this).text(HelloWorldStage.__name__ + ":I'm quiting")
         return None
 
     def on_canceling(self, ctx: "Context", this: Thought, _) -> Operator | None:
-        ctx.send_at(this).text("I'm canceling!")
+        ctx.send_at(this).text(HelloWorldStage.__name__ + ":I'm canceling!")
         return None
 
     def on_preempt(self, ctx: "Context", this: Thought, _) -> Operator | None:
-        ctx.send_at(this).text("preempted!")
-        return None
+        ctx.send_at(this).text(HelloWorldStage.__name__ + ":preempted!")
+        return ctx.mind(this).awaits()

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from ghoshell.ghost import *
 from ghoshell.ghost_fmk.stages import AwaitStage
-from ghoshell.llms.contracts import LLMPrompt
+from ghoshell.llms.utils import fetch_prompter
 from ghoshell.messages import *
 
 # todo: 优化多轮对话模板.
@@ -160,16 +160,15 @@ class DefaultConversationalStage(AwaitStage):
         return ctx.mind(this).awaits()
 
     def _prompt(self, ctx: Context, prompt: str) -> str:
-        prompter = self.llm_prompter(ctx)
-        return "helloworld"
-        # resp = prompter.prompt(prompt)
-        # resp = resp.strip()
-        # if self.config.dialog_quote_mark:
-        #     if resp.startswith(self._talk_start_quote):
-        #         resp = resp[len(self._talk_start_quote):]
-        #     if resp.endswith(self._talk_end_quote):
-        #         resp = resp[:len(resp) - len(self._talk_end_quote)]
-        # return resp
+        prompter = fetch_prompter(ctx)
+        resp = prompter.prompt(prompt)
+        resp = resp.strip()
+        if self.config.dialog_quote_mark:
+            if resp.startswith(self._talk_start_quote):
+                resp = resp[len(self._talk_start_quote):]
+            if resp.endswith(self._talk_end_quote):
+                resp = resp[:len(resp) - len(self._talk_end_quote)]
+        return resp
 
     def _join_resp_prompt(self, this: ConversationalThought) -> str:
         dialog = []
@@ -216,10 +215,6 @@ class DefaultConversationalStage(AwaitStage):
 
     def reactions(self) -> Dict[str, Reaction]:
         return self._reactions if self._reactions else {}
-
-    @classmethod
-    def llm_prompter(cls, ctx: Context) -> LLMPrompt:
-        return ctx.container.force_fetch(LLMPrompt)
 
 
 class ConversationalThink(Think, ThinkDriver):

@@ -45,6 +45,7 @@ class ConsoleShell(ShellKernel):
         self.ghost = ghost
         super().__init__(shell_container, messenger)
         self._welcome()
+        self._session: PromptSession = None
 
     def _welcome(self) -> None:
         self.app.print(Markdown("""
@@ -76,11 +77,12 @@ log:
 
     async def _prompt_loop(self):
         session = PromptSession("\n\n<<< ", )
+        self._session = session
         bindings = KeyBindings()
 
+        self.tick("")
         while True:
             try:
-                self.tick("")
                 event = await session.prompt_async(multiline=False, key_bindings=bindings)
                 self.tick(event)
             except (EOFError, KeyboardInterrupt):
@@ -89,8 +91,7 @@ log:
 
     def on_event(self, prompt: str) -> Optional[Input]:
         if prompt == "/exit":
-            self.app.print("Exit, Bye!")
-            exit(0)
+            self._quit()
         prompt = prompt.strip()
         trace = dict(
             clone_id=self.session_id,
@@ -105,6 +106,13 @@ log:
             payload=text.as_payload_dict(),
             trace=trace,
         )
+
+    def _quit(self):
+        if self._session is not None:
+            # todo: close?
+            pass
+        self.app.print("Exit, Bye!")
+        exit(0)
 
     def deliver(self, _output: Output) -> None:
         text = Text.read(_output.payload)
@@ -123,13 +131,16 @@ log:
                 f"# Error Occur {err.errcode}\n\n{err.errmsg} {where}\n\n{err.stack_info}")
             self.app.print(err_info)
 
+        signal = Signal.read(_output.payload)
+        if signal is not None and signal.code == signal.QUIT_CODE:
+            self._quit()
+
     def _markdown_output(self, text: str) -> Markdown:
         lines = text.split("\n\n")
         result = ["----"]
         for line in lines:
             # line = "\n\n".join(line.split("\n"))
             result.append(line)
-        result.append("----")
         return Markdown("\n\n".join(result))
 
     def messenger(self, _input: Input | None) -> Messenger:

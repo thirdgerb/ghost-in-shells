@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Optional, Iterator, Dict, List
 
 from ghoshell.ghost.mindset import ThinkMeta
+from ghoshell.ghost.runtime import Process
 from ghoshell.messages import Tasked
 
 
@@ -31,11 +32,11 @@ class RuntimeDriver(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_process_data(self, session_id: str, process_id: str) -> Dict | None:
+    def get_process_data(self, session_id: str, process_id: str) -> Process | None:
         pass
 
     @abstractmethod
-    def save_process_data(self, session_id: str, process_id: str, data: Dict, overdue: int):
+    def save_process_data(self, session_id: str, process_id: str, data: Process, overdue: int):
         pass
 
     @abstractmethod
