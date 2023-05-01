@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from logging import Logger
 from typing import Optional, Dict, List, Tuple
 
 from ghoshell.ghost.context import Context
@@ -22,8 +23,17 @@ class CtxTool:
     """
 
     @classmethod
+    def logger(cls, ctx: "Context") -> Logger:
+        return ctx.container.force_fetch(Logger)
+
+    @classmethod
     def fetch_thought(cls, ctx: "Context", url: URL) -> Thought:
         task = RuntimeTool.fetch_task_by_url(ctx, url, True)
+        return RuntimeTool.fetch_thought_by_task(ctx, task)
+
+    @classmethod
+    def fetch_awaiting_thought(cls, ctx: "Context") -> Thought:
+        task = RuntimeTool.fetch_awaiting_task(ctx)
         return RuntimeTool.fetch_thought_by_task(ctx, task)
 
     @classmethod

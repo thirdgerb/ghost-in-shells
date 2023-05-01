@@ -80,6 +80,7 @@ log:
 
         while True:
             try:
+                self.tick("")
                 event = await session.prompt_async(multiline=False, key_bindings=bindings)
                 self.tick(event)
             except (EOFError, KeyboardInterrupt):

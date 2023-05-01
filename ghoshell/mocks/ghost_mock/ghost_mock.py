@@ -1,8 +1,10 @@
 from typing import List
 
 from ghoshell.container import Container, Provider
+from ghoshell.ghost_fmk.bootstrapper import FileLoggerBootstrapper
 from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
+from ghoshell.ghost_fmk.providers import ContextLoggerProvider
 from ghoshell.llms import LLMConversationalThinkBootstrapper, LangChainOpenAIPromptProvider, LLMPrompt
 from ghoshell.mocks.cache import MockCacheProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
@@ -32,7 +34,7 @@ class OperatorMock(OperationKernel):
 
 conversational_bootstrapper = LLMConversationalThinkBootstrapper([
     dict(
-        think="llm_conversational_test_only",
+        think="conversational",
         desc="test llm conversational basic feats",
         debug="true",
     ),
@@ -42,6 +44,7 @@ conversational_bootstrapper = LLMConversationalThinkBootstrapper([
 class MockGhost(GhostKernel):
     # 启动流程. 想用这种方式解耦掉系统文件读取等逻辑.
     bootstrapper: List[Bootstrapper] = [
+        FileLoggerBootstrapper(),
         RegisterThinkDemosBootstrapper(),
         RegisterFocusDriverBootstrapper(),
         conversational_bootstrapper,
@@ -72,7 +75,9 @@ class MockGhost(GhostKernel):
 
     @classmethod
     def _context_providers(cls) -> List[Provider]:
-        return []
+        return [
+            ContextLoggerProvider(),
+        ]
 
     def new_operation_kernel(self) -> "OperationKernel":
         return OperatorMock()

@@ -31,7 +31,7 @@ class MindsetImpl(Mindset):
         return None
 
     def _wrap_meta(self, meta: ThinkMeta) -> Think | None:
-        driver = self._think_drivers.get(meta.driver, None)
+        driver = self._think_drivers.get(meta.kind, None)
         if driver is None:
             return None
         return driver.from_meta(meta)

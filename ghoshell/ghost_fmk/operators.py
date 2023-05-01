@@ -156,6 +156,8 @@ class ReceiveInputOperator(AbsOperator):
 
         # 目前认为需要分批匹配意图. 第一批是前序意图, 决定重定向方向.
         attentions = CtxTool.context_attentions(ctx)
+        CtxTool.logger(ctx).debug("attentions: %s" % attentions)
+
         matched = CtxTool.match_attentions(ctx, attentions)
 
         if matched is not None:
@@ -376,7 +378,9 @@ class RewindOperator(AbsOperator):
         return None
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
-        ctx.runtime.rewind()
+        process = ctx.runtime.current_process()
+        if process.round > 2:
+            ctx.runtime.rewind()
         if self.repeat:
             return AwaitOperator(None, None, None, None, self.fr)
         return None
@@ -398,11 +402,13 @@ class AwaitOperator(AbsOperator):
             only: List[str] | None,
             exclude: List[str] | None,
             fr: URL | None = None,
+            to: URL | None = None,
     ):
         self.tid = tid
         self.stage = stage
         self.only = only
         self.exclude = exclude
+        self.to = to
         super().__init__(fr)
 
     def _desc(self) -> str:
@@ -455,6 +461,8 @@ class AwaitOperator(AbsOperator):
         return None
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
+        if self.to is not None:
+            return ActivateOperator(self.to, self.fr, None)
         return None
 
     def destroy(self) -> None:
@@ -463,6 +471,7 @@ class AwaitOperator(AbsOperator):
         del self.stage
         del self.only
         del self.fr
+        del self.to
 
 
 class ForwardOperator(AbsOperator):

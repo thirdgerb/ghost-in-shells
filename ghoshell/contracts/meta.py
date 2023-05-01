@@ -1,7 +1,9 @@
 from abc import ABCMeta, abstractmethod
 from typing import Dict, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from ghoshell.container import Container
 
 
 class Meta(BaseModel):
@@ -14,7 +16,7 @@ class Meta(BaseModel):
     kind: str
 
     # meta 的配置内容, 是一个 dict 表示的数据.
-    config: Dict
+    config: Dict = Field(default_factory=dict)
 
 
 class MetaClass(metaclass=ABCMeta):
@@ -39,7 +41,7 @@ class MetaProvider(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def instance(self, meta: Meta) -> MetaClass:
+    def instance(self, con: Container, meta: Meta) -> MetaClass:
         pass
 
 
@@ -54,9 +56,9 @@ class MetaContainer:
     def register(self, provider: MetaProvider) -> None:
         self._providers[provider.kind()] = provider
 
-    def instance(self, meta: Meta) -> Any | None:
+    def instance(self, con: Container, meta: Meta) -> Any | None:
         kind = meta.kind
         if kind not in self._providers:
             return None
         provider = self._providers[kind]
-        return provider.instance(meta)
+        return provider.instance(con, meta)

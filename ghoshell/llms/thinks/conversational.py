@@ -10,6 +10,8 @@ from ghoshell.ghost_fmk.stages import AwaitStage
 from ghoshell.llms.contracts import LLMPrompt
 from ghoshell.messages import *
 
+# todo: 优化多轮对话模板.
+# 但必要性不大, 用 langchain 的方案就可以了.
 RECEIVE_TEMPLATE = """
 You are playing a chatbot ai "{ai_role}" to user "{user_role}"
 
@@ -61,12 +63,12 @@ class ConversationalThinkConfig(BaseModel):
         # 发生 cancel 事件时的回复.
         on_canceling: str = "canceling"
         on_quiting: str = "quitting"
-        on_activating: str = "talk to me"
+        on_activating: str = "activating conversational bot; talk to me"
         on_conclusion: str = ""
         on_none_text: str = "can only response text message."
         on_empty_text: str = "you speak nothing."
 
-    instructions: Instructions = Instructions()
+    instructions: Instructions = Field(default_factory=Instructions)
 
 
 class Line(BaseModel):
@@ -135,8 +137,7 @@ class DefaultConversationalStage(AwaitStage):
             return ctx.mind(this).rewind()
         # 空消息.
         if text.is_empty():
-            # todo: 也可以考虑 prompt
-            ctx.send_at(this).err(self.config.instructions.on_empty_text)
+            # todo: 也可以考虑将多个输出记录到栈里, 用 empty 来描述"继续"
             return ctx.mind(this).rewind()
 
         # 检查对话轮次. todo
@@ -160,15 +161,14 @@ class DefaultConversationalStage(AwaitStage):
 
     def _prompt(self, ctx: Context, prompt: str) -> str:
         prompter = self.llm_prompter(ctx)
-        resp = prompter.prompt(prompt)
-        resp = resp.strip()
-        if self.config.dialog_quote_mark:
-            if resp.startswith(self._talk_start_quote):
-                resp = resp[len(self._talk_start_quote):]
-            if resp.endswith(self._talk_end_quote):
-                resp = resp[:len(resp) - len(self._talk_end_quote)]
-        return resp
-        # resp = "hello world!"
+        return "helloworld"
+        # resp = prompter.prompt(prompt)
+        # resp = resp.strip()
+        # if self.config.dialog_quote_mark:
+        #     if resp.startswith(self._talk_start_quote):
+        #         resp = resp[len(self._talk_start_quote):]
+        #     if resp.endswith(self._talk_end_quote):
+        #         resp = resp[:len(resp) - len(self._talk_end_quote)]
         # return resp
 
     def _join_resp_prompt(self, this: ConversationalThought) -> str:
@@ -257,9 +257,10 @@ class ConversationalThink(Think, ThinkDriver):
         return self
 
     def to_meta(self) -> ThinkMeta:
+        resolver = self.url().resolver
         return ThinkMeta(
-            url=self.url(),
-            driver=self.driver_name(),
+            id=resolver,
+            kind=f"{self.driver_name()}",
         )
 
     def description(self, thought: Thought) -> Any:

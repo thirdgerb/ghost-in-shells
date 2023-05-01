@@ -67,7 +67,8 @@ class ThoughtCmdReaction(CommandReaction):
         """
         todo: 实现 authentication
         """
-        ctx.send_at(this).json(this.dict())
+        thought = CtxTool.fetch_awaiting_thought(ctx)
+        ctx.send_at(this).json(thought.dict())
         return ctx.mind(this).rewind()
 
 
@@ -88,8 +89,8 @@ class ProcessCmdReaction(CommandReaction):
         todo: 实现 authentication
         """
         process_data = ctx.runtime.current_process().dict()
-        ctx.send_at(this).json(process_data)
-        return ctx.mind(this).rewind()
+        ctx.send_at(None).json(process_data)
+        return ctx.mind(None).rewind()
 
 
 class HelpCmdReaction(CommandReaction):
@@ -121,8 +122,8 @@ class HelpCmdReaction(CommandReaction):
             commands.append(cmd.config)
         # 进行解析.
         format_line = handler.format_help_commands(commands)
-        ctx.send_at(this).text(format_line, markdown=True)
-        return ctx.mind(this).rewind()
+        ctx.send_at(None).text(format_line, markdown=True)
+        return ctx.mind(None).rewind()
 
 
 class HelloWorldCmdReaction(CommandReaction):
@@ -138,8 +139,8 @@ class HelloWorldCmdReaction(CommandReaction):
         super().__init__(cmd, level)
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
-        ctx.send_at(this).text("hello world! from /helloworld command")
-        return ctx.mind(this).rewind()
+        ctx.send_at(None).text("hello world! from /helloworld command")
+        return ctx.mind(None).rewind()
 
 
 class RedirectCmdReaction(CommandReaction):
@@ -170,14 +171,14 @@ class RedirectCmdReaction(CommandReaction):
         think_name = output.params.get("think_name", None)
         stage_name = output.params.get("stage_name", "")
         if not think_name:
-            ctx.send_at(this).err("think name must not be empty")
-            return ctx.mind(this).rewind()
+            ctx.send_at(None).err("think name must not be empty")
+            return ctx.mind(None).rewind()
         if think_name == this.url.resolver:
             if not stage_name or stage_name == this.url.stage:
-                ctx.send_at(this).err(f"think name '{think_name}' is same as current")
-                return ctx.mind(this).rewind()
+                ctx.send_at(None).err(f"think name '{think_name}' is same as current")
+                return ctx.mind(None).rewind()
             else:
                 # 重定向节点
-                return ctx.mind(this).forward(stage_name)
+                return ctx.mind(None).forward(stage_name)
         # 重定向思维.
-        return ctx.mind(this).redirect(URL(resolver=think_name))
+        return ctx.mind(None).redirect(URL(resolver=think_name))

@@ -1,0 +1,21 @@
+# logging_config.yml
+
+version: 1
+
+formatters:
+  default:
+    format: "%(asctime)s - %(name)s - %(levelname)s: %(message)s - %(trace)s"
+
+handlers:
+  file:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: DEBUG
+    filename: runtime/logs/ghoshell.log
+    when: midnight
+    encoding: utf-8
+    formatter: default
+
+loggers:
+  ghoshell:
+    handlers: [file]
+    level: DEBUG

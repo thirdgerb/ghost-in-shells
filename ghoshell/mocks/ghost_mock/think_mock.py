@@ -14,8 +14,8 @@ class HelloWorldThink(Think, ThinkDriver):
 
     def to_meta(self) -> ThinkMeta:
         return ThinkMeta(
-            url=self.url().dict(),
-            driver=self.driver_name(),
+            id=self.url().resolver,
+            kind=self.driver_name(),
         )
 
     def driver_name(self) -> str:
@@ -71,7 +71,7 @@ class HelloWorldStage(AwaitStage):
 
     def on_activating(self, ctx: "Context", this: Thought, _) -> Operator | None:
         ctx.send_at(this).text("hello world!")
-        return ctx.mind(this).awaits()
+        return ctx.mind(this).awaits(to=URL(resolver="conversational"))
 
     def on_quiting(self, ctx: "Context", this: Thought, _) -> Operator | None:
         ctx.send_at(this).text("I'm quiting")

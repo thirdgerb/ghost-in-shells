@@ -37,7 +37,11 @@ class Ghost(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
     def app_path(self) -> str:
+        """
+        运行时的路径.
+        """
         pass
 
     @property

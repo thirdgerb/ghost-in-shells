@@ -20,7 +20,7 @@ class ThinkMetaDriverMock(ThinkMetaDriver):
             yield self.__metas[name]
 
     def register_meta(self, meta: ThinkMeta, clone_id: str | None) -> None:
-        think_name = meta.url.resolver
+        think_name = meta.id
         self.__metas[think_name] = meta
         self.__metas_order.append(think_name)
 

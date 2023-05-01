@@ -119,19 +119,19 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             raise RuntimeException("todo xxxx")
 
         clone = self.new_clone(inpt.trace.clone_id)
-        container = Container(self._container)
+        ctx_container = Container(self._container)
         # instance
         ctx = ContextImpl(
             inpt=inpt,
             clone=clone,
-            container=container,
+            container=ctx_container,
             config=self._config
         )
         # bound instances
-        container.set(Clone, clone)
-        container.set(Context, ctx)
+        ctx_container.set(Clone, clone)
+        ctx_container.set(Context, ctx)
         for provider in self._context_providers():
-            container.register(provider)
+            ctx_container.register(provider)
         return ctx
 
     @abstractmethod
@@ -164,6 +164,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         try:
             pipeline = self._build_pipeline()
             ctx = pipeline(ctx)
+
             return ctx.get_outputs()
         except GhostException as e:
             ctx.fail()

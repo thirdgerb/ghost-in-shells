@@ -98,3 +98,16 @@ def test_default_value_is_copy() -> None:
     p2 = Parent()
     assert p2.val.get("foo") is None
     assert len(p2.field) == 0
+
+
+def test_sub_model_default_value():
+    class Foo(BaseModel):
+        foo: str
+
+        class Bar(BaseModel):
+            zoo: str = "zoo"
+
+        bar: Bar = Field(default_factory=Bar)
+
+    foo = Foo(foo="foo")
+    assert foo.bar.zoo == "zoo"

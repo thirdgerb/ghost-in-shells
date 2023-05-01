@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Dict, List, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.mindset.stage import Stage
@@ -17,10 +17,13 @@ class ThinkMeta(BaseModel):
     要求所有的 Think 都可以产出元数据, 使之可配置.
     这么做, 是为了可以在运行时动态生成 Think
     机器人也因此可以自己生产自己的 Think.
+
+    Think Meta 没有实现 contracts.Meta
+    原因是还没想明白.
     """
-    url: URL
-    driver: str
-    config: Dict = Field(lambda: {})
+    id: str
+    kind: str
+    config: Dict = {}
 
 
 class Think(metaclass=ABCMeta):

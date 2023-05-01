@@ -18,8 +18,10 @@ class Container:
         if parent is not None:
             if not isinstance(parent, Container):
                 raise AttributeError("container can only initialized with parent Container")
+            if parent is self:
+                raise AttributeError("container's parent must not be itself")
+        self.parent = parent
         self.__instances: Dict[Type[Contract], Contract] = {}
-        self.__parent = parent
         self.__providers: Dict[Type[Contract], Provider] = {}
 
     def set(self, contract: Type[Contract], instance: Contract) -> None:
@@ -30,7 +32,7 @@ class Container:
 
     def bound(self, contract: Type[Contract]) -> bool:
         return contract in self.__instances or contract in self.__providers or \
-            (self.__parent is not None and self.__parent.bound(contract))
+            (self.parent is not None and self.parent.bound(contract))
 
     def get(self, contract: Type[Contract], params: Dict | None = None) -> Contract | None:
         """
@@ -49,8 +51,8 @@ class Container:
             return made
 
         # 第三优先级.
-        if self.__parent is not None:
-            return self.__parent.get(contract)
+        if self.parent is not None:
+            return self.parent.get(contract)
         return None
 
     def register(self, provider: Provider) -> None:
@@ -59,21 +61,23 @@ class Container:
             del self.__instances[contract]
         self.__providers[contract] = provider
 
-    def fetch(self, contract: Type[Contract]) -> Contract | None:
+    def fetch(self, contract: Type[Contract], strict: bool = False) -> Contract | None:
         instance = self.get(contract)
-        if instance is not None and isinstance(instance, contract):
+        if instance is not None:
+            if strict and not isinstance(instance, contract):
+                return None
             return instance
         return None
 
-    def force_fetch(self, contract: Type[Contract]) -> Contract:
-        ins = fetch(self, contract)
+    def force_fetch(self, contract: Type[Contract], strict: bool = False) -> Contract:
+        ins = self.fetch(contract, strict)
         if ins is None:
             raise Exception(f"contract {contract} not register in container")
         return ins
 
     def destroy(self) -> None:
         del self.__instances
-        del self.__parent
+        del self.parent
         del self.__providers
 
 
@@ -90,17 +94,3 @@ class Provider(metaclass=ABCMeta):
     @abstractmethod
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         pass
-
-
-def fetch(con: Container, contract: Type[Contract]) -> Contract | None:
-    instance = con.get(contract)
-    if instance is not None and isinstance(instance, contract):
-        return instance
-    return None
-
-
-def force_fetch(con: Container, contract: Type[Contract]) -> Contract:
-    ins = fetch(con, contract)
-    if ins is None:
-        raise Exception(f"contract {contract} not register in container")
-    return ins

@@ -28,11 +28,18 @@ class Mind(metaclass=ABCMeta):
     # ---- 中断命令 ---- #
 
     @abstractmethod
-    def awaits(self, only: List[str] | None = None, exclude: List[str] | None = None) -> "Operator":
+    def awaits(
+            self,
+            # 是否进入 waiting 状态并重定向.
+            to: URL = None,
+            # only reactions
+            only: List[str] | None = None,
+            # exclude reactions
+            exclude: List[str] | None = None,
+    ) -> "Operator":
         """
-        本来想用 await, 无奈 python 的系统关键字太多, 这是 python 一个巨大的缺点.
-        wait 是挂起整个 Clone. 上下文也会同步休眠, 等待下一次 input 的唤醒.
-
+        await 是挂起当前任务. 可以通过 to 重定向到别的任务.
+        如果 to 不存在, 则当前 上下文也会同步休眠, 等待下一次 input 的唤醒.
         而实际上, 当前 Process 进入了 wait 状态, 可能 clone 还不会立刻释放 (unlock), 而是继续去处理异步消息.
         就看具体怎么实现了.
         """

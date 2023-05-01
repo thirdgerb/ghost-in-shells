@@ -75,3 +75,7 @@ class ErrMessageException(GhostException):
 
 class OperatorException(GhostException):
     CODE: int = 522
+
+
+class BootstrapException(GhostException):
+    CODE: int = 600

@@ -29,7 +29,7 @@ class Sender(metaclass=ABCMeta):
         return self
 
     def json(self, value: Any, indent: int = 2) -> "Sender":
-        string = json.dumps(value, indent=indent)
+        string = json.dumps(value, indent=indent, ensure_ascii=False)
         return self.text(f"```json\n{string}\n```", markdown=True)
 
     def err(self, line: str, code: int = ErrMessageException.CODE, at: str = "") -> "Sender":

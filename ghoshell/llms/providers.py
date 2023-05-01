@@ -17,4 +17,4 @@ class LangChainOpenAIPromptProvider(Provider):
 
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         # 暂时没有时间做复杂参数.
-        return LangChainOpenAIAdapter(OpenAI())
+        return LangChainOpenAIAdapter(OpenAI(request_timeout=5))

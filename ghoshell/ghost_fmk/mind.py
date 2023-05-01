@@ -17,8 +17,13 @@ class MindImpl(Mind):
     def yield_to(self, stage: str, callback: bool = False) -> "Operator":
         return YieldToOperator(self.tid, stage, callback, self.url)
 
-    def awaits(self, only: List[str] | None = None, exclude: List[str] | None = None) -> "Operator":
-        return AwaitOperator(self.tid, self.url.stage, only, exclude, self.url)
+    def awaits(
+            self,
+            to: URL | None = None,
+            only: List[str] | None = None,
+            exclude: List[str] | None = None,
+    ) -> "Operator":
+        return AwaitOperator(self.tid, self.url.stage, only, exclude, self.url, to=to)
 
     def depend_on(self, target: "URL") -> "Operator":
         return DependOnOperator(self.tid, self.url.stage, target, self.url)
