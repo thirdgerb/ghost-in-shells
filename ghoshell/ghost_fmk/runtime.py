@@ -207,7 +207,7 @@ class RuntimeImpl(Runtime):
             # 可以被遗忘的状态.
             elif TaskStatus.is_able_to_gc(status):
                 gc.append(ptr)
-            elif count > max_task and ptr.is_forgettable:
+            elif ptr.is_forgettable:
                 # 可以被遗忘的任务. 直接从栈里拿掉.
                 gc.append(ptr)
             else:

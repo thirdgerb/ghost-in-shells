@@ -1,7 +1,7 @@
 desc: 测试大模型单元测试自身的单元测试 (dog face)
-conclusion: 测试后给自己的结论.
+conclusion: 基准测试完成~ 单元测试是初步可用的.
 tests:
   - name: hello
-    desc: hello world
+    desc: 测试最基准的 "你好" 会发生什么
     prompt: 你好
     expect: 一个友好的回复.

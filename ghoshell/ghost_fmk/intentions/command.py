@@ -21,6 +21,7 @@ class Argument(BaseModel):
     desc: str = ""
     short: str = ""
     default: Any = None
+    const: str = None
     nargs: int | str | None = None
     choices: List[Any] | None = None
 
@@ -207,6 +208,7 @@ current commands. use -h option on command to see details:
             "default": "default",
             "choices": "choices",
             "nargs": "nargs",
+            "const": "const",
             # "type": "type",
         }
         for key in mapping:
@@ -217,6 +219,8 @@ current commands. use -h option on command to see details:
                 continue
             alias = mapping[key]
             result[alias] = value
+        if "const" in result:
+            result["nargs"] = "?"
         return result
 
     def register_global_intentions(self, *intentions: Intention) -> None:

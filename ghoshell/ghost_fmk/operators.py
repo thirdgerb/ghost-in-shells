@@ -431,10 +431,10 @@ class AwaitOperator(AbsOperator):
         reactions = stage.reactions()
         reaction_names = set(reactions.keys())
         if len(reaction_names) == 0:
-            return None
-        if self.only is not None:
+            pass
+        elif self.only is not None:
             reaction_names = reaction_names & set(self.only)
-        if self.exclude is not None:
+        elif self.exclude is not None:
             reaction_names = reaction_names - set(self.exclude)
 
         attentions = []
@@ -455,6 +455,7 @@ class AwaitOperator(AbsOperator):
         # 变更 process 的 awaiting
         process.current = task.tid
         RuntimeTool.store_task(ctx, task)
+        RuntimeTool.store_process(ctx, process)
         # 任务结束.
         return None
 

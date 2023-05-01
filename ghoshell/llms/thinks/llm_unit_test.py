@@ -100,7 +100,7 @@ class LLMUnitTestThink(Think, ThinkDriver, Stage):
         if isinstance(event, OnReceived):
             return self.on_receiving(ctx, this)
         ctx.send_at(this).text(f"receive unhandled event {event}")
-        return ctx.mind(this).rewind()
+        return None
 
     activating_template: ClassVar[str] = """
 # LLMs UnitTest {name}
@@ -114,24 +114,23 @@ instruction:
 
 - input [case name] shall run single test case
 - input "/help" see what commands can be useful
-- input "cancel" will cancel current unit test
 """
 
     def on_activating(self, ctx: Context, this: DictThought) -> Operator | None:
         cases = []
-        activated = this.data.get("activated", False)
-        if not activated:
-            for case in self._config.tests:
-                line = f"- {case.name}: {case.desc}"
-                cases.append(line)
-            _format = {
-                "name": self._config.think_name,
-                "desc": self._config.desc,
-                "cases": "\n".join(cases)
-            }
-            _output = self.activating_template.format(**_format)
-            ctx.send_at(this).text(_output, markdown=True)
-            this.data["activated"] = True
+        # activated = this.data.get("activated", False)
+        # if not activated:
+        for case in self._config.tests:
+            line = f"- {case.name}: {case.desc}"
+            cases.append(line)
+        _format = {
+            "name": self._config.think_name,
+            "desc": self._config.desc,
+            "cases": "\n".join(cases)
+        }
+        _output = self.activating_template.format(**_format)
+        ctx.send_at(this).text(_output, markdown=True)
+        # this.data["activated"] = True
         return ctx.mind(this).awaits()
 
     def on_receiving(self, ctx: Context, this: DictThought) -> Operator | None:
@@ -190,18 +189,25 @@ prompt:
 {prompt}
 ```
 """)
-        ctx.send_at(this).text("input any to continue")
+        ctx.send_at(this).text("input any to run test")
         return ctx.mind(this).awaits()
 
-    def run_test_case(self, ctx: Context, this: Thought) -> Operator:
-        prompter = fetch_prompter(ctx)
-        resp = prompter.prompt(self.config.prompt)
-        ctx.send_at(this).markdown(f"""
-## response
+    def run_test_case(self, ctx: Context, this: DictThought) -> Operator:
+        waiting = this.data.get("waiting", False)
+        if not waiting:
+            prompter = fetch_prompter(ctx)
+            resp = prompter.prompt(self.config.prompt)
+            ctx.send_at(this).markdown(f"""
+    ## response
 
-{resp}
+    {resp}
 
-## expect
-{self.config.expect}
-""")
-        return ctx.mind(this).restart()
+    ## expect
+    {self.config.expect}
+    """)
+            this.data["waiting"] = True
+            ctx.send_at(this).markdown("input anything to return")
+            return ctx.mind(this).awaits()
+        else:
+            this.data["waiting"] = False
+            return ctx.mind(this).restart()

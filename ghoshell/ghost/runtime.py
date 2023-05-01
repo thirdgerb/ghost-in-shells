@@ -138,7 +138,7 @@ class Task(BaseModel):
 
     # status: 当前任务在 runtime 中排列用的状态.
     # 用来让 runtime 调度多个同时存在的 tasks
-    status: TASK_STATUS = TaskStatus.RUNNING
+    status: TASK_STATUS = TaskStatus.NEW
 
     # level: 当前任务的开放程度.
     # 决定了任务执行中, 是否可以被中断. 目前有三种级别.
@@ -302,6 +302,8 @@ class Task(BaseModel):
         # callbacks 保留
         self.callbacks = self.callbacks
         self.attentions = None
+        self.vars = None
+        self.instanced = False
 
 
 class Process(BaseModel):

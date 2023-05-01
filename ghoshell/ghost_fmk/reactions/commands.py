@@ -117,6 +117,13 @@ class ProcessCmdReaction(CommandReaction):
         cmd = Command(
             name=name,
             desc=desc,
+            opts=[
+                dict(
+                    name="brief",
+                    short="b",
+                    const="true",
+                )
+            ],
         )
         super().__init__(cmd, level)
 
@@ -124,9 +131,15 @@ class ProcessCmdReaction(CommandReaction):
         """
         todo: 实现 authentication
         """
-        process_data = ctx.runtime.current_process().dict()
-        ctx.send_at(None).json(process_data)
-        return ctx.mind(None).rewind()
+        process = ctx.runtime.current_process()
+        if "brief" in output.params:
+            brief = output.params.get("brief", "")
+            if brief == "true":
+                ctx.send_at(None).json(process.brief())
+            return ctx.mind(None).rewind()
+        else:
+            ctx.send_at(None).json(process.dict())
+            return ctx.mind(None).rewind()
 
 
 class TaskCmdReaction(CommandReaction):
@@ -144,7 +157,8 @@ class TaskCmdReaction(CommandReaction):
         super().__init__(cmd, level)
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
-        task = ctx.runtime.fetch_task(this.tid)
+        process = ctx.runtime.current_process()
+        task = ctx.runtime.fetch_task(process.current)
         ctx.send_at(None).json(task.dict())
         return ctx.mind(None).rewind()
 

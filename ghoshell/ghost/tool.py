@@ -191,7 +191,7 @@ class CtxTool:
         awaiting_task_level = awaiting_task.level
 
         # awaiting 永远最高优.
-        if awaiting_task.tid != root_task.tid and awaiting_task.attentions is not None:
+        if awaiting_task.tid != root_task.tid and awaiting_task.attentions:
             # awaiting 添加所有.
             result.append(*awaiting_task.attentions)
 
@@ -384,9 +384,10 @@ class RuntimeTool:
         thought.tid = task.tid
         thought.url = task.url.copy_with()
         thought.status = task.status
-        thought.level = task.level
-        thought.overdue = task.overdue
-        thought.priority = task.priority
+        if task.status != TaskStatus.NEW:
+            thought.level = task.level
+            thought.overdue = task.overdue
+            thought.priority = task.priority
         return thought
 
     @classmethod
@@ -416,10 +417,14 @@ class RuntimeTool:
         根据 url 初始化一个 task
         """
         tid = cls.new_task_id(ctx, url)
-        return Task(
+        task = Task(
             tid=tid,
             url=url.dict(),
         )
+        think = CtxTool.force_fetch_think(ctx, url.resolver)
+        thought = think.new_thought(ctx, url.args)
+        cls.merge_thought_to_task(thought, task)
+        return task
 
     @classmethod
     def new_task_id(cls, ctx: Context, url: URL) -> str:

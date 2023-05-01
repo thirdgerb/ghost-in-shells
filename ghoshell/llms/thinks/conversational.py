@@ -80,6 +80,7 @@ class ConversationalThought(Thought):
     """
     最基本的多轮对话实现.
     """
+    priority = -1
 
     class Vars(BaseModel):
         instruction: str = ""

@@ -29,13 +29,16 @@ class Thought(metaclass=ABCMeta):
     overdue: int = 0
 
     # 当前任务的优先级, 影响到排序, 修改影响 task
+    # priority < 0  任务中断时, 会遗忘.
+    # priority == 0 任务中断时, 会等待回调.
+    # priority > 0 任务在 Preempting 状态时, 会根据优先级排序.
     priority: float = 0
 
     # 当前任务的开放度, 修改影响 task
     level: int = TaskLevel.LEVEL_PUBLIC
 
     # 当前任务的状态. 传入值, 修改没有意义.
-    status: int = TaskStatus.RUNNING
+    status: int = TaskStatus.NEW
 
     def __init__(
             self,
@@ -67,11 +70,12 @@ class Thought(metaclass=ABCMeta):
 
     def dict(self):
         return dict(
-            url=self.url.dict(),
+            url=self.url.dict() if self.url else None,
             tid=self.tid,
             level=self.level,
             status=self.status,
             priority=self.priority,
+            overdue=self.overdue,
             vars=self.vars(),
         )
 
