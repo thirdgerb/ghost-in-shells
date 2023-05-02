@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Dict, List, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.mindset.stage import Stage
@@ -23,7 +23,7 @@ class ThinkMeta(BaseModel):
     """
     id: str
     kind: str
-    config: Dict = {}
+    config: Dict = Field(default_factory=dict)
 
 
 class Think(metaclass=ABCMeta):

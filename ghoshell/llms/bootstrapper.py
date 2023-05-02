@@ -1,12 +1,9 @@
-import os
 from typing import List, Dict
-
-import yaml
 
 from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import Bootstrapper
 from ghoshell.llms.thinks.conversational import ConversationalThinkConfig, ConversationalThink
-from ghoshell.llms.thinks.llm_unit_test import LLMUnitTestThinkConfig, LLMUnitTestThink
+from ghoshell.llms.thinks.prompt_unittest import PromptUnitTestThinkDriver
 
 
 class LLMConversationalThinkBootstrapper(Bootstrapper):
@@ -31,26 +28,16 @@ class LLMConversationalThinkBootstrapper(Bootstrapper):
             mindset.register_think(think)
 
 
-class LLMUnitTestsThinkBootstrapper(Bootstrapper):
+class PromptUnitTestsBootstrapper(Bootstrapper):
 
-    def __init__(self, config_path: str = "/configs/llms/unittests", think_prefix: str = "unittest"):
+    def __init__(self, config_path: str = "/configs/llms/unittests", think_prefix: str = "unittests"):
         self.config_path = config_path
         self.think_prefix = think_prefix
 
     def bootstrap(self, ghost: Ghost):
-        dir_name = "/".join([ghost.app_path().rstrip("/"), self.config_path.lstrip("/")])
         mindset = ghost.mindset
-        for root, ds, fs in os.walk(dir_name):
-            for filename in fs:
-                if not filename.endswith(".yaml"):
-                    continue
-                fullname = dir_name + "/" + filename
-                with open(fullname) as f:
-                    data = yaml.safe_load(f)
-                    if "think_name" not in data:
-                        name = f"unittests/{filename}"
-                        name = name[:len(name) - len(".yaml")]
-                        data["think_name"] = name
-                    config = LLMUnitTestThinkConfig(**data)
-                    think = LLMUnitTestThink(config)
-                    mindset.register_think(think)
+        root_dir = ghost.app_path().rstrip("/") + "/" + self.config_path.strip("/")
+        driver = PromptUnitTestThinkDriver(root_dir, think_prefix=self.think_prefix)
+        mindset.register_driver(driver)
+        for meta in driver.foreach_think():
+            mindset.register_meta(meta)

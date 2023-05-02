@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from ghoshell.ghost import *
 from ghoshell.ghost_fmk.stages import AwaitStage
-from ghoshell.llms.utils import fetch_prompter
+from ghoshell.llms.utils import fetch_ctx_prompter
 from ghoshell.messages import *
 
 # todo: 优化多轮对话模板.
@@ -161,7 +161,7 @@ class DefaultConversationalStage(AwaitStage):
         return ctx.mind(this).awaits()
 
     def _prompt(self, ctx: Context, prompt: str) -> str:
-        prompter = fetch_prompter(ctx)
+        prompter = fetch_ctx_prompter(ctx)
         resp = prompter.prompt(prompt)
         resp = resp.strip()
         if self.config.dialog_quote_mark:

@@ -44,12 +44,16 @@ class UniformResolverLocator(BaseModel):
             result["args"] = args.copy()
         return result
 
-    def new_stages(self, *stages: str) -> List["URL"]:
+    def to_stages(self, *stages: str) -> List["URL"]:
         result = []
         for stage in stages:
             url = self.copy_with(stage=stage)
             result.append(url)
         return result
+
+    @classmethod
+    def new_resolver(cls, resolver) -> "UniformResolverLocator":
+        return cls(resolver=resolver)
 
     def new_id(self, extra: Dict[str, str] = None, enums: set = None, args: bool = False) -> str:
         """

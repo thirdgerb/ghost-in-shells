@@ -14,5 +14,5 @@ __all__ = [
 
     # bootstrapper
     "LLMConversationalThinkBootstrapper",
-    "LLMUnitTestsThinkBootstrapper",
+    "PromptUnitTestsBootstrapper",
 ]

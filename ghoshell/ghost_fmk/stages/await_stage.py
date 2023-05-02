@@ -3,9 +3,12 @@ from abc import ABCMeta, abstractmethod
 from ghoshell.ghost import *
 
 
+# 为一些最常见的节点提供开发范式.
+
 class AwaitStage(Stage, metaclass=ABCMeta):
     """
     一个等待节点的实例, 很简单的等待节点.
+    作为示范.
     """
 
     def on_event(self, ctx: "Context", this: Thought, event: Event) -> Operator | None:
@@ -51,3 +54,5 @@ class AwaitStage(Stage, metaclass=ABCMeta):
 
     def on_withdrawing(self, ctx: "Context", this: Thought, e: OnWithdrawing) -> Operator | None:
         return None
+
+
