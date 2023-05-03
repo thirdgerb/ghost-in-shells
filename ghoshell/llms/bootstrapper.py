@@ -4,6 +4,7 @@ from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import Bootstrapper
 from ghoshell.llms.thinks.conversational import ConversationalThinkConfig, ConversationalThink
 from ghoshell.llms.thinks.prompt_unittest import PromptUnitTestThinkDriver
+from ghoshell.llms.thinks.undercover import UndercoverGameDriver
 
 
 class LLMConversationalThinkBootstrapper(Bootstrapper):
@@ -41,3 +42,20 @@ class PromptUnitTestsBootstrapper(Bootstrapper):
         mindset.register_driver(driver)
         for meta in driver.foreach_think():
             mindset.register_meta(meta)
+
+
+class GameUndercoverBootstrapper(Bootstrapper):
+
+    def __init__(self, review_relative_dir: str = "/runtime/games/undercover", think_name: str = None):
+        self.review_relative_path = review_relative_dir
+        self.think_name = think_name
+
+    def bootstrap(self, ghost: Ghost):
+        review_dir = ghost.app_path().rstrip("/") + "/" + self.review_relative_path
+        driver = UndercoverGameDriver(
+            review_dir,
+            self.think_name,
+        )
+        mindset = ghost.mindset
+        mindset.register_driver(driver)
+        mindset.register_meta(driver.to_meta())

@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import List, Dict, Type
 
-from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel, CtxTool, URL
+from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel, CtxTool, URL, RuntimeTool
 from ghoshell.ghost_fmk.intentions import Command, CommandOutput, CommandIntention, CommandIntentionKind
 from ghoshell.ghost_fmk.intentions import FocusOnCommandHandler
 from ghoshell.ghost_fmk.utils import InstanceCount
@@ -158,7 +158,8 @@ class TaskCmdReaction(CommandReaction):
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
         process = ctx.runtime.current_process()
-        task = ctx.runtime.fetch_task(process.current)
+        task = RuntimeTool.fetch_task(ctx, process.current)
+        task = ctx.runtime.instance_task(task)
         ctx.send_at(None).json(task.dict())
         return ctx.mind(None).rewind()
 
@@ -179,6 +180,27 @@ class QuitCmdReaction(CommandReaction):
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
         return ctx.mind(None).quit()
+
+
+class RestartCmdReaction(CommandReaction):
+    """
+    重启当前任务.
+    """
+
+    def __init__(
+            self,
+            name: str = "restart",
+            desc: str = "restart current task",
+            level: int = TaskLevel.LEVEL_PUBLIC,
+    ):
+        cmd = Command(
+            name=name,
+            desc=desc,
+        )
+        super().__init__(cmd, level)
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        return ctx.mind(None).restart()
 
 
 class CancelCmdReaction(CommandReaction):

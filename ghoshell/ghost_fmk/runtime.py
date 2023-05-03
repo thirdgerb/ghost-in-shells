@@ -224,10 +224,11 @@ class RuntimeImpl(Runtime):
         # todo: gc 的 tasks 要干什么?
         saving: Dict[str, Tasked] = {}
         for task in process.tasks:
+            # 拥有长期记忆的 task 要通过长期记忆来读取.
             if task.is_long_term and task.vars is not None:
                 saving[task.tid] = task.to_tasked()
-            task.instanced = False
-            task.vars = None
+                task.instanced = False
+                task.vars = None
 
         # 重置掉多余数据.
         process.clear_cached_indexes()

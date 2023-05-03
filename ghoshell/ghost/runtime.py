@@ -192,7 +192,8 @@ class Task(BaseModel):
         # 重置状态.
         self.url.stage = tasked.stage
         self.status = tasked.status
-        self.vars = tasked.vars
+        if tasked.vars is not None:
+            self.vars = tasked.vars
         self.overdue = tasked.overdue
 
     @property
@@ -219,11 +220,8 @@ class Task(BaseModel):
             return None
         # 将 stages 推入当前的任务中
         # 注意, 从头开始插入, 符合人类直觉.
-        for stage in stages:
-            first = self.forwards[0] if len(self.forwards) > 0 else None
-            if stage == first:
-                continue
-            self.forwards.insert(0, stage)
+        for stage in self.forwards:
+            stages.append(stage)
         self.forwards = stages
 
     def forward(self) -> str | None:

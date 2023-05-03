@@ -6,6 +6,7 @@ from ghoshell.ghost_fmk.bootstrapper import FileLoggerBootstrapper
 from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
 from ghoshell.ghost_fmk.providers import ContextLoggerProvider
+from ghoshell.llms import GameUndercoverBootstrapper
 from ghoshell.llms import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
 from ghoshell.llms import LangChainOpenAIPromptProvider, LLMPrompter
 from ghoshell.mocks.cache import MockCacheProvider
@@ -55,6 +56,9 @@ class MockGhost(GhostKernel):
 
         # 将 configs/llms/unitests 下的文件当成单元测试思维.
         PromptUnitTestsBootstrapper(),
+
+        # 测试加入 undercover 游戏.
+        GameUndercoverBootstrapper(think_name="game/undercover"),
     ]
 
     def __init__(self, container: Container, root_path: str):

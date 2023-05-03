@@ -30,7 +30,7 @@ class MindImpl(Mind):
 
     def repeat(self) -> "Operator":
         # 不变更状态.
-        return AwaitOperator(self.tid, None, None, None, self.url)
+        return ActivateOperator(self.url, self.url, self.tid)
 
     def restart(self) -> "Operator":
         return RestartOperator(self.tid, self.url)
@@ -49,6 +49,9 @@ class MindImpl(Mind):
 
     def fail(self) -> "Operator":
         return FailOperator(self.tid, self.url.stage, self.url)
+
+    def finish(self) -> "Operator":
+        return FinishOperator(self.tid, self.url.stage, self.url)
 
     def destroy(self) -> None:
         del self.tid

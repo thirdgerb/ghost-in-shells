@@ -18,7 +18,8 @@ def main():
     container.register(MockMessageQueueProvider())
 
     pwd = os.getcwd()
-    ghost = MockGhost(container, pwd)
+    app_root = pwd + "/demo"
+    ghost = MockGhost(container, app_root)
     ghost.boostrap()
     shell = ConsoleShell(ghost.container)
     shell.run_as_app()

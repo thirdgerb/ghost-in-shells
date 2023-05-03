@@ -10,7 +10,7 @@ handlers:
   file:
     class: logging.handlers.TimedRotatingFileHandler
     level: DEBUG
-    filename: runtime/logs/ghoshell.log
+    filename: demo/runtime/logs/ghoshell.log
     when: midnight
     encoding: utf-8
     formatter: default

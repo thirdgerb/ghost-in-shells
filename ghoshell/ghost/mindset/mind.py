@@ -135,5 +135,9 @@ class Mind(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def finish(self) -> "Operator":
+        pass
+
+    @abstractmethod
     def destroy(self) -> None:
         pass

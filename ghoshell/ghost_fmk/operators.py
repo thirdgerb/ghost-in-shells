@@ -496,11 +496,9 @@ class ForwardOperator(AbsOperator):
             task.insert(self.stages)
             RuntimeTool.store_task(ctx, task)
 
-        return self._forward(ctx)
-
-    def _forward(self, ctx: "Context") -> Optional["Operator"]:
         task = RuntimeTool.fetch_task(ctx, self.tid)
         _next = task.forward()
+        RuntimeTool.store_task(ctx, task)
         if _next is not None:
             # 启动目标节点.
             return ActivateOperator(task.url.copy_with(stage=_next), task.url, task.tid)
