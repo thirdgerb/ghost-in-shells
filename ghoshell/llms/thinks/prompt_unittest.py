@@ -270,7 +270,9 @@ class PromptUnitTestThink(Think, Stage):
 
     def on_activating(self, ctx: Context, this: DictThought) -> Operator | None:
         cases = []
-        for name in self.config.tests:
+        names = self.config.tests.keys()
+        names = sorted(names)
+        for name in names:
             case = self.config.tests[name]
             line = f"- {name}: {case.desc}"
             cases.append(line)
