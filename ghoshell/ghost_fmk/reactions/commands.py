@@ -132,10 +132,8 @@ class ProcessCmdReaction(CommandReaction):
         todo: 实现 authentication
         """
         process = ctx.runtime.current_process()
-        if "brief" in output.params:
-            brief = output.params.get("brief", "")
-            if brief == "true":
-                ctx.send_at(None).json(process.brief())
+        if "brief" in output.params and output.params.get("brief", "") == "true":
+            ctx.send_at(None).json(process.brief())
             return ctx.mind(None).rewind()
         else:
             ctx.send_at(None).json(process.dict())

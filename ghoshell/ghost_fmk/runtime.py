@@ -215,7 +215,7 @@ class RuntimeImpl(Runtime):
                 alive.append(ptr)
         process.reset_tasks(alive)
         # 重置 process.
-        process.store_task(*reversed(alive))
+        # process.store_task(*reversed(alive))
         return gc
 
     def _save_process(self, process: Process) -> None:

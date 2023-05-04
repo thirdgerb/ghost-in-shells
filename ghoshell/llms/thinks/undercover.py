@@ -137,7 +137,7 @@ class _UndercoverGameInfo(BaseModel):
 
 
 class UndercoverGameThought(Thought):
-    # 游戏退出时就遗忘.
+    # 游戏退出时不遗忘, 保持状态.
     priority = 0.1
 
     def __init__(self, args: Dict):
@@ -665,6 +665,8 @@ class _AbsStage(Stage, metaclass=ABCMeta):
             return self.on_activate(ctx, this)
         if isinstance(event, OnReceived):
             return self.on_received(ctx, this)
+        if isinstance(event, OnPreempted):
+            return self.on_preempted(ctx, this)
         return None
 
     @abstractmethod
@@ -674,6 +676,11 @@ class _AbsStage(Stage, metaclass=ABCMeta):
     @abstractmethod
     def on_received(self, ctx: "Context", this: UndercoverGameThought) -> Operator | None:
         pass
+
+    def on_preempted(self, ctx: "Context", this: UndercoverGameThought) -> Operator | None:
+        # 偷懒不写模板了.
+        ctx.send_at(this).text("欢迎回到 谁是卧底小游戏!  让我们恢复之前的进程. ")
+        return ctx.mind(this).repeat()
 
     @classmethod
     def _receive_valid_text_message(
