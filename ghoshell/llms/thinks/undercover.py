@@ -3,10 +3,12 @@ from abc import ABCMeta, abstractmethod
 from random import randint
 from typing import Optional, List, Dict, Any, ClassVar, Tuple
 
+import yaml
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost import *
 from ghoshell.ghost_fmk.reactions import CommandReaction, Command, CommandOutput
+from ghoshell.llms.utils import fetch_ctx_prompter
 from ghoshell.messages import *
 
 
@@ -21,7 +23,7 @@ class _RoundInfo(BaseModel):
     round: int
 
     # 玩家的描述词
-    describes: Dict[str, str] = Field(default_factory=dict)
+    commits: Dict[str, str] = Field(default_factory=dict)
 
     # 玩家的投票结果
     votes: Dict[str, str] = Field(default_factory=dict)
@@ -30,16 +32,48 @@ class _RoundInfo(BaseModel):
     # 会带到下一轮游戏中, 作为他的思考上下文.
     player_thoughts: Dict[str, str] = Field(default_factory=dict)
 
+    # 结果描述
+    result: str = ""
+
     # 当前发言的用户
     current_player: str = ""
 
-    def vote_count(self, vote: str) -> int:
+    def vote_count(self, voted: str) -> int:
+        """
+        计票. 写快点.
+        """
         vote_count = 0
-        for player in self.votes:
-            voted = self.votes[player]
-            if voted == vote:
+        for player in self.votes.values():
+            if voted == player:
                 vote_count += 1
         return vote_count
+
+    def round_votes_text(self, players: List[str]) -> str:
+        """
+        每个回合所有用户的投票.
+        """
+        return self.__join_ordered_player_dict(players, self.votes)
+
+    def round_commits_text(self, players: List[str]) -> str:
+        """
+        每个回合所有用户提交的描述.
+        """
+        return self.__join_ordered_player_dict(players, self.commits)
+
+    @classmethod
+    def __join_ordered_player_dict(cls, players: List[str], mapping: Dict) -> str:
+        if not mapping:
+            return ""
+
+        temp = "- {player}: {value}"
+
+        result = []
+        for player in players:
+            if player in mapping:
+                value = mapping[player]
+                line = temp.format(player=player, value=value)
+                result.append(line)
+        return "\n".join(result)
 
 
 class _Gaming(BaseModel):
@@ -75,6 +109,9 @@ class _Gaming(BaseModel):
     # 每个玩家游戏结束时的感想.
     feelings: Dict[str, str] = Field(default_factory=dict)
 
+    def someones_word(self, someone: str) -> str:
+        return self.undercover_word if someone in set(self.undercover) else self.player_word
+
 
 class _UndercoverGameInfo(BaseModel):
     """
@@ -101,7 +138,7 @@ class _UndercoverGameInfo(BaseModel):
 
 class UndercoverGameThought(Thought):
     # 游戏退出时就遗忘.
-    priority = -1
+    priority = 0.1
 
     def __init__(self, args: Dict):
         self.game_info = _UndercoverGameInfo()
@@ -146,6 +183,7 @@ class UndercoverGameDriver(ThinkDriver):
 游戏进行中, 您可以随时通过 /help 查看可用的指令. 
 比如:
 - /rule : 查询游戏的基本规则
+- /debug : 开启 debug 模式
 - /restart : 重启游戏. 
 - /cancel : 退出.
 
@@ -203,12 +241,13 @@ class UndercoverGameDriver(ThinkDriver):
 玩家 {name} 说: {description}
 """
 
-    VOTE_RESULT_TEMP: ClassVar[str] = """
+    ROUND_VOTES_TEMP: ClassVar[str] = """
 本轮游戏投票如下:
 
 {votes}
+"""
 
-
+    ROUND_RESULT_TEMP: ClassVar[str] = """
 系统判定: {result}
 """
 
@@ -222,21 +261,110 @@ class UndercoverGameDriver(ThinkDriver):
 
 恭喜{winner}方获得最后的胜利!
 
+大家的感想是:
+
+{feelings}
+
+
 游戏数据保存在 {filename}
 
 (输入任何内容结束)
 """
 
-    DESCRIBE_PROMPT_TEMP: ClassVar[str] = """
-我在玩 "谁是卧底" 的小游戏. 游戏的基本信息如下:
+    GAME_DESC: ClassVar[str] = """
+简述规则: 
 
-{context}
+六个玩家分成两组, 一组是 "普通玩家" 4个人, 一组是 "卧底" 2 个人, 相互之间都不知道身份.
+
+游戏会给每一组玩家分配一个 "关键词", "普通玩家" 拿到的词和 "卧底" 有相同点也有不同点. 互相不知道别人拿到的 "关键词" 是什么.
+
+游戏开始后, 每一轮有两个环节:
+- "描述环节": 每个玩家需要用一个形容词描述自己拿到的 关键词, 不能雷同, 不能包含 关键词 本身, 包括它的每个字.
+- "投票环节": 每个玩家选出一个在场的玩家投票, 得票最高的玩家被淘汰, 然后进入下一轮.
+
+胜负规则:
+- 如果所有卧底都被投票淘汰, 则普通玩家获胜
+- 如果只剩三个玩家, 中间包含任何一个卧底, 则卧底获胜. 
+
+只能用中文回复. 
+"""
+
+    COMMIT_PROMPT_TEMP: ClassVar[str] = """
+我在玩一局 "谁是卧底" 的小游戏. 
+
+{game_desc}
 
 ---
 
-当前游戏的状态: 
+我这局游戏的基本信息如下:
 
-{game_status}
+{private_info}
+
+--- 
+
+游戏进行过程的信息如下: 
+
+{game_process}
+
+    
+现在轮到我发言了, 我需要回顾的规则是:
+
+- 我的描述决不能包含我拿到的关键词本身
+- 我的描述也不能偏离拿到的关键词
+- 描述必须简单精辟, 最好只有一个形容词
+- 我的描述绝对不能和别人说过的描述重复, 最好每个字都不同. 
+
+我发言需要思考的策略是: 
+{strategy}
+
+我对 {my_word} 的特征的描述是:  
+"""
+    COMMIT_UNDERCOVER_STRATEGY: ClassVar[str] = """
+- 普通玩家的词可能是什么?
+- 作为卧底玩家, 我的描述需要尽可能接近普通玩家, 但绝对不能偏离自己拿到的关键词的特征.
+- 我的描述也要避免普通玩家猜到我的关键词
+- 我的描述绝不能和别人的描述相同
+"""
+
+    COMMIT_PLAYER_STRATEGY: ClassVar[str] = """
+- 作为普通玩家, 我需要通过描述, 暗示其他普通玩家我是朋友
+- 我得思考卧底玩家拿到的关键词是什么
+- 我的描述, 得避免卧底玩家猜到我的关键词是什么
+- 我的描述绝不能和别人的描述相同
+"""
+
+    EXILED_FEELING_PROMPT_TEMP: ClassVar[str] = """
+我在玩一局 "谁是卧底" 的小游戏. 
+
+{game_desc}
+
+---
+
+这局游戏的基本信息如下:
+
+{game_info}
+
+--- 
+
+游戏进行过程的信息如下: 
+
+{game_process}
+
+现在我被淘汰了.
+
+我当前的感想是:  
+"""
+
+    EXILED_OVER_PROMPT_TEMP: ClassVar[str] = """
+我在玩一局 "谁是卧底" 的小游戏. 
+
+{game_desc}
+
+---
+
+我这局游戏的基本信息如下:
+
+{private_info}
 
 --- 
 
@@ -245,31 +373,27 @@ class UndercoverGameDriver(ThinkDriver):
 {game_process}
 
 ---
+游戏结束!
 
-现在是第 {round} 轮, 我需要描述自己提示词所描述的事物. 
+这局游戏的设定揭晓:
 
-我是第 {commit_n} 个发言, 之前的发言如下: 
+{game_info}
 
-{commits}
+获胜方是: {winner}
 
-我需要考虑的是:
-- 我的描述不能偏离拿到的词  
-- 卧底会尽可能隐藏自己卧底身份
-- 普通玩家会尽可能误导卧底
-
-我对 {my_word} 的描述是:  
+我当前的感想是:  
 """
 
     VOTE_PROMPT_TEMP: ClassVar[str] = """
-我在玩 "谁是卧底" 的小游戏. 游戏的基本信息如下:
+我在玩一局 "谁是卧底" 的小游戏. 
 
-{context}
+{game_desc}
 
 ---
 
-当前游戏的状态: 
+我这局游戏的基本信息如下:
 
-{game_status}
+{private_info}
 
 --- 
 
@@ -277,20 +401,46 @@ class UndercoverGameDriver(ThinkDriver):
 
 {game_process}
 
----
+现在轮到我投票了, 我需要回顾的规则是:
+- 当前可投票对象是: {alive}
+- 得票最高的人, 会从游戏里淘汰掉.
+- 如果投票结果分不出最高票, 系统会随机淘汰掉一人. 
 
-现在是第 {round} 轮, 我需要投票. 本轮所有人的发言是: 
+我需要逐步思考的投票策略是:
 
-{commits}
+{strategy}
 
+然后我要把思考结果按 yaml 的 dict 输出, 举例:
 
-我需要考虑的是:
-- 我的描述不能偏离拿到的词  
-- 卧底会尽可能隐藏自己卧底身份
-- 普通玩家会尽可能误导卧底
+```yaml
+vote: 名字
+reason: 原因
+```
 
-我对 {my_word} 的描述是:  
+思考结果是:
 """
+    UNDERCOVER_VOTE_STRATEGY: ClassVar[str] = """
+- 我是卧底. 
+- 得票最高的玩家会被淘汰, 被人投票是坏事
+- 我想要卧底阵营获胜, 所以我需要投票淘汰普通玩家 
+- 我拿到的关键词是 "{my_word}"
+- 普通玩家的关键词也符合 "{word_desc}"
+- 如果得票高的可能是普通玩家, 我应该投给他
+- 如果得票高的可能是卧底, 我应该投给第二高的人, 以分散票数
+
+基于策略, 我需要思考: 应该投票给谁? 他的发言是什么? 我为何投票给他? 普通玩家的关键词可能是什么?
+"""
+
+    PLAYER_VOTE_STRATEGY: ClassVar[str] = """
+- 我是普通玩家.
+- 我想要普通玩家阵营获胜, 就要尽可能投票给卧底
+- 我拿到的词是 "{my_word}", 谁给出描述不符合它的特性, 就可能是卧底.
+- 卧底很可能投票给普通玩家. 
+- 我需要投票给卧底, 而且票数要集中, 确保卧底能被投出去.
+
+基于策略, 我需要思考: 谁是卧底呢? 他的发言是什么? 我为何投票给他? 卧底的关键词可能是什么?
+"""
+
     ASK_WHAT_WORD_LIKE: ClassVar[str] = """
 请问这次游戏给的提示词大概是什么类型 (会告诉每一个玩家)?
 """
@@ -319,15 +469,19 @@ class UndercoverGameDriver(ThinkDriver):
 """
 
     ROUND_START_TEMP: ClassVar[str] = """
-第 {round} 轮游戏开始!
-
-(输入任何信息继续)
+第 {round} 轮游戏开始:
 """
 
-    ROUND_DESCRIBE_SUMMARY_TEMP: ClassVar[str] = """
-第 {round} 轮发言完毕. 所有人的发言结果是:
+    ROUND_ALL_COMMITS_TEMP: ClassVar[str] = """
+当前的发言结果是:
 
 {commits}
+"""
+
+    ROUND_THOUGHT_TEMP: ClassVar[str] = """
+我这一轮的思考是:
+
+{thought}
 """
 
     AI_COMMIT_DESC_TEMP: ClassVar[str] = """
@@ -395,7 +549,9 @@ class UndercoverGameDriver(ThinkDriver):
 
     @classmethod
     def save_review_result(cls, filename: str, game_info: _UndercoverGameInfo) -> None:
-        print(filename, game_info.dict())
+        config = game_info.dict()
+        with open(filename, 'w') as f:
+            yaml.dump(config, f, allow_unicode=True)
 
 
 # ----- think ----- #
@@ -501,6 +657,7 @@ class _AbsStage(Stage, metaclass=ABCMeta):
     def reactions(self) -> Dict[str, Reaction]:
         return {
             "/rule": ShowRuleCmdReaction(),
+            "/debug": DebugCmdReaction(),
         }
 
     def on_event(self, ctx: "Context", this: UndercoverGameThought, event: Event) -> Operator | None:
@@ -586,6 +743,159 @@ class _AbsStage(Stage, metaclass=ABCMeta):
         )
         return text
 
+    def _game_exiled_feeling(self, ctx: Context, this: UndercoverGameThought, player: str) -> None:
+        """
+        比赛结束的想法.
+        """
+        game_info = self._game_private_info(this)
+        game_process = self._game_process_for_player(this, player)
+
+        prompt = UndercoverGameDriver.EXILED_FEELING_PROMPT_TEMP.format(
+            game_desc=UndercoverGameDriver.GAME_DESC,
+            game_info=game_info,
+            game_process=game_process,
+        )
+
+        if this.game_info.gaming.debug_mode:
+            # debug 模式会打印 prompt
+            ctx.send_at(this).markdown("# debug mode: feeling prompt \n\n" + prompt)
+
+        prompter = fetch_ctx_prompter(ctx)
+        resp = prompter.prompt(prompt)
+        if this.game_info.gaming.debug_mode or not this.game_info.gaming.user_player:
+            ctx.send_at(this).markdown(f"# player {player} exiled feeling \n\n" + resp)
+        this.game_info.gaming.feelings[player] = resp
+        return
+
+    def _game_over_feeling(self, ctx: Context, this: UndercoverGameThought, player: str, winner: str) -> None:
+        game_info = self._game_private_info(this)
+        private_info = self._user_private_info(this, player)
+        game_process = self._game_process_for_player(this, player)
+
+        prompt = UndercoverGameDriver.EXILED_OVER_PROMPT_TEMP.format(
+            game_desc=UndercoverGameDriver.GAME_DESC,
+            game_info=game_info,
+            private_info=private_info,
+            game_process=game_process,
+            winner=winner,
+        )
+
+        if this.game_info.gaming.debug_mode:
+            # debug 模式会打印 prompt
+            ctx.send_at(this).markdown("# debug mode: feeling prompt \n\n" + prompt)
+
+        prompter = fetch_ctx_prompter(ctx)
+        resp = prompter.prompt(prompt)
+        this.game_info.gaming.feelings[player] = resp
+        return
+
+    @classmethod
+    def _game_process_for_player(cls, this: UndercoverGameThought, player: str) -> str:
+        game_process = []
+        for round_info in this.game_info.gaming.rounds:
+            round_process = cls._round_process_for_player(this, round_info, player)
+            game_process.append(round_process)
+        return "\n---\n\n".join(game_process)
+
+    @classmethod
+    def _round_process_for_player(cls, this: UndercoverGameThought, round_info: _RoundInfo, player: str) -> str:
+        round_desc = []
+        round_start = UndercoverGameDriver.ROUND_START_TEMP.format(round=round_info.round + 1)
+        round_desc.append(round_start)
+
+        if len(round_info.commits) > 0:
+            commit_info = round_info.round_commits_text(this.game_info.players)
+            round_commits = UndercoverGameDriver.ROUND_ALL_COMMITS_TEMP.format(commits=commit_info)
+            round_desc.append(round_commits)
+
+        if len(round_info.votes) > 0:
+            vote_info = round_info.round_votes_text(this.game_info.players)
+            round_vote = UndercoverGameDriver.ROUND_VOTES_TEMP.format(votes=vote_info)
+            round_desc.append(round_vote)
+
+        if player in round_info.player_thoughts:
+            thought = round_info.player_thoughts[player]
+            thought_text = UndercoverGameDriver.ROUND_THOUGHT_TEMP.format(thought=thought)
+            round_desc.append(thought_text)
+
+        if round_info.result:
+            round_desc.append(round_info.result)
+
+        return "\n\n".join(round_desc)
+
+    def _ai_player_commit_describe(self, ctx: "Context", this: UndercoverGameThought, player: str) -> str:
+        private_info = self._user_private_info(this, player)
+        game_process = self._game_process_for_player(this, player)
+        my_word = this.game_info.gaming.someones_word(player)
+        strategy = UndercoverGameDriver.COMMIT_UNDERCOVER_STRATEGY if my_word == this.game_info.gaming.undercover_word \
+            else UndercoverGameDriver.COMMIT_PLAYER_STRATEGY
+
+        prompt = UndercoverGameDriver.COMMIT_PROMPT_TEMP.format(
+            game_desc=UndercoverGameDriver.GAME_DESC,
+            private_info=private_info,
+            game_process=game_process,
+            my_word=my_word,
+            strategy=strategy,
+        )
+
+        if this.game_info.gaming.debug_mode:
+            # debug 模式会打印 prompt
+            ctx.send_at(this).markdown("# debug mode: prompt \n\n" + prompt)
+
+        prompter = fetch_ctx_prompter(ctx)
+        resp = prompter.prompt(prompt)
+        return resp
+
+    def _ai_player_commit_vote(self, ctx: "Context", this: UndercoverGameThought, player: str) -> Tuple[str, str]:
+        private_info = self._user_private_info(this, player)
+        game_process = self._game_process_for_player(this, player)
+        alive = this.game_info.current_players()
+        my_word = this.game_info.gaming.someones_word(player)
+
+        if player in set(this.game_info.gaming.undercover):
+            my_role = UndercoverGameDriver.UNDERCOVER_ROLE
+            strategy = UndercoverGameDriver.UNDERCOVER_VOTE_STRATEGY.format(
+                my_word=my_word,
+                word_desc=this.game_info.gaming.word_desc
+            )
+        else:
+            my_role = UndercoverGameDriver.PLAYER_ROLE
+            strategy = UndercoverGameDriver.PLAYER_VOTE_STRATEGY.format(my_word=my_word)
+
+        prompt = UndercoverGameDriver.VOTE_PROMPT_TEMP.format(
+            game_desc=UndercoverGameDriver.GAME_DESC,
+            private_info=private_info,
+            game_process=game_process,
+            alive=", ".join(alive),
+            my_role=my_role,
+            strategy=strategy,
+        )
+        if this.game_info.gaming.debug_mode:
+            # debug 模式会打印 prompt
+            ctx.send_at(this).markdown("# debug mode: thought prompt \n\n" + prompt)
+
+        prompter = fetch_ctx_prompter(ctx)
+        resp = prompter.prompt(prompt)
+
+        if this.game_info.gaming.debug_mode or not this.game_info.gaming.user_player:
+            # debug 模式会打印 prompt
+            ctx.send_at(this).markdown("\n\n".join([
+                "# debug mode: vote reason",
+                private_info,
+                resp,
+            ]))
+
+        if resp.startswith("```yaml"):
+            resp = resp[7:]
+        if resp.endswith("```"):
+            resp = resp[:len(resp) - 3]
+        if resp.startswith("```"):
+            resp = resp[3:]
+
+        loaded: Dict = yaml.safe_load(resp.strip())
+        # 偷懒, 不写校验了.
+        return loaded.get("vote", ""), loaded.get("reason", "")
+
 
 class _DefaultStage(_AbsStage):
     """
@@ -600,6 +910,9 @@ class _DefaultStage(_AbsStage):
         return ctx.mind(this).awaits()
 
     def on_received(self, ctx: "Context", this: UndercoverGameThought) -> Operator | None:
+        """
+        简单测试一下 task 的路径规划.
+        """
         return ctx.mind(this).forward(
             _AskUserWhatWordObjectLike.stage_name,
             _AskUserWhatPlayerWord.stage_name,
@@ -765,7 +1078,8 @@ class _RoundInitializeStage(_AbsStage):
         # 判定游戏是否已经结束
         if len(this.game_info.players) - len(this.game_info.gaming.exiled) <= 3:
             # 游戏已经接入, 进入结算环节.
-            return ctx.mind(this).forward(_GameResultStage.stage_name)
+            ctx.send_at(this).text("it looks game is over")
+            return ctx.mind(this).awaits()
 
         # 有必要的话, 初始化 round
         current_round = this.game_info.gaming.round
@@ -775,12 +1089,15 @@ class _RoundInitializeStage(_AbsStage):
 
         text = UndercoverGameDriver.ROUND_START_TEMP.format(round=current_round + 1)
         ctx.send_at(this).markdown(text)
-        return ctx.mind(this).forward(_RoundCommitStage.stage_name)
+        return ctx.mind(this).awaits()
 
     def on_received(self, ctx: "Context", this: UndercoverGameThought) -> Operator | None:
         """
         任何消息直接进入.
         """
+        if len(this.game_info.players) - len(this.game_info.gaming.exiled) <= 3:
+            # 游戏已经接入, 进入结算环节.
+            return ctx.mind(this).forward(_GameResultStage.stage_name)
         return ctx.mind(this).forward(_RoundCommitStage.stage_name)
 
 
@@ -802,7 +1119,7 @@ class _RoundCommitStage(_AbsStage):
                 # 已经淘汰的成员没有资格发言.
                 continue
             # 用户已经发言过了.
-            if player in round_info.describes:
+            if player in round_info.commits:
                 continue
 
             round_info.current_player = player
@@ -818,10 +1135,10 @@ class _RoundCommitStage(_AbsStage):
 
         # 说明所有人发言已经结束了. 进入思考环节.
         commits = []
-        for player in round_info.describes:
-            commit = round_info.describes[player]
+        for player in round_info.commits:
+            commit = round_info.commits[player]
             commits.append(f"- {player} 发言是: {commit}")
-        summary = UndercoverGameDriver.ROUND_DESCRIBE_SUMMARY_TEMP.format(
+        summary = UndercoverGameDriver.ROUND_ALL_COMMITS_TEMP.format(
             round=round_info.round,
             commits="\n".join(commits)
         )
@@ -840,10 +1157,10 @@ class _RoundCommitStage(_AbsStage):
                 return op
         else:
             # AI 发言环节.
-            content = self._ai_describe(ctx, this, current_player)
+            content = self._ai_player_commit_describe(ctx, this, current_player)
 
         # 设置好发言内容.
-        round_info.describes[current_player] = content
+        round_info.commits[current_player] = content
         text = UndercoverGameDriver.PLAYER_SPEAK_OUT_DESCRIBE_TEMP.format(
             player=current_player,
             content=content,
@@ -851,9 +1168,6 @@ class _RoundCommitStage(_AbsStage):
         ctx.send_at(this).markdown(text)
         # 重启当前环节.
         return ctx.mind(this).repeat()
-
-    def _ai_describe(self, ctx: "Context", this: UndercoverGameThought, player: str) -> str:
-        return "测试测试"
 
 
 class _RoundVoteStage(_AbsStage):
@@ -903,7 +1217,7 @@ class _RoundVoteStage(_AbsStage):
             thought = ""
         else:
             # AI 发言环节.
-            vote, thought = self._ai_vote(ctx, this, current_player)
+            vote, thought = self._ai_player_commit_vote(ctx, this, current_player)
 
         # 设置好发言内容.
         # 必须是用户里的人.
@@ -926,11 +1240,6 @@ class _RoundVoteStage(_AbsStage):
         ctx.send_at(this).markdown(text)
         # 重启当前环节.
         return ctx.mind(this).repeat()
-
-    def _ai_vote(self, ctx: "Context", this: UndercoverGameThought, player: str) -> Tuple[str, str]:
-        # todo
-        return this.game_info.current_players()[0], "思考内容"
-        # return "投票对象", "思考内容"
 
 
 class _VoteResultStage(_AbsStage):
@@ -975,20 +1284,16 @@ class _VoteResultStage(_AbsStage):
 
         # 淘汰者入列.
         this.game_info.gaming.exiled.append(exiled_player)
+        round_info.result = result
+
         # 被淘汰的人说获奖感言.
-        exiled_feeling = self._exited_feeling(ctx, this, exiled_player)
-        this.game_info.gaming.feelings[exiled_player] = exiled_feeling
+        self._game_exiled_feeling(ctx, this, exiled_player)
 
         # 告知游戏信息.
-        text = UndercoverGameDriver.VOTE_RESULT_TEMP.format(
-            votes="\n".join(votes),
-            result=result,
-        )
-        ctx.send_at(this).markdown(text)
+        text = UndercoverGameDriver.ROUND_VOTES_TEMP.format(votes="\n".join(votes))
+        result_text = UndercoverGameDriver.ROUND_RESULT_TEMP.format(result=result)
+        ctx.send_at(this).markdown(text).markdown(result_text)
         return ctx.mind(this).awaits()
-
-    def _exited_feeling(self, ctx: Context, this: UndercoverGameThought, exiled: str) -> str:
-        return "feeling"
 
     def on_received(self, ctx: "Context", this: UndercoverGameThought) -> Operator | None:
         # 进入结算计算环节.
@@ -1022,21 +1327,25 @@ class _GameResultStage(_AbsStage):
                 players.append(player)
         alive = set(this.game_info.current_players())
 
-        winner = UndercoverGameDriver.PLAYER_ROLE
+        winner_role = UndercoverGameDriver.UNDERCOVER_ROLE if undercover & alive else UndercoverGameDriver.PLAYER_ROLE
         for name in alive:
-            if name in undercover:
-                winner = UndercoverGameDriver.UNDERCOVER_ROLE
-                break
+            self._game_over_feeling(ctx, this, name, winner_role)
 
         review_filename = self.driver.review_saving_filename()
+
+        feelings = []
+        for player in this.game_info.gaming.feelings:
+            feeling = this.game_info.gaming.feelings[player]
+            feelings.append(f"- {player}: {feeling}")
 
         text = UndercoverGameDriver.GAME_RESULT_TEMP.format(
             round=this.game_info.gaming.round + 1,
             players=",".join(players),
             undercover=",".join(undercover),
             alive=",".join(alive),
-            winner=winner,
+            winner=winner_role,
             filename=review_filename,
+            feelings="\n".join(feelings)
         )
         ctx.send_at(this).markdown(text)
         self.driver.save_review_result(review_filename, this.game_info)
@@ -1071,3 +1380,24 @@ class ShowRuleCmdReaction(CommandReaction):
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
         ctx.send_at(this).markdown(UndercoverGameDriver.GAME_RULE)
         return ctx.mind(this).rewind()
+
+
+class DebugCmdReaction(CommandReaction):
+
+    def __init__(
+            self,
+            name: str = "debug",
+            desc: str = "toggle debug mode",
+            level: int = TaskLevel.LEVEL_PRIVATE,
+    ):
+        cmd = Command(
+            name=name,
+            desc=desc,
+        )
+        super().__init__(cmd, level)
+
+    def on_output(self, ctx: Context, this: UndercoverGameThought, output: CommandOutput) -> Operator:
+        debug_mode = not this.game_info.gaming.debug_mode
+        this.game_info.gaming.debug_mode = debug_mode
+        ctx.send_at(this).markdown(f"toggle debug mode to {debug_mode}")
+        return ctx.mind(this).awaits()

@@ -1,3 +1,5 @@
+import time
+
 from langchain import OpenAI
 
 from ghoshell.llms.contracts import LLMPrompter
@@ -10,4 +12,7 @@ class LangChainOpenAIAdapter(LLMPrompter):
         # todo: log, records saving
 
     def prompt(self, prompt: str) -> str:
-        return self.ai(prompt).strip()
+        resp = self.ai(prompt)
+        # 避免高并发
+        time.sleep(0.1)
+        return resp.strip()

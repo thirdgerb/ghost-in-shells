@@ -51,7 +51,7 @@ class GameUndercoverBootstrapper(Bootstrapper):
         self.think_name = think_name
 
     def bootstrap(self, ghost: Ghost):
-        review_dir = ghost.app_path().rstrip("/") + "/" + self.review_relative_path
+        review_dir = ghost.app_path().rstrip("/") + "/" + self.review_relative_path.strip("/")
         driver = UndercoverGameDriver(
             review_dir,
             self.think_name,

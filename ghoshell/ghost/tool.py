@@ -193,7 +193,8 @@ class CtxTool:
         # awaiting 永远最高优.
         if awaiting_task.tid != root_task.tid and awaiting_task.attentions:
             # awaiting 添加所有.
-            result.append(*awaiting_task.attentions)
+            for attention in awaiting_task.attentions:
+                result.append(attention)
 
         if root_task.tid and root_task.attentions is not None:
             for attention in root_task.attentions:

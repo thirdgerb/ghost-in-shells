@@ -241,7 +241,10 @@ class IntendingOperator(AbsOperator):
         thought = RuntimeTool.fetch_thought_by_task(ctx, task)
         # 这里就反映出 python 弱约束 + 强类型的痛苦了.
         result = self.matched.dict(include={"params"})
-        return reaction.react(ctx, thought, result.get("params", None))
+        op = reaction.react(ctx, thought, result.get("params", None))
+        RuntimeTool.merge_thought_to_task(thought, task)
+        RuntimeTool.store_task(ctx, task)
+        return op
 
     def _match_new_thought(self, target: URL, args: Dict | None) -> Optional["Operator"]:
         if target.stage:
