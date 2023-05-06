@@ -2,9 +2,9 @@ from typing import List, Dict
 
 from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import Bootstrapper
-from ghoshell.llms.thinks.conversational import ConversationalThinkConfig, ConversationalThink
-from ghoshell.llms.thinks.prompt_unittest import PromptUnitTestThinkDriver
-from ghoshell.llms.thinks.undercover import UndercoverGameDriver
+from ghoshell.llms.discover.conversational import ConversationalThinkConfig, ConversationalThink
+from ghoshell.llms.discover.prompt_unittest import PromptUnitTestThinkDriver
+from ghoshell.llms.discover.undercover import UndercoverGameDriver
 
 
 class LLMConversationalThinkBootstrapper(Bootstrapper):

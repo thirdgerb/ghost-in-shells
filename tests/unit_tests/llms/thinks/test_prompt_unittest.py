@@ -1,4 +1,4 @@
-from ghoshell.llms.thinks.prompt_unittest import PromptUnitTestLoader
+from ghoshell.llms.discover.prompt_unittest import PromptUnitTestLoader
 
 
 def test_prompt_unittest_storage_1():

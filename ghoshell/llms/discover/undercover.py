@@ -355,7 +355,7 @@ class UndercoverGameDriver(ThinkDriver):
 我当前的感想是:  
 """
 
-    EXILED_OVER_PROMPT_TEMP: ClassVar[str] = """
+    GAME_OVER_PROMPT_TEMP: ClassVar[str] = """
 我在玩一局 "谁是卧底" 的小游戏. 
 
 {game_desc}
@@ -779,7 +779,7 @@ class _AbsStage(Stage, metaclass=ABCMeta):
         private_info = self._user_private_info(this, player)
         game_process = self._game_process_for_player(this, player)
 
-        prompt = UndercoverGameDriver.EXILED_OVER_PROMPT_TEMP.format(
+        prompt = UndercoverGameDriver.GAME_OVER_PROMPT_TEMP.format(
             game_desc=UndercoverGameDriver.GAME_DESC,
             game_info=game_info,
             private_info=private_info,
