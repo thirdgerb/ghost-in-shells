@@ -17,7 +17,7 @@ class LangChainOpenAIPromptProvider(Provider):
 
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         ai = OpenAI(
-            request_timeout=10,
+            request_timeout=15,
             max_tokens=2048,
             model_name="text-davinci-003",
             max_retries=0,
