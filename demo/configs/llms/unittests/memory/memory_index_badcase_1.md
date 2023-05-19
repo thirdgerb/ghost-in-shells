@@ -1,6 +1,6 @@
 # DESC
 
-测试用 AI 自己来提示自己使用记忆能力. 这个是基线测试, 实际情况要复杂得多. 
+测试用 AI 自己来提示自己使用记忆能力. 这是个失败的用例.
 
 # PROMPT
 
@@ -40,7 +40,12 @@ User: =qef= 请问这个项目需要怎么安装呢? =qef=
 
 # EXPECT
 
-不知道会不会调用
 
 # CONCLUSION
 
+bad case. 不是很好的调用策略. 下一步尝试用 API 方法. 
+
+```
+ 1 需要使用 recall_document_by_keywords 能力, 提供的关键字为: 安装 Ghost in Shells                                                                                        
+ 2 根据上下文和之前记忆的文档, 回答用户的问题.
+```
