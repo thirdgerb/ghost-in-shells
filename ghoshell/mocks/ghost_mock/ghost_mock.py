@@ -1,7 +1,7 @@
 from logging import Logger
 from typing import List
 
-from ghoshell.container import Container, Provider
+from ghoshell.container import Provider
 from ghoshell.ghost_fmk.bootstrapper import FileLoggerBootstrapper
 from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
@@ -41,7 +41,7 @@ conversational_bootstrapper = LLMConversationalThinkBootstrapper([
     dict(
         think="conversational",
         desc="test llm conversational basic feats",
-        debug="true",
+        debug=False,
     ),
 ])
 
@@ -60,15 +60,6 @@ class MockGhost(GhostKernel):
         # 测试加入 undercover 游戏.
         GameUndercoverBootstrapper(think_name="game/undercover"),
     ]
-
-    def __init__(self, container: Container, root_path: str):
-        config = container.force_fetch(GhostConfig)
-        super().__init__(
-            "mock_ghost",
-            container=container,
-            root_path=root_path.rstrip("/"),
-            config=config,
-        )
 
     @classmethod
     def _depend_contracts(cls) -> List:

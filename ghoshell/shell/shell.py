@@ -89,3 +89,13 @@ class Shell(metaclass=ABCMeta):
         当成 app 来执行.
         """
         pass
+
+    @property
+    @abstractmethod
+    def config_path(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def runtime_path(self) -> str:
+        pass

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Tuple, Optional, Callable, List, Any, ClassVar
 
-from ghoshell.container import Container
+from ghoshell.container import Container, Provider
 from ghoshell.messages import Output, Input
 from ghoshell.shell import Shell, Messenger
 from ghoshell.utils import create_pipeline
@@ -73,15 +73,20 @@ class ShellKernel(Shell, metaclass=ABCMeta):
     # 初始化流程
     bootstrapping: ClassVar[List[Bootstrapper]] = []
 
+    # container providers
+    providers: ClassVar[List[Provider]] = []
+
     # 输入处理
     input_middlewares: ClassVar[List[InputMiddleware]] = []
     # 输出处理
     output_middlewares: ClassVar[List[OutputMiddleware]] = []
 
-    def __init__(self, container: Container, messenger: Messenger):
+    def __init__(self, container: Container, config_path: str, runtime_path: str):
         self._container = Container(container)
         self._container.set(Shell, self)
-        self._messenger = messenger
+        self._config_path = config_path
+        self._runtime_path = runtime_path
+        self._messenger: Messenger | None = None
 
     @property
     def kind(self) -> str:
@@ -103,6 +108,8 @@ class ShellKernel(Shell, metaclass=ABCMeta):
         return self._container
 
     def messenger(self, _input: Input | None) -> Messenger:
+        if self._messenger is None:
+            self._messenger = self._container.force_fetch(Messenger)
         return self._messenger
 
     # ----- implements ----- #
@@ -111,6 +118,9 @@ class ShellKernel(Shell, metaclass=ABCMeta):
         """
         初始化启动
         """
+        for provider in self.providers:
+            self._container.register(provider)
+
         for bootstrapper in self.bootstrapping:
             bootstrapper.bootstrap(self)
         return self
@@ -192,3 +202,11 @@ class ShellKernel(Shell, metaclass=ABCMeta):
         finally:
             # todo: 异常处理
             pass
+
+    @property
+    def config_path(self) -> str:
+        return self._config_path
+
+    @property
+    def runtime_path(self) -> str:
+        return self._runtime_path

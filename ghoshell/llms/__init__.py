@@ -15,4 +15,5 @@ __all__ = [
     # bootstrapper
     "LLMConversationalThinkBootstrapper",
     "PromptUnitTestsBootstrapper",
+    "GameUndercoverBootstrapper",
 ]

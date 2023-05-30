@@ -4,6 +4,8 @@ from ghoshell.ghost import URL
 
 
 class GhostConfig(BaseModel):
+    name: str = "ghost"
+
     root_url: URL
 
     exception_traceback_limit: int = 5

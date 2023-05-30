@@ -11,20 +11,20 @@ from rich.markdown import Markdown
 from ghoshell.container import Container
 from ghoshell.ghost import Ghost
 from ghoshell.messages import *
-from ghoshell.shell import Messenger
-from ghoshell.shell_fmk import InputMiddleware, OutputMiddleware
-from ghoshell.shell_fmk import ShellKernel, Bootstrapper
-from ghoshell.shell_fmk import SyncGhostMessenger, MessageQueue
+from ghoshell.shell_fmk import OutputMiddleware
+from ghoshell.shell_fmk import ShellKernel
 
 
 class ConsoleShell(ShellKernel):
     KIND: ClassVar[str] = "console"
 
+    providers = []
+
     # 初始化流程
-    bootstrapping: ClassVar[List[Bootstrapper]] = []
+    bootstrapping = []
 
     # 输入处理
-    input_middlewares: ClassVar[List[InputMiddleware]] = [
+    input_middlewares = [
         # InputTestMiddleware()
     ]
 
@@ -32,23 +32,18 @@ class ConsoleShell(ShellKernel):
     output_middlewares: ClassVar[List[OutputMiddleware]] = [
     ]
 
-    def __init__(self, container: Container):
+    def __init__(self, container: Container, config_path: str, runtime_path: str):
         # message_queue = ghost
-        shell_container = Container(container)
         ghost = container.force_fetch(Ghost)
-        message_queue = container.force_fetch(MessageQueue)
-        messenger = SyncGhostMessenger(ghost, queue=message_queue)
-
-        self.session_id = str(uuid.uuid4().hex)
-        self.user_id = str(uuid.uuid4().hex)
-        self.app = Console()
-        self.ghost = ghost
-        super().__init__(shell_container, messenger)
-        self._welcome()
-        self._session: PromptSession = None
+        self._session_id = str(uuid.uuid4().hex)
+        self._user_id = str(uuid.uuid4().hex)
+        self._app = Console()
+        self._ghost = ghost
+        self._session: PromptSession | None = None
+        super().__init__(container, config_path, runtime_path)
 
     def _welcome(self) -> None:
-        self.app.print(Markdown("""
+        self._app.print(Markdown("""
 ----
 # Console Demo
 
@@ -64,6 +59,7 @@ log:
         return "command_shell"
 
     def run_as_app(self):
+        self._welcome()
         asyncio.run(self._main())
 
     async def _main(self):
@@ -73,7 +69,7 @@ log:
                 await self._prompt_loop()
             finally:
                 background_task.cancel()
-            self.app.print("Quitting event loop. Bye.")
+            self._app.print("Quitting event loop. Bye.")
 
     async def _prompt_loop(self):
         session = PromptSession("\n\n<<< ", )
@@ -86,7 +82,7 @@ log:
                 event = await session.prompt_async(multiline=False, key_bindings=bindings)
                 self.tick(event)
             except (EOFError, KeyboardInterrupt):
-                self.app.print(f"quit!!")
+                self._app.print(f"quit!!")
                 exit(0)
 
     def on_event(self, prompt: str) -> Optional[Input]:
@@ -94,11 +90,11 @@ log:
             self._quit()
         prompt = prompt.strip()
         trace = dict(
-            clone_id=self.session_id,
-            session_id=self.session_id,
-            shell_id=self.session_id,
+            clone_id=self._session_id,
+            session_id=self._session_id,
+            shell_id=self._session_id,
             shell_kind=self.kind(),
-            subject_id=self.user_id,
+            subject_id=self._user_id,
         )
         text = Text(content=prompt)
         return Input(
@@ -111,16 +107,16 @@ log:
         if self._session is not None:
             # todo: close?
             pass
-        self.app.print("Exit, Bye!")
+        self._app.print("Exit, Bye!")
         exit(0)
 
     def deliver(self, _output: Output) -> None:
         text = Text.read(_output.payload)
         if text is not None:
             if text.markdown:
-                self.app.print(self._markdown_output(text.content))
+                self._app.print(self._markdown_output(text.content))
             else:
-                self.app.print(text.content)
+                self._app.print(text.content)
 
         err = Error.read(_output.payload)
         if err is not None:
@@ -129,7 +125,7 @@ log:
                 where = f"at {err.at}"
             err_info = self._markdown_output(
                 f"# Error Occur {err.errcode}\n\n{err.errmsg} {where}\n\n{err.stack_info}")
-            self.app.print(err_info)
+            self._app.print(err_info)
 
         signal = Signal.read(_output.payload)
         if signal is not None and signal.code == signal.QUIT_CODE:
@@ -142,6 +138,3 @@ log:
             # line = "\n\n".join(line.split("\n"))
             result.append(line)
         return Markdown("\n\n".join(result))
-
-    def messenger(self, _input: Input | None) -> Messenger:
-        return self._messenger

@@ -31,13 +31,13 @@ class LLMConversationalThinkBootstrapper(Bootstrapper):
 
 class PromptUnitTestsBootstrapper(Bootstrapper):
 
-    def __init__(self, config_path: str = "/configs/llms/unittests", think_prefix: str = "unittests"):
-        self.config_path = config_path
+    def __init__(self, relative_config_path: str = "/llms/unittests", think_prefix: str = "unittests"):
+        self.relative_config_path = relative_config_path
         self.think_prefix = think_prefix
 
     def bootstrap(self, ghost: Ghost):
         mindset = ghost.mindset
-        root_dir = ghost.app_path().rstrip("/") + "/" + self.config_path.strip("/")
+        root_dir = ghost.config_path.rstrip("/") + "/" + self.relative_config_path.strip("/")
         driver = PromptUnitTestThinkDriver(root_dir, think_prefix=self.think_prefix)
         mindset.register_driver(driver)
         for meta in driver.foreach_think():
@@ -46,12 +46,12 @@ class PromptUnitTestsBootstrapper(Bootstrapper):
 
 class GameUndercoverBootstrapper(Bootstrapper):
 
-    def __init__(self, review_relative_dir: str = "/runtime/games/undercover", think_name: str = None):
-        self.review_relative_path = review_relative_dir
+    def __init__(self, relative_review_dir: str = "/games/undercover", think_name: str = None):
+        self.relative_review_path = relative_review_dir
         self.think_name = think_name
 
     def bootstrap(self, ghost: Ghost):
-        review_dir = ghost.app_path().rstrip("/") + "/" + self.review_relative_path.strip("/")
+        review_dir = ghost.runtime_path.rstrip("/") + "/" + self.relative_review_path.strip("/")
         driver = UndercoverGameDriver(
             review_dir,
             self.think_name,

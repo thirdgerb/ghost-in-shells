@@ -37,13 +37,6 @@ class Ghost(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
-    def app_path(self) -> str:
-        """
-        运行时的路径.
-        """
-        pass
-
     @property
     @abstractmethod
     def container(self) -> "Container":
@@ -117,6 +110,16 @@ class Ghost(metaclass=ABCMeta):
         我理解不同的机器人, 可能会有不同的运行时方案, 这里做出抽象方便调整.
         但 ghoshell 只会实现唯一的一个 kernel
         """
+        pass
+
+    @property
+    @abstractmethod
+    def config_path(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def runtime_path(self) -> str:
         pass
 
 

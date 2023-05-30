@@ -1,28 +1,90 @@
 #!/usr/bin/env python
 import os.path
+from logging.config import dictConfig
+
+import yaml
+from rich.prompt import Prompt
 
 from ghoshell.container import Container
+from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import GhostConfig
 from ghoshell.mocks import MockGhost, MockMessageQueueProvider
-from ghoshell.shell_protos import ConsoleShell
+from ghoshell.shell import Messenger
+from ghoshell.shell_fmk import SyncGhostMessenger, MessageQueue
+from ghoshell.shell_protos import ConsoleShell, BaiduSpeechShell
+
+pwd = os.getcwd()
+root_path = pwd + "/demo"
+
+root_container = Container()
+
+# register logger
+with open(root_path + "/configs/logging.yaml", "r", encoding="utf-8") as f:
+    logging_config = yaml.safe_load(f)
+    dictConfig(logging_config)
 
 
-def main():
-    config = GhostConfig(
-        root_url=dict(
-            resolver="test"
-        )
-    )
-    container = Container()
-    container.set(GhostConfig, config)
+def demo_ghost() -> Ghost:
+    """
+    bootstrap demo ghost from local files in ./demo
+    """
+    container = root_container
     container.register(MockMessageQueueProvider())
+    config_path = "/".join([root_path, "configs", "mock_ghost"])
+    runtime_path = "/".join([root_path, "runtime"])
 
-    pwd = os.getcwd()
-    app_root = pwd + "/demo"
-    ghost = MockGhost(container, app_root)
+    config_file = config_path + "/config.yml"
+    with open(config_file, 'r', encoding='utf-8') as f:
+        config_data = yaml.safe_load(f)
+    config = GhostConfig(**config_data)
+
+    ghost = MockGhost(container, config, config_path, runtime_path)
+    return ghost
+
+
+def run_console_shell():
+    """
+    run console shell with local demo ghost
+    """
+    container = root_container
+    config_path = "/".join([root_path, "configs", "console_shell"])
+    runtime_path = "/".join([root_path, "runtime"])
+    # 分享相同的 path.
+    shell = ConsoleShell(container, config_path, runtime_path)
+    shell.bootstrap().run_as_app()
+
+
+def run_speech_shell():
+    container = root_container
+    config_path = "/".join([root_path, "configs", "baidu_speech_shell"])
+    runtime_path = "/".join([root_path, "runtime"])
+    shell = BaiduSpeechShell(container, config_path, runtime_path)
+    shell.bootstrap().run_as_app()
+
+
+shells = {
+    "console": run_console_shell,
+    "speech": run_speech_shell,
+}
+
+default_shell = "console"
+
+
+def main() -> None:
+    ghost = demo_ghost()
     ghost.boostrap()
-    shell = ConsoleShell(ghost.container)
-    shell.run_as_app()
+    message_queue = ghost.container.force_fetch(MessageQueue)
+    messenger = SyncGhostMessenger(ghost, queue=message_queue)
+    root_container.set(Messenger, messenger)
+    root_container.set(Ghost, ghost)
+
+    demo_shell_chosen = Prompt.ask("choose demo shell", choices=[key for key in shells.keys()], default=default_shell)
+    if demo_shell_chosen not in shells:
+        print(f"invalid [{demo_shell_chosen}] provided")
+        exit(0)
+
+    runner = shells[demo_shell_chosen]
+    runner()
 
 
 if __name__ == "__main__":

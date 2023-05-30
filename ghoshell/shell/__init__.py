@@ -5,5 +5,5 @@ from ghoshell.shell.shell import Shell
 __all__ = [
     "Shell",
     "Messenger",
-    "ShellException",
+    "ShellException", "BoostrapException",
 ]

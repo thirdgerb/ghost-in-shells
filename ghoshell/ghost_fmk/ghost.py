@@ -36,19 +36,18 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
 
     def __init__(
             self,
-            name: str,
             container: Container,
-            root_path: str,
             config: GhostConfig,
-            # messenger: Messenger,
+            config_path: str,
+            runtime_path: str,
     ):
-        self._name = name
-        self._root_path = root_path
         self._config = config
         self._container = container
         self._mindset: Mindset | None = None
         self._focus: Focus | None = None
         self._memory: Memory | None = None
+        self._config_path = config_path
+        self._runtime_path = runtime_path
         container.set(Ghost, self)
         container.set(GhostConfig, config)
         # self._messenger: Messenger = messenger
@@ -138,9 +137,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     def new_operation_kernel(self) -> "OperationKernel":
         pass
 
-    def app_path(self) -> str:
-        return self._root_path
-
     def respond(self, inpt: Input) -> List[Output] | None:
         """
         核心方法: 处理输入 inpt
@@ -184,7 +180,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
 
     @property
     def name(self) -> str:
-        return self._name
+        return self._config.name
 
     @property
     def container(self) -> "Container":
@@ -246,3 +242,11 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             return ctx
 
         return destination
+
+    @property
+    def config_path(self) -> str:
+        return self._config_path
+
+    @property
+    def runtime_path(self) -> str:
+        return self._runtime_path
