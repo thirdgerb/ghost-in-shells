@@ -3,7 +3,7 @@ import json
 import os
 from typing import Dict, Type, ClassVar
 from urllib.error import URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote_plus
 from urllib.request import Request
 from urllib.request import urlopen
 
@@ -36,7 +36,7 @@ class BaiduSpeechAdapter:
 
         post_data = urlencode(params)
         post_data = post_data.encode('utf-8')
-        req = Request(self._config.tts.token_url, post_data)
+        req = Request(self._config.token_url, post_data)
 
         f = urlopen(req, timeout=5)
         result_str = f.read()
@@ -86,12 +86,13 @@ class BaiduSpeechAdapter:
             return "\n".join(result_data.get("result", ""))
         return result_str
 
-    def text2speech(self, text: str, filename: str) -> None:
+    def text2speech(self, text: str) -> bytes:
         """
         文字内容转语音.
         随便写写.
         """
         token = self._fetch_token()
+        text = quote_plus(text)
         params = {
             'tok': token,
             'tex': text,
@@ -105,17 +106,16 @@ class BaiduSpeechAdapter:
             'ctp': 1,
         }
         data = urlencode(params)
-        req = Request(self._config.tts.tts_url, data.encode('utf-8'))
+        req = Request(self._config.tts.tts_url, data=data.encode('utf-8'))
         f = urlopen(req)
         result_str = f.read()
         headers = dict((name.lower(), value) for name, value in f.headers.items())
 
         has_error = 'content-type' not in headers.keys() or headers['content-type'].find('audio/') < 0
         if not has_error:
-            with open(filename, 'wb') as of:
-                of.write(result_str)
+            return result_str
         else:
-            raise RuntimeError("tts err:" + result_str)
+            raise RuntimeError("tts err:" + str(result_str) + "; text: " + text)
 
 
 class BaiduSpeechProvider(Provider):

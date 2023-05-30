@@ -1,5 +1,6 @@
 import random
 import string
+from typing import ClassVar
 
 from pydantic import BaseModel
 
@@ -29,12 +30,11 @@ class BaiduTTSConfig(BaseModel):
     vol = 5
 
     # 下载的文件格式, 3：mp3(default) 4： pcm-16k 5： pcm-8k 6. wav
-    aue = 3
+    aue: ClassVar[int] = 6
 
     cuid = cuid()
 
     tts_url = 'https://tsn.baidu.com/text2audio'
-    token_url = 'https://aip.baidubce.com/oauth/2.0/token'
     scope = 'audio_tts_post'  # 有此scope表示有tts能力，没有请在网页里勾选
 
     FORMATS = {3: "mp3", 4: "pcm", 5: "pcm", 6: "wav"}
@@ -45,5 +45,6 @@ class BaiduTTSConfig(BaseModel):
 
 
 class BaiduSpeechConfig(BaseModel):
+    token_url = 'https://aip.baidubce.com/oauth/2.0/token'
     tts: BaiduTTSConfig = BaiduTTSConfig()
     asr: BaiduASRConfig = BaiduASRConfig()

@@ -3,6 +3,7 @@ from typing import Optional
 
 import speech_recognition as sr
 from prompt_toolkit import prompt
+from pyaudio import PyAudio
 from rich.console import Console
 from rich.markdown import Markdown
 
@@ -25,6 +26,8 @@ class BaiduSpeechShell(ShellKernel):
         self._console = Console()
         self.session_id = str(uuid.uuid4().hex)
         self.user_id = str(uuid.uuid4().hex)
+        self.pyaudio = PyAudio()
+        self._talking = False
         super().__init__(container, config_path, runtime_path)
 
     def deliver(self, _output: Output) -> None:
@@ -32,7 +35,8 @@ class BaiduSpeechShell(ShellKernel):
         if text is None:
             return None
         self._markdown_print(text.content)
-        self._speak(text.content)
+        if self._talking:
+            self._speak_text(text.content)
 
     def on_event(self, e: str) -> Optional[Input]:
         content = e.strip()
@@ -68,7 +72,7 @@ class BaiduSpeechShell(ShellKernel):
                     self.tick(user_input)
 
     def tick(self, text: str) -> None:
-        self._console.print("> waiting...")
+        self._console.print("> waiting ghost...")
         super().tick(text)
 
     def _listen(self) -> None:
@@ -79,16 +83,36 @@ class BaiduSpeechShell(ShellKernel):
             self._console.print("> listening...")
             audio = r.listen(source)
         wave_data = audio.get_wav_data(convert_rate=16000)
-        self._console.print("> understanding...")
+        self._console.print("> speech to text...")
         text = adapter.wave2text(wave_data)
         self._console.print("> you said: " + text)
+        self._talking = True
         self.tick(text)
+        self._talking = False
 
-    def _speak(self, text: str) -> None:
+    def _speak_text(self, text: str) -> None:
         """
         说话.
         """
-        pass
+        adapter = self.container.force_fetch(BaiduSpeechAdapter)
+        self._console.print("> text to speech...")
+        speech_data = adapter.text2speech(text)
+        self._speak(speech_data)
+
+    def _speak(self, wave_data: bytes) -> None:
+        self._console.print("> speaking...")
+        p = self.pyaudio
+        stream = p.open(
+            format=p.get_format_from_width(2),
+            channels=1,
+            rate=16000,
+            output=True,
+        )
+        # play stream
+        stream.write(wave_data)
+        # stop stream
+        stream.stop_stream()
+        stream.close()
 
     def _markdown_print(self, text: str) -> None:
         markdown = Markdown(f"""
