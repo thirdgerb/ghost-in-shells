@@ -76,7 +76,9 @@ class ChainOperator(Operator):
     链式 operator
     """
 
-    def __init__(self, chain: List[Operator]):
+    def __init__(self, chain: List[Operator] = None):
+        if chain is None:
+            chain = []
         self.chain = chain
 
     def run(self, ctx: "Context") -> Optional["Operator"]:

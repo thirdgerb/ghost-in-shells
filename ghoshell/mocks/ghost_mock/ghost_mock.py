@@ -37,22 +37,13 @@ class OperatorMock(OperationKernel):
         pass
 
 
-conversational_bootstrapper = LLMConversationalThinkBootstrapper([
-    dict(
-        think="conversational",
-        desc="test llm conversational basic feats",
-        debug=False,
-    ),
-])
-
-
 class MockGhost(GhostKernel):
     # 启动流程. 想用这种方式解耦掉系统文件读取等逻辑.
     bootstrapper: List[Bootstrapper] = [
         FileLoggerBootstrapper(),
         RegisterThinkDemosBootstrapper(),
         RegisterFocusDriverBootstrapper(),
-        conversational_bootstrapper,
+        LLMConversationalThinkBootstrapper(),
 
         # 将 configs/llms/unitests 下的文件当成单元测试思维.
         PromptUnitTestsBootstrapper(),

@@ -4,14 +4,21 @@ from typing import Optional
 import speech_recognition as sr
 from prompt_toolkit import prompt
 from pyaudio import PyAudio
+from pydantic import BaseModel
 from rich.console import Console
 from rich.markdown import Markdown
 
 from ghoshell.container import Container
+from ghoshell.ghost import URL
 from ghoshell.messages import Input, Output
 from ghoshell.messages import Text
 from ghoshell.shell_fmk import ShellKernel
 from ghoshell.shell_protos.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
+
+
+class BaiduSpeechConfig(BaseModel):
+    welcome: str
+    root_url: URL
 
 
 class BaiduSpeechShell(ShellKernel):
@@ -32,6 +39,7 @@ class BaiduSpeechShell(ShellKernel):
 
     def deliver(self, _output: Output) -> None:
         text = Text.read(_output.payload)
+        self._console.print(_output.payload)
         if text is None:
             return None
         self._markdown_print(text.content)

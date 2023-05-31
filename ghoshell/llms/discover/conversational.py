@@ -144,8 +144,7 @@ class DefaultConversationalStage(AwaitStage):
         # 检查对话轮次. todo
 
         # 变更 this 的内容.
-        this.data.last_input = text.content
-        this.data.dialog.append(Line(role=self.config.user_role, text=text.content))
+        self._record_dialog(ctx, this, self.config.user_role, text.content)
         #  prompt 如果发生错误, RuntimeTool.fire_event 不会保存.
         prompt = self._join_resp_prompt(this)
         if this.data.debug:
@@ -153,12 +152,33 @@ class DefaultConversationalStage(AwaitStage):
 
         resp = self._prompt(ctx, prompt)
         # 继续变更输出消息.
-        this.data.last_output = resp
-        this.data.dialog.append(Line(role=self.config.ai_role, text=resp))
+        self._record_dialog(ctx, this, self.config.ai_role, resp)
+
+        # 删除超额的内容.
+        self._check_max_turns(this)
 
         # 发送消息.
         ctx.send_at(this).text(resp)
         return ctx.mind(this).awaits()
+
+    def _record_dialog(self, ctx: Context, this: ConversationalThought, role: str, content: str) -> None:
+        """
+        todo: 实现一个对话记录, 方便日后查阅.
+        """
+        this.data.last_input = content
+        this.data.dialog.append(Line(role=self.config.user_role, text=content))
+
+    def _check_max_turns(self, this: ConversationalThought) -> None:
+        """
+        如果超过了最大会话长度, 就删除掉历史记录.
+        todo: 让 llm 自己对前文进行总结.
+        """
+        if len(this.data.dialog) > self.config.max_turns:
+            # 删除两轮对话. 当然最好的做法应该是让 bot 自己总结.
+            self._reduce_dialog(this)
+
+    def _reduce_dialog(self, this: ConversationalThought) -> None:
+        this.data.dialog = this.data.dialog[2:]
 
     def _prompt(self, ctx: Context, prompt: str) -> str:
         prompter = fetch_ctx_prompter(ctx)
@@ -187,7 +207,12 @@ class DefaultConversationalStage(AwaitStage):
             "user_role": self.config.user_role,
             "quote_notice": quote_notice,
         }
-        return self.config.on_receive_template.format(**formatting)
+        prompt = self.config.on_receive_template.format(**formatting)
+        if len(prompt) > self.config.max_context_length:
+            # 执行 reduce.
+            self._reduce_dialog(this)
+            return self._join_resp_prompt(this)
+        return prompt
 
     @classmethod
     def _send_and_await(cls, ctx: Context, this: ConversationalThought, content: str) -> Operator | None:

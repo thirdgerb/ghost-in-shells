@@ -1,0 +1,3 @@
+think: "conversational"
+desc: "test llm conversational basic feats"
+debug: false

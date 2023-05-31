@@ -1,4 +1,6 @@
-from typing import List, Dict
+import os
+
+import yaml
 
 from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import Bootstrapper
@@ -14,19 +16,24 @@ class LLMConversationalThinkBootstrapper(Bootstrapper):
     todo: 需要实现从路径读取 json 或者 yaml 配置的办法.
     """
 
-    def __init__(self, configs: List[Dict]):
+    def __init__(self, relative_path: str = "/conversational"):
         """
         用 dict 来传参可能范用性好一些.
         实际数据格式参考: ConversationalThinkConfig
         """
-        self.configs = configs
+        self.relative_path = relative_path
 
     def bootstrap(self, ghost: Ghost):
         mindset = ghost.mindset
-        for config_data in self.configs:
-            config = ConversationalThinkConfig(**config_data)
-            think = ConversationalThink(config)
-            mindset.register_think(think)
+        config_path = ghost.config_path.rstrip("/") + "/" + self.relative_path.lstrip("/")
+        for root, ds, fs in os.walk(config_path):
+            for filename in fs:
+                file_path = config_path.rstrip("/") + "/" + filename
+                with open(file_path) as f:
+                    config_data = yaml.safe_load(f)
+                config = ConversationalThinkConfig(**config_data)
+                think = ConversationalThink(config)
+                mindset.register_think(think)
 
 
 class PromptUnitTestsBootstrapper(Bootstrapper):
