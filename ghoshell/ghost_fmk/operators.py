@@ -118,7 +118,8 @@ class ReceiveInputOperator(AbsOperator):
         if not process.root:
             if ctx.input.url is not None:
                 # input 传入场景信息.
-                root = ctx.input.url.copy_with()
+                root_url = ctx.input.url.copy_with()
+                root = RuntimeTool.new_task(ctx, root_url)
             elif tasked is not None:
                 # 任务消息就是根节点.
                 root = RuntimeTool.new_task(

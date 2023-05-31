@@ -2,6 +2,7 @@ import uuid
 from typing import Optional
 
 import speech_recognition as sr
+import yaml
 from prompt_toolkit import prompt
 from pyaudio import PyAudio
 from pydantic import BaseModel
@@ -11,14 +12,18 @@ from rich.markdown import Markdown
 from ghoshell.container import Container
 from ghoshell.ghost import URL
 from ghoshell.messages import Input, Output
-from ghoshell.messages import Text
+from ghoshell.messages import Text, Error
 from ghoshell.shell_fmk import ShellKernel
 from ghoshell.shell_protos.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
 
 
-class BaiduSpeechConfig(BaseModel):
+class BaiduSpeechShellConfig(BaseModel):
+    """
+    todo: 将 shell 的配置做到 configs 里.
+    """
     welcome: str
     root_url: URL
+    debug: bool = True
 
 
 class BaiduSpeechShell(ShellKernel):
@@ -29,22 +34,37 @@ class BaiduSpeechShell(ShellKernel):
         BaiduSpeechProvider(),
     ]
 
-    def __init__(self, container: Container, config_path: str, runtime_path: str):
+    def __init__(self, container: Container, config_path: str, runtime_path: str, config_filename: str = "config.yml"):
         self._console = Console()
         self.session_id = str(uuid.uuid4().hex)
         self.user_id = str(uuid.uuid4().hex)
         self.pyaudio = PyAudio()
         self._talking = False
         super().__init__(container, config_path, runtime_path)
+        self._config: BaiduSpeechShellConfig = self._load_config(config_filename)
+
+    def _load_config(self, config_filename: str) -> BaiduSpeechShellConfig:
+        config_filename = self.config_path.rstrip("/") + "/" + config_filename.lstrip("/")
+        with open(config_filename) as f:
+            data = yaml.safe_load(f)
+        return BaiduSpeechShellConfig(**data)
 
     def deliver(self, _output: Output) -> None:
         text = Text.read(_output.payload)
-        self._console.print(_output.payload)
-        if text is None:
-            return None
-        self._markdown_print(text.content)
-        if self._talking:
+        if self._config.debug:
+            self._console.print(_output.payload)
+        if text is not None:
+            self._markdown_print(text.content)
             self._speak_text(text.content)
+        err = Error.read(_output.payload)
+        if err is not None:
+            self._markdown_print(f"""
+# error {err.errcode} occur
+
+{err.errmsg}
+
+{err.stack_info}
+""")
 
     def on_event(self, e: str) -> Optional[Input]:
         content = e.strip()
@@ -62,12 +82,13 @@ class BaiduSpeechShell(ShellKernel):
         text = Text(content=content)
         return Input(
             mid=uuid.uuid4().hex,
+            url=self._config.root_url.dict(),
             payload=text.as_payload_dict(),
             trace=trace,
         )
 
     def run_as_app(self) -> None:
-        self.tick("")
+        self._welcome()
         while True:
             user_input = prompt("<<< ")
             match user_input:
@@ -82,6 +103,12 @@ class BaiduSpeechShell(ShellKernel):
     def tick(self, text: str) -> None:
         self._console.print("> waiting ghost...")
         super().tick(text)
+
+    def _welcome(self) -> None:
+        """
+        todo: welcome
+        """
+        self._markdown_print(self._config.welcome)
 
     def _listen(self) -> None:
         adapter = self.container.force_fetch(BaiduSpeechAdapter)

@@ -30,7 +30,7 @@ def demo_ghost() -> Ghost:
     """
     container = root_container
     container.register(MockMessageQueueProvider())
-    config_path = "/".join([root_path, "configs", "mock_ghost"])
+    config_path = "/".join([root_path, "configs", "ghost"])
     runtime_path = "/".join([root_path, "runtime"])
 
     config_file = config_path + "/config.yml"
