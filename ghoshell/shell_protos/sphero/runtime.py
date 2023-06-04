@@ -7,7 +7,8 @@ from typing import List
 
 from rich.console import Console
 from spherov2 import scanner
-from spherov2.sphero_edu import SpheroEduAPI
+from spherov2.sphero_edu import SpheroEduAPI, EventType
+from spherov2.types import Color
 
 from ghoshell.ghost_protos.sphero import *
 from ghoshell.messages import Text
@@ -31,6 +32,12 @@ class SpheroBoltKernel:
         self.cmd: SpheroCommand | None = None
         self.cmd_start_at: float = 0
         self.cmd_ran: int = 0
+        self.api.register_event(EventType.on_collision, self._on_collision)
+
+    def _on_collision(self, api: SpheroEduAPI):
+        api.stop_roll()
+        api.set_front_led(Color(255, 0, 0))
+        self.console.print("")
 
     def reset_command(self) -> None:
         self.cmd_start_at = 0
@@ -67,9 +74,11 @@ class SpheroBoltKernel:
     def _roll(self, cmd: Roll, at: float) -> bool:
         if self.cmd_start_at + cmd.duration < at:
             self.api.stop_roll()
+            self.api.set_front_led(Color(0, 0, 0))
             return False
         if self.cmd_ran == 0:
             self.api.set_speed(cmd.speed)
+            self.api.set_front_led(Color(0, 200, 0))
             heading = self.front_angle + cmd.heading % 360
             self.api.set_heading(heading)
         return True
@@ -78,20 +87,29 @@ class SpheroBoltKernel:
         if self.cmd_ran == 0:
             self.api.stop_roll(cmd.heading)
             self.front_angle = self.front_angle + cmd.heading % 360
-        return self.cmd_start_at + cmd.duration >= at
+            self.api.set_front_led(Color(200, 0, 0))
+            self.api.set_back_led(Color(200, 0, 0))
+        continual = self.cmd_start_at + cmd.duration >= at
+        if not continual:
+            self.api.set_front_led(Color(0, 0, 0))
+        return continual
 
     def _say(self, cmd: Say, at: float) -> bool:
         if self.cmd_ran == 0:
+            self.api.set_main_led(Color(0, 0, 200))
             self.speaker(Text(content=cmd.text))
+        self.api.clear_matrix()
         return False
 
     def _spin(self, cmd: Spin, at: float) -> bool:
         if self.cmd_ran == 0:
             self.api.spin(cmd.angle, cmd.duration)
+            self.api.set_front_led(Color(0, 200, 0))
         if self.cmd_start_at + cmd.duration >= at:
             return True
         # 变更角度.
         self.front_angle = self.front_angle + cmd.angle % 360
+        self.api.set_front_led(Color(0, 0, 0))
         return False
 
     def close(self) -> None:

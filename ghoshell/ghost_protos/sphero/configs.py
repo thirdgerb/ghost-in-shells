@@ -29,6 +29,8 @@ class SpheroSimpleCommandModeConfig(BaseModel):
 输出为 yaml 的格式为: 
 
 ```
+- method: say
+  text: 我开始喽!
 - method: roll
   speed: 50
   heading: 0
