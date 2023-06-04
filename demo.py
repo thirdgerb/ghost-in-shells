@@ -11,7 +11,7 @@ from ghoshell.ghost_fmk import GhostConfig
 from ghoshell.mocks import MockGhost, MockMessageQueueProvider
 from ghoshell.shell import Messenger
 from ghoshell.shell_fmk import SyncGhostMessenger, MessageQueue
-from ghoshell.shell_protos import ConsoleShell, BaiduSpeechShell
+from ghoshell.shell_protos import ConsoleShell, BaiduSpeechShell, SpheroBoltShell
 
 pwd = os.getcwd()
 root_path = pwd + "/demo"
@@ -54,6 +54,18 @@ def run_console_shell():
     shell.bootstrap().run_as_app()
 
 
+def run_sphero_shell():
+    """
+    run console shell with local demo ghost
+    """
+    container = root_container
+    config_path = "/".join([root_path, "configs", "sphero_shell"])
+    runtime_path = "/".join([root_path, "runtime"])
+    # 分享相同的 path.
+    shell = SpheroBoltShell(container, config_path, runtime_path)
+    shell.bootstrap().run_as_app()
+
+
 def run_speech_shell():
     container = root_container
     config_path = "/".join([root_path, "configs", "baidu_speech_shell"])
@@ -65,6 +77,7 @@ def run_speech_shell():
 shells = {
     "console": run_console_shell,
     "speech": run_speech_shell,
+    "sphero": run_sphero_shell,
 }
 
 default_shell = "console"

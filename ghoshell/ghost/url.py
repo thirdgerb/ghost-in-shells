@@ -1,5 +1,5 @@
 import hashlib
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Set
 
 from pydantic import BaseModel, Field
 
@@ -55,7 +55,12 @@ class UniformResolverLocator(BaseModel):
     def new_resolver(cls, resolver) -> "UniformResolverLocator":
         return cls(resolver=resolver)
 
-    def new_id(self, extra: Dict[str, str] = None, enums: set = None, args: bool = False) -> str:
+    def new_id(
+            self,
+            extra: Dict[str, str] | None = None,  # 加入额外的参数, 通常是 context.input.trace 相关参数.
+            enums: Set[str] | None = None,  # 加入额外的常量, 用来生成唯一 id.
+            args: bool = False,  # 将入参也作为生成唯一 id 的变量.
+    ) -> str:
         """
         提供一个默认的方法用来生成一个 id.
         """

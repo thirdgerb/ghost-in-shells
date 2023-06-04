@@ -118,7 +118,7 @@ log:
             else:
                 self._app.print(text.content)
 
-        err = Error.read(_output.payload)
+        err = ErrMsg.read(_output.payload)
         if err is not None:
             where = ""
             if err.at:

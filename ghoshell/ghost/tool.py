@@ -191,12 +191,12 @@ class CtxTool:
         awaiting_task_level = awaiting_task.level
 
         # awaiting 永远最高优.
-        if awaiting_task.tid != root_task.tid and awaiting_task.attentions:
+        if awaiting_task.attentions:
             # awaiting 添加所有.
             for attention in awaiting_task.attentions:
                 result.append(attention)
 
-        if root_task.tid and root_task.attentions is not None:
+        if root_task.tid != awaiting_task.tid and root_task.attentions is not None:
             for attention in root_task.attentions:
                 # root 非私有方法都可以添加进去, 而且是高优.
                 if attention.level != TaskLevel.LEVEL_PRIVATE:

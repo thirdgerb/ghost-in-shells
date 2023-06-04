@@ -1,15 +1,11 @@
-import uuid
-from typing import Optional
+import time
 
-from rich.console import Console
-
-from ghoshell.container import Container
-from ghoshell.messages import Input, Output
-from ghoshell.messages import Text
-from ghoshell.shell_fmk import ShellKernel
+from ghoshell.messages import Output, Text
+from ghoshell.shell_protos.baidu_speech import BaiduSpeechShell
+from ghoshell.shell_protos.sphero.runtime import SpheroBoltRuntime, SpheroCommandMessage
 
 
-class SpheroShell(ShellKernel):
+class SpheroBoltShell(BaiduSpeechShell):
     """
     实现一个基于 LLM 的 Sphero 的自然语言交互界面.
     Shell 的任务包括:
@@ -19,36 +15,39 @@ class SpheroShell(ShellKernel):
     - 实现 DSL 来方便控制 Sphero, 而且是实时的.
     - 要求 Ghost 需要具备学习指令的能力.
     """
-
-    def __init__(self, container: Container, config_path: str, runtime_path: str):
-        self._console = Console()
-        self.session_id = str(uuid.uuid4().hex)
-        self.user_id = str(uuid.uuid4().hex)
-        self._talking = False
-        super().__init__(container, config_path, runtime_path)
+    _sphero_runtime: SpheroBoltRuntime | None = None
 
     def deliver(self, _output: Output) -> None:
-        pass
 
-    def on_event(self, e: str) -> Optional[Input]:
-        content = e.strip()
-        if content == "/exit":
-            self._console.print("bye!")
-            exit(0)
+        commands = SpheroCommandMessage.read(_output.payload)
+        if commands is not None:
+            self._sphero_runtime.set_cmd_message(commands)
+        super().deliver(_output)
+        return None
 
-        trace = dict(
-            clone_id=self.session_id,
-            session_id=self.session_id,
-            shell_id=self.session_id,
-            shell_kind="audio_shell",
-            subject_id=self.user_id,
-        )
-        text = Text(content=content)
-        return Input(
-            mid=uuid.uuid4().hex,
-            payload=text.as_payload_dict(),
-            trace=trace,
-        )
+    def _output_text(self, text: Text) -> None:
+        self._print_text(text)
 
     def run_as_app(self) -> None:
-        pass
+        self._console.print("bootstrap sphero bolt...")
+        self._sphero_runtime = SpheroBoltRuntime(
+            self._speak_text,
+            self._console,
+            0.1,
+        )
+        self._sphero_runtime.run()
+        count = 0
+        while count < 20:
+            if self._sphero_runtime.ready:
+                break
+            time.sleep(1)
+        if not self._sphero_runtime.ready:
+            self._console.print("failed to boot sphero")
+            exit(0)
+        # use Thread to run sphero BOLT
+        super().run_as_app()
+
+    def _close(self) -> None:
+        if self._sphero_runtime is not None:
+            self._sphero_runtime.close()
+        super()._close()

@@ -2,8 +2,7 @@ from abc import ABCMeta, abstractmethod
 from typing import List, Dict, Type
 
 from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel, CtxTool, URL, RuntimeTool
-from ghoshell.ghost_fmk.intentions import Command, CommandOutput, CommandIntention, CommandIntentionKind
-from ghoshell.ghost_fmk.intentions import FocusOnCommandHandler
+from ghoshell.ghost_fmk.intentions import Command, CommandOutput, CommandIntention
 from ghoshell.ghost_fmk.utils import InstanceCount
 
 """
@@ -217,44 +216,6 @@ class CancelCmdReaction(CommandReaction):
 
     def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
         return ctx.mind(None).cancel()
-
-
-class HelpCmdReaction(CommandReaction):
-    """
-    help: 查看可行的命令.
-    """
-
-    def __init__(
-            self,
-            name="help",
-            desc="check out all available commands",
-            level: int = TaskLevel.LEVEL_PUBLIC,
-    ):
-        cmd = Command(
-            name=name,
-            desc=desc,
-        )
-        super().__init__(cmd, level)
-
-    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
-        """
-        todo: 实现 authentication
-        """
-        handler = ctx.container.get(FocusOnCommandHandler)
-        if handler is None:
-            ctx.send_at(this).text("unknown command")
-            return ctx.mind(this).rewind()
-
-        grouped_intentions = CtxTool.context_intentions(ctx)
-        command_intentions = grouped_intentions.get(CommandIntentionKind, [])
-        commands: List[Command] = []
-        for intention in command_intentions:
-            cmd = CommandIntention(**intention.dict())
-            commands.append(cmd.config)
-        # 进行解析.
-        format_line = handler.format_help_commands(commands)
-        ctx.send_at(None).text(format_line, markdown=True)
-        return ctx.mind(None).rewind()
 
 
 class HelloWorldCmdReaction(CommandReaction):

@@ -60,12 +60,12 @@ roll(100, 100)
 
 text-davinci-003 的回答: 
 ```
- toward(0, 100)                                                                                                                                                            
- roll(70, 3)                                                                                                                                                              
- turn_around(90, False)                                                                                                                                                   
- roll(70, 2)                                                                                                                                                              
- turn_around(90, True)                                                                                                                                                    
- roll(70, 5)    
+toward(0, 100)                                                                                                                                                            
+roll(70, 3)                                                                                                                                                              
+turn_around(90, False)                                                                                                                                                   
+roll(70, 2)                                                                                                                                                              
+turn_around(90, True)                                                                                                                                                    
+roll(70, 5)    
 ```
 
 最让我惊讶的是, 它用了 turn_around(90, false) 来逆时针转向左边. 

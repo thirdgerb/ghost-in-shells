@@ -15,7 +15,7 @@ from ghoshell.ghost_fmk.context import ContextImpl
 from ghoshell.ghost_fmk.contracts import ThinkMetaDriver
 from ghoshell.ghost_fmk.middleware import CtxMiddleware, ExceptionHandlerMiddleware, CtxPipe, CtxPipeline
 from ghoshell.ghost_fmk.providers import CacheRuntimeDriverProvider, MindsetProvider, FocusProvider, MemoryProvider
-from ghoshell.messages import Input, Output, Error
+from ghoshell.messages import Input, Output, ErrMsg
 from ghoshell.utils import create_pipeline
 
 
@@ -173,7 +173,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         stack_info = err.stack_info
         if not stack_info:
             stack_info = "\n".join(traceback.format_exception(*sys.exc_info(), limit=5))
-        msg = Error(errcode=err.CODE, errmsg=str(err), at=err.at, stack_info=stack_info)
+        msg = ErrMsg(errcode=err.CODE, errmsg=str(err), at=err.at, stack_info=stack_info)
         _output = Output.new(uuid.uuid4().hex, _input)
         msg.join(_output.payload)
         return _output

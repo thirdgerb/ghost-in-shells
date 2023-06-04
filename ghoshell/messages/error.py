@@ -4,7 +4,7 @@ import traceback
 from ghoshell.messages.base import Message
 
 
-class Error(Message):
+class ErrMsg(Message):
     KIND = "error"
 
     errcode: int = 500
@@ -13,7 +13,7 @@ class Error(Message):
     stack_info: str = ""
 
     @classmethod
-    def wrap(cls, code: int, err: Exception, limit: int = 5) -> "Error":
+    def wrap(cls, code: int, err: Exception, limit: int = 5) -> "ErrMsg":
         trace = "\n".join(traceback.format_exception(*sys.exc_info(), limit=limit))
-        wrapped = Error(errcode=code, errmsg=f"{err}", stack_info=trace)
+        wrapped = ErrMsg(errcode=code, errmsg=f"{err}", stack_info=trace)
         return wrapped

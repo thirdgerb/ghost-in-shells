@@ -2,7 +2,7 @@ import uuid
 from typing import Callable, Optional, List
 
 from ghoshell.ghost import Ghost
-from ghoshell.messages import Output, Input, Error
+from ghoshell.messages import Output, Input, ErrMsg
 from ghoshell.shell import Messenger
 from ghoshell.shell_fmk.contracts import MessageQueue
 
@@ -26,7 +26,7 @@ class SyncGhostMessenger(Messenger):
             return result
         # todo catch exceptions
         except Exception as e:
-            err = Error(errmsg=e.__repr__())
+            err = ErrMsg(errmsg=e.__repr__())
             _output = Output.new(uuid.uuid4().hex, _input)
             err.join(_output.payload)
             return [_output]

@@ -1,4 +1,5 @@
-from ghoshell.ghost_fmk.intentions.command import CommandIntention, FocusOnCommandHandler, Command, CommandOutput, \
+from ghoshell.ghost_fmk.intentions.command_intention import CommandIntention, FocusOnCommandHandler, Command, \
+    CommandOutput, \
     CommandIntentionKind
 
 __all__ = [

@@ -58,7 +58,7 @@ class HelloWorldStage(AwaitStage):
             "/helloworld": HelloWorldCmdReaction(),
             "/thought": ThoughtCmdReaction(),
             "/process": ProcessCmdReaction(),
-            "/help": HelpCmdReaction(),
+            # "/help": HelpCmdReaction(),
             "/redirect": RedirectCmdReaction(),
             "/task": TaskCmdReaction(),
             "/cancel": CancelCmdReaction(),

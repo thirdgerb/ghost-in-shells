@@ -1,0 +1,3 @@
+welcome: "todo: describe the sphero shell"
+root_url:
+  resolver: sphero/simple_command_mode

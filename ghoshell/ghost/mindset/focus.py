@@ -6,6 +6,7 @@ from typing import Optional, List, Dict
 from pydantic import BaseModel
 
 from ghoshell.ghost.context import Context
+from ghoshell.ghost.mindset.operator import Operator
 from ghoshell.ghost.url import URL
 
 
@@ -31,6 +32,12 @@ class Intention(BaseModel):
     # 关联.
     target: URL | None = None
     reaction: str | None = None
+
+    def action(self, ctx: Context) -> Operator | None:
+        """
+        重写这个方法可以定义全局命令.
+        """
+        return None
 
 
 class Attention(BaseModel):

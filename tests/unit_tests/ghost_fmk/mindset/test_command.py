@@ -1,5 +1,5 @@
 from ghoshell.ghost import Intention
-from ghoshell.ghost_fmk.intentions.command import Command, CommandIntention
+from ghoshell.ghost_fmk.intentions.command_intention import Command, CommandIntention
 
 
 def test_command_intention():

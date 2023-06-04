@@ -168,6 +168,7 @@ class ReceiveInputOperator(AbsOperator):
         attentions = CtxTool.context_attentions(ctx)
         matched = CtxTool.match_attentions(ctx, attentions)
         if matched is not None:
+            # 允许定义拦截逻辑.
             return IntendingOperator(matched)
 
         # 都没有匹配, 就尝试模糊匹配.
@@ -217,7 +218,7 @@ class IntendingOperator(AbsOperator):
         super().__init__(None)
 
     def _intercept(self, ctx: "Context") -> Optional["Operator"]:
-        return None
+        return self.matched.action(ctx)
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         if self.matched.target is None:

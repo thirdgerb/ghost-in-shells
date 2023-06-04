@@ -5,8 +5,8 @@ from typing import Dict, List, Any, Optional, ClassVar
 
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost import ErrMessageException
 from ghoshell.ghost import Intention, Context, FocusDriver
+from ghoshell.ghost import Operator, CtxTool
 from ghoshell.messages import Text
 
 CommandIntentionKind = "command_line"
@@ -63,6 +63,16 @@ class CommandIntention(Intention):
     config: Command
     params: CommandOutput | None = None
 
+    def action(self, ctx: Context) -> Operator | None:
+        if self.params is not None:
+            if self.params.error:
+                ctx.send_at(None).err(self.params.message)
+                return ctx.mind(None).rewind()
+            elif self.params.message != "":
+                ctx.send_at(None).text(self.params.message)
+                return ctx.mind(None).rewind()
+        return None
+
 
 class _ArgumentParserWrapper(ArgumentParser):
     """
@@ -84,11 +94,44 @@ class _ArgumentParserWrapper(ArgumentParser):
         pass
 
 
+class HelpCommand(CommandIntention):
+    config = Command(
+        name="help",
+        desc="show all the available commands",
+    )
+
+    def action(self, ctx: Context) -> Operator | None:
+        i = super().action(ctx)
+        if i is not None:
+            return i
+
+        handler = ctx.container.get(FocusOnCommandHandler)
+        if handler is None:
+            ctx.send_at(None).text("unknown command")
+            return ctx.mind(None).rewind()
+
+        grouped_intentions = CtxTool.context_intentions(ctx)
+        command_intentions = grouped_intentions.get(CommandIntentionKind, [])
+        commands: List[Command] = [self.config]
+        for intention in command_intentions:
+            cmd = CommandIntention(**intention.dict())
+            commands.append(cmd.config)
+        # 进行解析.
+        format_line = handler.format_help_commands(commands)
+        ctx.send_at(None).text(format_line, markdown=True)
+        return ctx.mind(None).rewind()
+
+
 class FocusOnCommandHandler(FocusDriver):
     prefix: ClassVar[str] = "/"
 
-    def __init__(self):
+    def __init__(self, default_commands: List[CommandIntention] | None = None):
         self.global_commands: Dict[str, CommandIntention] = {}
+        if default_commands is None:
+            default_commands = [
+                HelpCommand()
+            ]
+        self.default_commands: List[CommandIntention] = default_commands
 
     def kind(self) -> str:
         return CommandIntentionKind
@@ -96,7 +139,7 @@ class FocusOnCommandHandler(FocusDriver):
     @classmethod
     def format_help_commands(cls, commands: List[Command]) -> str:
         head = f"""
-current commands. use -h option on command to see details:
+show current commands. use -h option on command to see details:
 
 """
         body_lines = [head]
@@ -110,7 +153,7 @@ current commands. use -h option on command to see details:
             return None
         if len(text.content) == 0:
             return None
-        command_lines = []
+        command_lines = self.default_commands.copy()
         for meta in metas:
             if isinstance(meta, CommandIntention):
                 command_lines.append(meta)
@@ -131,10 +174,7 @@ current commands. use -h option on command to see details:
         commands = {}
         for meta in metas:
             if isinstance(meta, CommandIntention):
-                name = meta.config.name
-                if name in commands:
-                    # 顺序优先, 避免覆盖.
-                    continue
+                # 顺序优先, 后面的命令覆盖前面的命令.
                 commands[meta.config.name] = meta
 
         command_line = text[len(self.prefix):]
@@ -147,7 +187,7 @@ current commands. use -h option on command to see details:
         result = self._parse_command(matched_meta, arguments)
         if result is None:
             return None
-        matched = CommandIntention(**matched_meta.dict())
+        matched = matched_meta.copy()
         matched.params = result
         return matched
 
@@ -181,9 +221,6 @@ current commands. use -h option on command to see details:
             message=parser.message,
             params=params,
         )
-        if result.error:
-            raise ErrMessageException(result.message)
-
         return result
 
     @classmethod
@@ -209,7 +246,7 @@ current commands. use -h option on command to see details:
             "choices": "choices",
             "nargs": "nargs",
             "const": "const",
-            # "type": "type",
+            "type": "type",
         }
         for key in mapping:
             if key not in origin:
