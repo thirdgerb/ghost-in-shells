@@ -92,6 +92,7 @@ class SpheroBoltKernel:
         continual = self.cmd_start_at + cmd.duration >= at
         if not continual:
             self.api.set_front_led(Color(0, 0, 0))
+            self.api.set_back_led(Color(0, 0, 0))
         return continual
 
     def _say(self, cmd: Say, at: float) -> bool:

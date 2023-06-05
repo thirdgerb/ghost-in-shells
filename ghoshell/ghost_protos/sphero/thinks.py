@@ -11,7 +11,7 @@ from ghoshell.ghost_fmk.intentions import CommandOutput
 from ghoshell.ghost_fmk.reactions import CommandReaction, Command
 from ghoshell.ghost_fmk.thinks import SingleStageThink
 from ghoshell.ghost_protos.sphero.configs import *
-from ghoshell.ghost_protos.sphero.messages import SpheroCommandMessage, Roll, Say
+from ghoshell.ghost_protos.sphero.messages import SpheroCommandMessage, Roll, Say, Stop
 from ghoshell.llms import LLMPrompter
 from ghoshell.messages import Text
 
@@ -28,13 +28,19 @@ class SpheroThinkDriver(ThinkDriver):
     def from_meta(self, meta: ThinkMeta) -> "Think":
         match meta.id:
             case self.config.simple_command_mode.name:
-                return SpheroSimpleCommandModeThink(self.config.simple_command_mode)
+                return SpheroSimpleCommandModeThink(self)
+            case self.config.conversational_mode.name:
+                return SpheroConversationalModeThink(self)
             case _:
                 raise MindsetNotFoundException(f"think {meta.id} not found")
 
     def to_metas(self) -> List[ThinkMeta]:
         result = []
-        for think_name in [self.config.simple_command_mode.name]:
+        modes = [
+            self.config.simple_command_mode.name,
+            self.config.conversational_mode.name,
+        ]
+        for think_name in modes:
             result.append(ThinkMeta(
                 kind=self.driver_name(),
                 id=think_name,
@@ -45,10 +51,12 @@ class SpheroThinkDriver(ThinkDriver):
 class SpheroSimpleCommandModeThink(SingleStageThink):
     """
     简单命令模式.
+    让 sphero 理解一次性输入的命令, 并且执行.
     """
 
-    def __init__(self, config: SpheroSimpleCommandModeConfig):
-        self._config = config
+    def __init__(self, driver: SpheroThinkDriver):
+        self._driver = driver
+        self._config = driver.config.simple_command_mode
 
     def url(self) -> URL:
         return URL.new_resolver(self._config.name)
@@ -60,7 +68,7 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
         )
 
     def description(self, thought: Thought) -> AnyStr:
-        return "sphero simple command mode"
+        return self._config.desc
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:
         return self.url().new_id()
@@ -79,6 +87,7 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
     def reactions(self) -> Dict[str, Reaction]:
         return {
             "roll": RollCmdReaction(),
+            "stop": StopCmdReaction(),
         }
 
     def on_activate(self, ctx: "Context", this: Thought) -> Operator | None:
@@ -125,6 +134,16 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
         return result
 
 
+class SpheroConversationalModeThink(SingleStageThink):
+    """
+    多轮对话模式, 支持教学, 技能记忆等等等.
+    """
+
+    def __init__(self, driver: SpheroThinkDriver):
+        self._driver = driver
+        self._config = driver.config.conversational_mode
+
+
 class RollCmdReaction(CommandReaction):
 
     def __init__(self):
@@ -167,5 +186,23 @@ class RollCmdReaction(CommandReaction):
             speed=speed,
             duration=duration,
         ))
+        ctx.send_at(this).output(direction)
+        return ctx.mind(this).rewind()
+
+
+class StopCmdReaction(CommandReaction):
+
+    def __init__(self):
+        super().__init__(
+            cmd=Command(
+                name="stop",
+                desc="stop sphero",
+            ),
+            level=TaskLevel.LEVEL_PRIVATE,
+        )
+
+    def on_output(self, ctx: Context, this: Thought, output: CommandOutput) -> Operator:
+        direction = SpheroCommandMessage()
+        direction.add(Stop(duration=1))
         ctx.send_at(this).output(direction)
         return ctx.mind(this).rewind()

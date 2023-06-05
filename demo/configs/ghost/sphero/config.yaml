@@ -1,3 +1,4 @@
 simple_command_mode:
   name: "sphero/simple_command_mode"
   welcome: "进入单一命令模式, 请给我下达指令"
+  debug: false

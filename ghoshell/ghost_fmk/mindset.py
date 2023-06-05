@@ -1,20 +1,25 @@
 from typing import Optional, Iterator, List, Dict
 
-from ghoshell.ghost import Mindset, Think
+from ghoshell.ghost import Mindset, Think, Focus
 from ghoshell.ghost.mindset import ThinkMeta, ThinkDriver
 from ghoshell.ghost_fmk.contracts import ThinkMetaDriver  # ThinkMetaDriverProvider
 
 
 class MindsetImpl(Mindset):
 
-    def __init__(self, driver: ThinkMetaDriver, clone_id: str | None):
+    def __init__(self, driver: ThinkMetaDriver, focus: Focus, clone_id: str | None):
         self._think_metas_driver = driver
         self._clone_id = clone_id
         self._sub_mindsets: List[Mindset] = []
         self._think_drivers: Dict[str, ThinkDriver] = {}
+        self._focus = focus
+
+    @property
+    def focus(self) -> Focus:
+        return self._focus
 
     def clone(self, clone_id: str) -> Mindset:
-        mindset = MindsetImpl(self._think_metas_driver, clone_id)
+        mindset = MindsetImpl(self._think_metas_driver, self._focus, clone_id)
         mindset.register_sub_mindset(self)
         return mindset
 
@@ -58,10 +63,10 @@ class MindsetImpl(Mindset):
         names = set()
         # 一套遍历策略.
         for meta in self._think_metas_driver.iterate_think_metas(self._clone_id):
-            if meta.url.resolver in names:
+            if meta.id in names:
                 # 重名的跳过, 不允许遍历. 从而实现继承重写.
                 continue
-            names.add(meta.url.resolver)
+            names.add(meta.id)
             think = self._wrap_meta(meta)
             if think is not None:
                 yield think

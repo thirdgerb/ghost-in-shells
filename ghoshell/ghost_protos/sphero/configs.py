@@ -11,6 +11,7 @@ class SpheroSimpleCommandModeConfig(BaseModel):
     简单命令模式.
     """
     name: str = "sphero/simple_command_mode"
+    desc: str = "todo"
     welcome: str = "进入单一命令模式, 请给我下达指令"
     unknown_order: str = "无法理解的命令"
 
@@ -71,5 +72,15 @@ class SpheroSimpleCommandModeConfig(BaseModel):
         )
 
 
+class SpheroConversationalModeConfig(BaseModel):
+    name: str = "sphero/conversational_mode"
+
+    desc: str = "todo"
+
+
 class SpheroThinkConfig(BaseModel):
+    """
+    Sphero 控制界面的各种配置.
+    """
     simple_command_mode: SpheroSimpleCommandModeConfig = SpheroSimpleCommandModeConfig()
+    conversational_mode: SpheroConversationalModeConfig = SpheroConversationalModeConfig()
