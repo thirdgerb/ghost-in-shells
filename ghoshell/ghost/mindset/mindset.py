@@ -17,10 +17,17 @@ class Mindset(metaclass=ABCMeta):
     @property
     @abstractmethod
     def focus(self) -> Focus:
+        """
+        mindset with focus component
+        for register global intentions
+        """
         pass
 
     @abstractmethod
     def clone(self, clone_id: str) -> Mindset:
+        """
+        clone mindset with clone id
+        """
         pass
 
     @abstractmethod

@@ -7,6 +7,7 @@ from ghoshell.ghost import Think, Stage, Thought, Event, Operator, OnActivating,
 class SingleStageThink(Think, Stage, metaclass=ABCMeta):
     """
     单节点状态机.
+    都是为了开发临时做的.
     """
 
     def all_stages(self) -> List[str]:

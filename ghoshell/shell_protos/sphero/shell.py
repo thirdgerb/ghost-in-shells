@@ -1,5 +1,6 @@
 import time
 
+from ghoshell.container import Container
 from ghoshell.messages import Output, Text
 from ghoshell.shell_protos.baidu_speech import BaiduSpeechShell
 from ghoshell.shell_protos.sphero.runtime import SpheroBoltRuntime, SpheroCommandMessage
@@ -16,6 +17,15 @@ class SpheroBoltShell(BaiduSpeechShell):
     - 要求 Ghost 需要具备学习指令的能力.
     """
     _sphero_runtime: SpheroBoltRuntime | None = None
+
+    def __init__(
+            self,
+            container: Container,
+            config_path: str,
+            runtime_path: str,
+            config_filename: str = "sphero_shell_config.yml",
+    ):
+        super().__init__(container, config_path, runtime_path, config_filename)
 
     def deliver(self, _output: Output) -> None:
 

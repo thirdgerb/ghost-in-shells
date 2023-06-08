@@ -144,6 +144,7 @@ class BaiduSpeechShell(ShellKernel):
     def tick(self, text: str) -> None:
         self._console.print("> waiting ghost...")
         super().tick(text)
+        self._console.print("> ghost replied")
 
     def _welcome(self) -> None:
         """

@@ -1,6 +1,7 @@
 import json
 import random
 import string
+import time
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request
@@ -103,7 +104,10 @@ class BaiduSpeech(TTS, ASR):
         }
         data = urlencode(params)
         req = Request(self._config.tts.tts_url, data.encode('utf-8'))
+        start = time.time()
         f = urlopen(req)
+        end = time.time()
+        print("+++++++++++++=l", end - start)
         result_str = f.read()
         headers = dict((name.lower(), value) for name, value in f.headers.items())
 
