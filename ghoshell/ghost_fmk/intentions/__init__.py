@@ -3,5 +3,6 @@ from ghoshell.ghost_fmk.intentions.command_intention import CommandIntention, Fo
     CommandIntentionKind
 
 __all__ = [
+    # 命令相关.
     "Command", "CommandOutput", "CommandIntention", "FocusOnCommandHandler", "CommandIntentionKind"
 ]

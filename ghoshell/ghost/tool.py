@@ -136,42 +136,10 @@ class CtxTool:
     ) -> Optional[Intention]:
         return ctx.clone.focus.global_match(ctx)
 
-    # @classmethod
-    # def context_fallback_intentions(cls, ctx: "Context", level: int) -> List[Attention]:
-    #     """
-    #     如果注意机制没有生效, 接下来走回调机制, 看看是否会激活一些已经有的任务.
-    #     """
-    #     runtime = ctx.runtime
-    #     process = runtime.current_process()
-    #     result: List[Attention] = []
-    #
-    #     # 当前任务是最高优的.
-    #     awaiting_task = RuntimeTool.fetch_root_task(ctx)
-    #     cls._add_task_intentions(ctx, result, awaiting_task, private=True, forward=False)
-    #
-    #     # 当前任务的状态是 protected, 才允许回溯匹配. 否则直接退出.
-    #     if level != TaskLevel.LEVEL_PRIVATE:
-    #         return result
-    #
-    #     # blocking 的任务也可以被消息来主动抢占.
-    #     blocking = process.preempting
-    #     for tid in blocking:
-    #         blocking_task = process.get_task(tid)
-    #         result = cls._add_task_intentions(ctx, result, blocking_task, private=False, forward=False)
-    #
-    #     # 检查 waiting, 将 waiting 都入栈.
-    #     # waiting 不能包含 root 和 awaiting
-    #     waiting = process.waiting
-    #     for tid in waiting:
-    #         waiting_task = process.get_task(tid)
-    #         result = cls._add_task_intentions(ctx, result, waiting_task, private=False, forward=False)
-    #
-    #     # 添加 root 节点.
-    #     if process.awaiting != process.root:
-    #         root_task = RuntimeTool.fetch_root_task(ctx)
-    #         result = cls._add_task_intentions(ctx, result, root_task, private=False, forward=False)
-    #
-    #     return result
+    @classmethod
+    def current_think_stage(cls, ctx: "Context") -> Stage:
+        task = RuntimeTool.fetch_current_task(ctx)
+        return cls.fetch_stage(ctx, task.url.resolver, task.url.stage)
 
     @classmethod
     def context_attentions(cls, ctx: "Context") -> List[Attention]:

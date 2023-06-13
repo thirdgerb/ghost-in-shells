@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Dict, AnyStr, ClassVar
+from typing import Optional, Dict, AnyStr, ClassVar, Tuple
 
 import yaml
 from pydantic import Field
@@ -23,12 +23,18 @@ class LearningModeOutput(BaseModel):
     """
 
     reply: str  # 本轮回复的内容.
-    direction: str | None = None  # 添加的命令.
-    run: str | None = None  # 本轮需要执行的命令.
-    test: bool = False
-    title: str = ""
-    save: bool = False
-    finished: bool = False  # 当前模式是否结束
+    title: str | None = None  # 技能的名称
+    directions: List[str] = Field(default_factory=lambda: [])
+    reaction: str | None = None  # 本轮对话执行的动作.
+
+
+class SpheroCommandsCache(BaseModel):
+    """
+    做一个假的本地 cache, 方便测试时重复使用指令但不用每次都去 prompt.
+    """
+
+    # 命令的索引.
+    indexes: Dict[str, List[Dict]] = Field(default_factory=lambda: {})
 
 
 class SpheroThinkDriver(ThinkDriver):
@@ -38,8 +44,21 @@ class SpheroThinkDriver(ThinkDriver):
 
     sphero_driver_name: ClassVar[str] = "sphero_thinks"
 
-    def __init__(self, config: SpheroThinkConfig):
+    def __init__(self, runtime_path: str, config: SpheroGhostConfig):
+        self.app_runtime_path = runtime_path
         self.config = config
+        self._cached_commands: SpheroCommandsCache = SpheroCommandsCache()
+        self._load_commands()
+
+    def _load_commands(self):
+        filename = "/".join([
+            self.app_runtime_path.rstrip("/"),
+            self.config.relative_runtime_path.strip("/"),
+            "/commands.yaml",
+        ])
+        with open(filename) as f:
+            data = yaml.safe_load(f)
+            self._cached_commands = SpheroCommandsCache(**data)
 
     def driver_name(self) -> str:
         return self.sphero_driver_name
@@ -67,17 +86,17 @@ class SpheroThinkDriver(ThinkDriver):
         return result
 
     @classmethod
-    def unpack_commands_in_direction(cls, text: str) -> SpheroCommandMessage:
+    def _unpack_commands_in_direction(cls, message: SpheroCommandMessage, text: str) -> SpheroCommandMessage:
         """
         解析 llm 通过 yaml 形式返回的 commands.
         """
-        result = SpheroCommandMessage(direction=text)
+        message.direction = text
         command_data = yaml.safe_load(text)
         if not isinstance(command_data, list):
             raise RuntimeException(f"invalid ghost response: {text}")
         for detail in command_data:
-            result.commands.append(detail)
-        return result
+            message.commands.append(detail)
+        return message
 
     @classmethod
     def unpack_learning_mode_resp(cls, text: str) -> LearningModeOutput:
@@ -92,6 +111,32 @@ class SpheroThinkDriver(ThinkDriver):
     def say(cls, ctx: Context, this: Thought, text: str) -> None:
         msg = SpheroCommandMessage.new(Say(text=text))
         ctx.send_at(this).output(msg)
+
+    def parse_command(
+            self,
+            command_str: str,
+            prompter: LLMPrompter,
+            message: SpheroCommandMessage,
+    ) -> Tuple[SpheroCommandMessage, bool]:
+        """
+        指令不适合用 embedding 索引, 否则仍然需要调用一次 llm 接口, 来让 llm 判断是否一致.
+        因此先尝试用完整的.
+        """
+        if command_str in self._cached_commands.indexes:
+            command_data = self._cached_commands.indexes[command_str]
+            message.commands = command_data
+            return message, True
+        else:
+            prompt = self.config.command_prompt(command_str)
+            resp = prompter.prompt(prompt)
+            if resp == self.config.invalid_mark:
+                return message, False
+            message = self._unpack_commands_in_direction(message, resp)
+            self._cached_commands.indexes[command_str] = message.commands.copy()
+            return message, True
+
+    def get_dialog_sep(self) -> str:
+        return self.config.dialog_sep
 
 
 class SpheroMainModeThink(SingleStageThink):
@@ -154,25 +199,22 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
         text = ctx.read(Text)
         if text is None or text.is_empty():
             return ctx.mind(this).rewind()
-        prompt = self._config.prompt(
-            self._config.instruction,
-            text.content,
-        )
         prompter = self._driver.get_prompter(ctx)
-        resp = prompter.prompt(prompt)
-        if resp == self._config.invalid_mark:
+        message = SpheroCommandMessage()
+        message, ok = self._driver.parse_command(text.content, prompter, message)
+        if not ok:
             ctx.send_at(this).err(self._config.unknown_order)
             return ctx.mind(this).rewind()
-        if self._config.debug:
-            ctx.send_at(this).markdown(f"""
-# debug mode show prompt resp
-
-{resp}
-""")
-        message = self._driver.unpack_commands_in_direction(resp)
-
         ctx.send_at(this).output(message)
         return ctx.mind(this).awaits()
+
+
+class DialogMessage(BaseModel):
+    """
+    多轮对话消息.
+    """
+    role: str
+    text: str
 
 
 class LearningModeThought(Thought):
@@ -183,12 +225,29 @@ class LearningModeThought(Thought):
     priority = -1
 
     class Data(BaseModel):
+        max_turns: int = 2
         round: int = 0
+        dialog: List[DialogMessage] = Field(default_factory=lambda: [])
         directions: List[str] = Field(default_factory=lambda: [])
-        commands: Dict[int, List[Dict]] = Field(default_factory=lambda: {})
         title: str = ""
 
     data: Data = Data()
+
+    def add_message(self, role: str, message: str):
+        self.data.dialog.append(DialogMessage(
+            role=role,
+            text=message,
+        ))
+        max_lines = self.data.max_turns * 2
+        exists_lines = len(self.data.dialog)
+        if exists_lines > max_lines:
+            self.data.dialog = self.data.dialog[exists_lines - max_lines:]
+
+    def join_conversation(self, sep: str) -> str:
+        dialog = []
+        for message in self.data.dialog:
+            dialog.append(f"{message.role}: ={sep}= {message.text} ={sep}=")
+        return "\n\n".join(dialog)
 
     def prepare(self, args: Dict) -> None:
         return
@@ -223,6 +282,7 @@ class SpheroLearningModeThink(SingleStageThink):
 
     def on_activate(self, ctx: "Context", this: LearningModeThought) -> Operator | None:
         self._driver.say(ctx, this, self._config.on_activate)
+        this.add_message(self._config.ai_role, self._config.on_activate)
         return ctx.mind(this).awaits()
 
     def on_received(self, ctx: "Context", this: LearningModeThought) -> Operator | None:
@@ -230,11 +290,17 @@ class SpheroLearningModeThink(SingleStageThink):
         if text is None or text.is_empty():
             return ctx.mind(this).rewind()
         this.data.round += 1
+
         prompt = self._config.turn_prompt(
-            n=this.data.round,
-            commands=this.data.directions,
-            direction=text.content,
+            title=this.data.title,
+            conversation=this.join_conversation(self._driver.get_dialog_sep()),
+            directions=this.data.directions,
+            user_message=text.content,
+            max_turns=self._config.max_turns * 2,
+            sep=self._driver.get_dialog_sep(),
         )
+
+        this.add_message(self._config.user_role, text.content)
         prompter = self._driver.get_prompter(ctx)
         resp = prompter.prompt(prompt)
         parsed = self._driver.unpack_learning_mode_resp(resp)
@@ -242,13 +308,15 @@ class SpheroLearningModeThink(SingleStageThink):
 
     def _receive_parsed_output(self, ctx: Context, parsed: LearningModeOutput, this: LearningModeThought) -> Operator:
         ctx.send_at(this).json(parsed.dict())
-        # if parsed.title:
-        #     this.data.title = parsed.title
-        # if parsed.direction:
-        #     this.data.commands.append(parsed.direction)
-        # if parsed.test:
-        # if parsed.finished:
-        #     return ctx.mind(this).finish()
+        if parsed.reply:
+            reply = parsed.reply
+            self._driver.say(ctx, this, reply)
+            this.add_message(self._config.ai_role, reply)
+        if parsed.title:
+            this.data.title = parsed.title
+        if parsed.directions:
+            this.data.directions = parsed.directions
+
         return ctx.mind(this).awaits()
 
     def url(self) -> URL:
@@ -267,7 +335,9 @@ class SpheroLearningModeThink(SingleStageThink):
         return self.url().new_id()
 
     def new_thought(self, ctx: "Context", args: Dict) -> Thought:
-        return LearningModeThought(args)
+        thought = LearningModeThought(args)
+        thought.data.max_turns = self._config.max_turns
+        return thought
 
     def result(self, ctx: Context, this: LearningModeThought) -> Optional[Dict]:
         return None

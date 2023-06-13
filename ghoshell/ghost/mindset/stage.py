@@ -13,10 +13,14 @@ from ghoshell.ghost.url import URL
 
 class Stage(metaclass=ABCMeta):
     """
-    Thinking 的状态位.
-    状态位有一些基本的类型, 可以分为两大类:
-    1. 中断的状态位, 等待
+    Think 作为一个有限状态机, Stage 是它的状态位.
     """
+
+    def desc(self) -> str:
+        """
+        stage 的自我描述, 通常用于 LLM
+        """
+        return ""
 
     @abstractmethod
     def url(self) -> URL:

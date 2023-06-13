@@ -1,6 +1,9 @@
 import asyncio
+import io
+import time
 import uuid
 from typing import Optional
+from wave import Wave_read
 
 import speech_recognition as sr
 import yaml
@@ -41,10 +44,12 @@ class BaiduSpeechShell(ShellKernel):
         self.session_id = str(uuid.uuid4().hex)
         self.user_id = str(uuid.uuid4().hex)
         self.pyaudio = PyAudio()
-        self._talking = False
         super().__init__(container, config_path, runtime_path)
         self._config: BaiduSpeechShellConfig = self._load_config(config_filename)
         self._session = PromptSession("\n<<< ")
+        self._listening: bool = False
+        self._speaking: bool = False
+        self._stopping_speak: bool = False
 
     def _load_config(self, config_filename: str) -> BaiduSpeechShellConfig:
         config_filename = self.config_path.rstrip("/") + "/" + config_filename.lstrip("/")
@@ -125,6 +130,7 @@ class BaiduSpeechShell(ShellKernel):
         while True:
             try:
                 user_input = await self._session.prompt_async(multiline=False)
+                self._stop_speak()
                 match user_input:
                     case "/exit":
                         self._close()
@@ -132,7 +138,6 @@ class BaiduSpeechShell(ShellKernel):
                         self._listen()
                     case _:
                         self.tick(user_input)
-                self.tick(user_input)
             except (EOFError, KeyboardInterrupt):
                 self._console.print(f"quit!!")
                 exit(0)
@@ -142,6 +147,7 @@ class BaiduSpeechShell(ShellKernel):
         exit(0)
 
     def tick(self, text: str) -> None:
+        self._stop_speak()
         self._console.print("> waiting ghost...")
         super().tick(text)
         self._console.print("> ghost replied")
@@ -153,8 +159,11 @@ class BaiduSpeechShell(ShellKernel):
         self._markdown_print(self._config.welcome)
 
     def _listen(self) -> None:
+        if self._listening:
+            return
+        self._listening = True
+        self._stop_speak()
         adapter = self.container.force_fetch(BaiduSpeechAdapter)
-
         r = sr.Recognizer()
         with sr.Microphone() as source:
             self._console.print("> listening...")
@@ -163,9 +172,8 @@ class BaiduSpeechShell(ShellKernel):
         self._console.print("> speech to text...")
         text = adapter.wave2text(wave_data)
         self._console.print("> you said: " + text)
-        self._talking = True
+        self._listening = False
         self.tick(text)
-        self._talking = False
 
     def _speak_text(self, text: Text) -> None:
         """
@@ -177,19 +185,40 @@ class BaiduSpeechShell(ShellKernel):
         self._speak(speech_data)
 
     def _speak(self, wave_data: bytes) -> None:
+        if self._listening:
+            self._console.print("> not speaking cause of listening")
+            return
         self._console.print("> speaking...")
-        p = self.pyaudio
-        stream = p.open(
-            format=p.get_format_from_width(2),
+        self._speaking = True
+        stream = self.pyaudio.open(
+            format=self.pyaudio.get_format_from_width(2),
             channels=1,
             rate=16000,
             output=True,
         )
+        wave_stream = io.BytesIO(wave_data)
+        wave_obj = Wave_read(wave_stream)
+        chunk = 1024
         # play stream
-        stream.write(wave_data)
-        # stop stream
+        self._stopping_speak = False
+        while not self._stopping_speak:
+            frames = wave_obj.readframes(chunk)
+            if not frames:
+                break
+            stream.write(frames)
         stream.stop_stream()
         stream.close()
+        self._speaking = False
+        self._stopping_speak = False
+        self._console.print("> finish speaking")
+
+    def _stop_speak(self) -> None:
+        if not self._speaking:
+            return
+        self._stopping_speak = True
+        while self._speaking:
+            time.sleep(0.1)
+        self._console.print("> speaking stopped")
 
     def _markdown_print(self, text: str) -> None:
         markdown = Markdown(f"""

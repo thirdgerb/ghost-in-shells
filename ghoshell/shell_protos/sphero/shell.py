@@ -50,12 +50,20 @@ class SpheroBoltShell(BaiduSpeechShell):
         while count < 20:
             if self._sphero_runtime.ready:
                 break
+            if self._sphero_runtime.error:
+                break
+
             time.sleep(1)
+        if self._sphero_runtime.error is not None:
+            self._quit(self._sphero_runtime.error)
         if not self._sphero_runtime.ready:
-            self._console.print("failed to boot sphero")
-            exit(0)
+            self._quit("failed to boot sphero")
         # use Thread to run sphero BOLT
         super().run_as_app()
+
+    def _quit(self, message: str):
+        self._console.print(message)
+        exit(0)
 
     def _close(self) -> None:
         if self._sphero_runtime is not None:

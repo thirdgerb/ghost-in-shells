@@ -1,4 +1,4 @@
-from ghoshell.shell_protos.baidu_speech.shell import BaiduSpeechShell
+from ghoshell.shell_protos.baidu_speech.baidu_speech_shell import BaiduSpeechShell
 
 __all__ = [
     "BaiduSpeechShell"

@@ -22,7 +22,7 @@ class LangChainOpenAIPromptProvider(Provider):
         proxy = os.environ.get("OPENAI_PROXY", None)
         ai = OpenAI(
             request_timeout=30,
-            max_tokens=2048,
+            max_tokens=512,
             model_name="text-davinci-003",
             max_retries=0,
             openai_proxy=proxy,

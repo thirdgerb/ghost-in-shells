@@ -98,18 +98,18 @@ class SpheroBoltKernel:
             self.api.set_front_led(Color(0, 0, 0))
             return False
         if self.cmd_ran == 0:
-            self.api.set_speed(cmd.speed)
             self.api.set_front_led(Color(0, 200, 0))
+            self.api.set_speed(cmd.speed)
             heading = self.front_angle + cmd.heading % 360
             self.api.set_heading(heading)
         return True
 
     def _stop(self, cmd: Stop, at: float) -> bool:
         if self.cmd_ran == 0:
-            self.api.stop_roll(cmd.heading)
             self.front_angle = self.front_angle + cmd.heading % 360
             self.api.set_front_led(Color(200, 0, 0))
             self.api.set_back_led(Color(200, 0, 0))
+            self.api.stop_roll(cmd.heading)
         continual = self.cmd_start_at + cmd.duration >= at
         if not continual:
             self.api.set_front_led(Color(0, 0, 0))
@@ -125,8 +125,8 @@ class SpheroBoltKernel:
 
     def _spin(self, cmd: Spin, at: float) -> bool:
         if self.cmd_ran == 0:
-            self.api.spin(cmd.angle, cmd.duration)
             self.api.set_front_led(Color(0, 200, 0))
+            self.api.spin(cmd.angle, cmd.duration)
         if self.cmd_start_at + cmd.duration >= at:
             return True
         # 变更角度.
@@ -157,38 +157,43 @@ class SpheroBoltRuntime:
         self._running: bool = True
 
         self.ready = False
+        self.error: str | None = None
 
     def close(self):
         self._running = False
 
     def _do_run(self):
         """
+        use thread to async run bolt
         """
-        bolt = scanner.find_BOLT()
-        with SpheroEduAPI(bolt) as api:
-            kernel = SpheroBoltKernel(api, self._console, self._speak)
-            self.ready = True
-            while self._running:
-                now = time.time()
+        try:
+            bolt = scanner.find_BOLT()
+            with SpheroEduAPI(bolt) as api:
+                kernel = SpheroBoltKernel(api, self._console, self._speak)
+                self.ready = True
+                while self._running:
+                    now = time.time()
 
-                try:
-                    more = kernel.run(now)
-                except Exception as e:
-                    self._console.print(e)
-                    self._sleep_frame()
-                    continue
+                    try:
+                        more = kernel.run(now)
+                    except Exception as e:
+                        self._console.print(e)
+                        self._sleep_frame()
+                        continue
 
-                if more:
-                    self._sleep_frame()
-                    continue
-                if len(self._cmds) == 0:
-                    self._sleep_frame()
-                    continue
-                cmd = self._cmds[0]
-                self._cmds = self._cmds[1:]
-                kernel.set_command(cmd)
+                    if more:
+                        self._sleep_frame()
+                        continue
+                    if len(self._cmds) == 0:
+                        self._sleep_frame()
+                        continue
+                    cmd = self._cmds[0]
+                    self._cmds = self._cmds[1:]
+                    kernel.set_command(cmd)
 
-            kernel.close()
+                kernel.close()
+        except Exception as e:
+            self.error = str(e)
 
     def run(self):
         """
