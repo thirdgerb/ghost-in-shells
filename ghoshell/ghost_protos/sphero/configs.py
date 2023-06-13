@@ -190,7 +190,7 @@ class SpheroGhostConfig(BaseModel):
     {command}
     ={sep}=
 
-    我的行动指令 (不需要用 ``` 隔开) 如下:
+    我的行动指令 (注意输出不需要用 ``` 隔开) 如下:
     """
 
     invalid_mark: str = "no"
@@ -201,8 +201,9 @@ class SpheroGhostConfig(BaseModel):
         sep = self.dialog_sep
         if not sep:
             sep = "".join(random.sample(string.ascii_letters, 3))
-        return self.prompt_temp.format(
+        resp = self.prompt_temp.format(
             instruction=self.instruction,
             command=command,
             sep=sep
         )
+        return resp.strip("```")

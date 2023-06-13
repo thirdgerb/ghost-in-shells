@@ -2,14 +2,15 @@ from logging import Logger
 from typing import List
 
 from ghoshell.container import Provider
-from ghoshell.ghost_fmk.bootstrapper import FileLoggerBootstrapper
+from ghoshell.ghost_fmk.bootstrapper import FileLoggerBootstrapper, \
+    CommandFocusDriverBootstrapper, LLMToolsFocusDriverBootstrapper
 from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
 from ghoshell.ghost_fmk.providers import ContextLoggerProvider
 from ghoshell.ghost_protos.sphero import SpheroGhostBootstrapper
-from ghoshell.llms import GameUndercoverBootstrapper
-from ghoshell.llms import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
 from ghoshell.llms import LangChainOpenAIPromptProvider, LLMPrompter
+from ghoshell.llms.discover import GameUndercoverBootstrapper
+from ghoshell.llms.discover import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
 from ghoshell.mocks.cache import MockCacheProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
 from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
@@ -43,9 +44,9 @@ class MockGhost(GhostKernel):
     bootstrapper: List[Bootstrapper] = [
         FileLoggerBootstrapper(),
         RegisterThinkDemosBootstrapper(),
-        RegisterFocusDriverBootstrapper(),
+        CommandFocusDriverBootstrapper(),
         LLMConversationalThinkBootstrapper(),
-
+        LLMToolsFocusDriverBootstrapper(),
         # sphero 的逻辑驱动.
         SpheroGhostBootstrapper(),
 

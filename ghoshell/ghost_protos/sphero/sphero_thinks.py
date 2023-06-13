@@ -8,8 +8,8 @@ from pydantic import Field
 from ghoshell.ghost import MindsetNotFoundException, Operator, Reaction, Intention
 from ghoshell.ghost import RuntimeException, TaskLevel
 from ghoshell.ghost import Think, Context, Thought, ThinkMeta, URL, ThinkDriver, DictThought
-from ghoshell.ghost_fmk.intentions import CommandOutput
-from ghoshell.ghost_fmk.reactions import CommandReaction, Command
+from ghoshell.ghost_fmk.intentions import CommandOutput, LLMToolIntention
+from ghoshell.ghost_fmk.reactions import CommandReaction, Command, LLMToolReaction
 from ghoshell.ghost_fmk.thinks import SingleStageThink
 from ghoshell.ghost_protos.sphero.configs import *
 from ghoshell.ghost_protos.sphero.messages import SpheroCommandMessage, Roll, Say, Stop
@@ -264,6 +264,19 @@ class LearningModeThought(Thought):
 
 # --- conversational mode
 
+class SpheroLearningModeToolsReaction(LLMToolReaction):
+
+    def __init__(self):
+        super().__init__({
+            "quit": "退出当前模式",
+            "finish": "结束学习模式",
+            "test": "测试或者直接运行系统",
+        })
+
+    def on_match(self, ctx: Context, this: LearningModeThought, result: LLMToolIntention.Result) -> Operator | None:
+        print(result)
+        return None
+
 
 class SpheroLearningModeThink(SingleStageThink):
     """
@@ -346,7 +359,9 @@ class SpheroLearningModeThink(SingleStageThink):
         return None
 
     def reactions(self) -> Dict[str, Reaction]:
-        return {}
+        return {
+
+        }
 
 
 # --- reactions

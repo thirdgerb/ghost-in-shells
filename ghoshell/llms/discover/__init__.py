@@ -1,3 +1,4 @@
+from ghoshell.llms.discover.bootstrapper import *
 from ghoshell.llms.discover.conversational import ConversationalThinkConfig
 from ghoshell.llms.discover.prompt_unittest import PromptUnitTestConfig, PromptUnitTestThink, PromptUnitTestThinkDriver
 from ghoshell.llms.discover.undercover import UndercoverGameDriver
@@ -14,5 +15,10 @@ __all__ = [
 
     # undercover game
     "UndercoverGameDriver",
+
+    # bootstrapper
+    "LLMConversationalThinkBootstrapper",
+    "PromptUnitTestsBootstrapper",
+    "GameUndercoverBootstrapper",
 
 ]

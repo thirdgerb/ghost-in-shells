@@ -48,6 +48,14 @@ class Attention(BaseModel):
 
 
 class FocusDriver(metaclass=ABCMeta):
+    """
+    focus on certain kind of user intention
+    fit any of attentions
+
+    intention, attention, focus 这几个概念似乎用得并不完全匹配单词原意
+    而且 intention & attention 已经成为了机器学习术语, 很容易招来术语警察.
+    需要考虑将这些名词全部替换一套.
+    """
 
     @abstractmethod
     def kind(self) -> str:

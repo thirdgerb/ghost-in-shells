@@ -105,7 +105,7 @@ class HelpCommand(CommandIntention):
         if i is not None:
             return i
 
-        handler = ctx.container.get(FocusOnCommandHandler)
+        handler = ctx.container.get(CommandFocusDriver)
         if handler is None:
             ctx.send_at(None).text("unknown command")
             return ctx.mind(None).rewind()
@@ -122,7 +122,8 @@ class HelpCommand(CommandIntention):
         return ctx.mind(None).rewind()
 
 
-class FocusOnCommandHandler(FocusDriver):
+class CommandFocusDriver(FocusDriver):
+    # 命令的前缀号
     prefix: ClassVar[str] = "/"
 
     def __init__(self, default_commands: List[CommandIntention] | None = None):

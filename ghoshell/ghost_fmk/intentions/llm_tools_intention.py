@@ -1,4 +1,6 @@
-from typing import List, Optional, Dict
+from __future__ import annotations
+
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -6,24 +8,45 @@ from ghoshell.ghost import Intention, Context, FocusDriver, CtxTool
 from ghoshell.llms import LLMPrompter
 from ghoshell.messages import Text
 
+LLM_TOOL_INTENTION_KIND = "llm_tools"
+
 
 class LLMToolIntention(Intention):
     """
     给 大模型用的工具提示
     """
-    kind = "llm_tools"
+    kind: str = LLM_TOOL_INTENTION_KIND
+
+    class Config(BaseModel):
+        name: str
+        desc: str
 
     class Result(BaseModel):
+        name: str
+        """
+        输出结果
+        """
+        # 命中的指令.
         # 调用工具时提供的上下文.
         context: str
 
     # name: desc
-    config: Dict
+    config: Config
 
+    # 输出结果.
     params: Result | None = None
 
+    @classmethod
+    def new(cls, name: str, desc: str) -> LLMToolIntention:
+        return cls(
+            config=dict(
+                name=name,
+                desc=desc,
+            )
+        )
 
-class LLMToolAgentConfig(BaseModel):
+
+class LLMToolsFocusConfig(BaseModel):
     instruction = """
 我是一个自然语言理解中间件 (NLU), 在思考用户说得话是否正好对应我的某种工具.
 这些工具也是基于大语言模型实现的. 
@@ -52,15 +75,15 @@ class LLMToolAgentConfig(BaseModel):
     invalid_mark = "no"
 
 
-class LLMToolAgentDriver(FocusDriver):
+class LLMToolsFocusDriver(FocusDriver):
 
-    def __init__(self, config: LLMToolAgentConfig, prompter: LLMPrompter):
+    def __init__(self, config: LLMToolsFocusConfig, prompter: LLMPrompter):
         self.global_tools: List[LLMToolIntention] = []
         self.prompter = prompter
         self.config = config
 
     def kind(self) -> str:
-        return LLMToolIntention.kind
+        return LLM_TOOL_INTENTION_KIND
 
     def match(self, ctx: Context, *metas: LLMToolIntention) -> Optional[LLMToolIntention]:
         text = Text.read(ctx.input.payload)
@@ -81,7 +104,7 @@ class LLMToolAgentDriver(FocusDriver):
                     continue
                 tool_list.append(name)
                 tool_map[name] = meta
-                tool_desc = self.config.tool_temp.format(name=name, desc=meta.config[name])
+                tool_desc = self.config.tool_temp.format(name=name, desc=meta.config.desc)
                 # 添加所有的 tools
                 tools.append(tool_desc)
 
@@ -113,7 +136,7 @@ class LLMToolAgentDriver(FocusDriver):
             return None
 
         matched = tool_map[name]
-        matched.params = LLMToolIntention.Result(context=desc)
+        matched.params = LLMToolIntention.Result(name=name, context=desc)
         return matched
 
     def register_global_intentions(self, *intentions: Intention) -> None:

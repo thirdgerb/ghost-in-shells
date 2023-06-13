@@ -62,7 +62,6 @@ class Reaction(metaclass=ABCMeta):
         """
         动作的级别, 对标 TaskLevel
         Private: 只有当前任务是 process.awaiting 时才可以响应.
-
         """
         pass
 
