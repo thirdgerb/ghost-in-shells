@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Dict, List
 
 from ghoshell.ghost import Reaction, Context, Thought, Operator, Intention, TaskLevel
-from ghoshell.ghost_fmk.intentions import LLMToolIntention
+from ghoshell.ghost_fmk.intentions import LLMToolIntention, LLMToolIntentionResult
 
 
 class LLMToolReaction(Reaction, metaclass=ABCMeta):
@@ -34,18 +34,23 @@ class LLMToolReaction(Reaction, metaclass=ABCMeta):
     def intentions(self, ctx: Context) -> List[Intention]:
         intentions = []
         for name in self._name_2_desc:
-            intention = LLMToolIntention.new(name, self._name_2_desc[name])
+            intention = LLMToolIntention(
+                config=dict(
+                    name=name,
+                    desc=self._name_2_desc[name],
+                )
+            )
             intentions.append(intention)
         return intentions
 
     def react(self, ctx: Context, this: Thought, params: Dict | None) -> Operator | None:
         if params is None:
             return None
-        result = LLMToolIntention.Result(**params)
+        result = LLMToolIntentionResult(**params)
         return self.on_match(ctx, this, result)
 
     @abstractmethod
-    def on_match(self, ctx: Context, this: Thought, result: LLMToolIntention.Result) -> Operator | None:
+    def on_match(self, ctx: Context, this: Thought, result: LLMToolIntentionResult) -> Operator | None:
         """
         实现 on match 方法做后续的操作.
         """

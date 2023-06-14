@@ -107,7 +107,6 @@ class BaiduSpeech(TTS, ASR):
         start = time.time()
         f = urlopen(req)
         end = time.time()
-        print("+++++++++++++=l", end - start)
         result_str = f.read()
         headers = dict((name.lower(), value) for name, value in f.headers.items())
 

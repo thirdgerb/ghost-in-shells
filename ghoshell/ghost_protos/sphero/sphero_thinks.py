@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Optional, Dict, AnyStr, ClassVar, Tuple
 
 import yaml
@@ -8,8 +9,9 @@ from pydantic import Field
 from ghoshell.ghost import MindsetNotFoundException, Operator, Reaction, Intention
 from ghoshell.ghost import RuntimeException, TaskLevel
 from ghoshell.ghost import Think, Context, Thought, ThinkMeta, URL, ThinkDriver, DictThought
-from ghoshell.ghost_fmk.intentions import CommandOutput, LLMToolIntention
-from ghoshell.ghost_fmk.reactions import CommandReaction, Command, LLMToolReaction
+from ghoshell.ghost_fmk.intentions import CommandOutput
+from ghoshell.ghost_fmk.reactions import CommandReaction, Command
+from ghoshell.ghost_fmk.reactions.commands import ProcessCmdReaction
 from ghoshell.ghost_fmk.thinks import SingleStageThink
 from ghoshell.ghost_protos.sphero.configs import *
 from ghoshell.ghost_protos.sphero.messages import SpheroCommandMessage, Roll, Say, Stop
@@ -51,14 +53,20 @@ class SpheroThinkDriver(ThinkDriver):
         self._load_commands()
 
     def _load_commands(self):
-        filename = "/".join([
+        filename = self._cached_commands_file()
+        if not os.path.exists(filename):
+            with open(filename, 'w') as f:
+                yaml.safe_dump(dict(), f)
+        with open(filename) as f:
+            data = yaml.safe_load(f)
+            self._cached_commands = SpheroCommandsCache(**data)
+
+    def _cached_commands_file(self) -> str:
+        return "/".join([
             self.app_runtime_path.rstrip("/"),
             self.config.relative_runtime_path.strip("/"),
             "/commands.yaml",
         ])
-        with open(filename) as f:
-            data = yaml.safe_load(f)
-            self._cached_commands = SpheroCommandsCache(**data)
 
     def driver_name(self) -> str:
         return self.sphero_driver_name
@@ -90,7 +98,9 @@ class SpheroThinkDriver(ThinkDriver):
         """
         解析 llm 通过 yaml 形式返回的 commands.
         """
-        message.direction = text
+        if text.startswith("`") or text.endswith("`"):
+            text.strip("`")
+
         command_data = yaml.safe_load(text)
         if not isinstance(command_data, list):
             raise RuntimeException(f"invalid ghost response: {text}")
@@ -100,6 +110,7 @@ class SpheroThinkDriver(ThinkDriver):
 
     @classmethod
     def unpack_learning_mode_resp(cls, text: str) -> LearningModeOutput:
+        text = text.strip("`")
         data = yaml.safe_load(text)
         return LearningModeOutput(**data)
 
@@ -111,6 +122,10 @@ class SpheroThinkDriver(ThinkDriver):
     def say(cls, ctx: Context, this: Thought, text: str) -> None:
         msg = SpheroCommandMessage.new(Say(text=text))
         ctx.send_at(this).output(msg)
+
+    def cache_command(self, command_str: str, message: SpheroCommandMessage) -> None:
+        self._cached_commands.indexes[command_str] = message.commands.copy()
+        self._save_cached()
 
     def parse_command(
             self,
@@ -133,7 +148,13 @@ class SpheroThinkDriver(ThinkDriver):
                 return message, False
             message = self._unpack_commands_in_direction(message, resp)
             self._cached_commands.indexes[command_str] = message.commands.copy()
+            self._save_cached()
             return message, True
+
+    def _save_cached(self):
+        filename = self._cached_commands_file()
+        with open(filename, 'w') as f:
+            yaml.safe_dump(self._cached_commands.dict(), f, allow_unicode=True)
 
     def get_dialog_sep(self) -> str:
         return self.config.dialog_sep
@@ -263,19 +284,19 @@ class LearningModeThought(Thought):
 
 
 # --- conversational mode
-
-class SpheroLearningModeToolsReaction(LLMToolReaction):
-
-    def __init__(self):
-        super().__init__({
-            "quit": "退出当前模式",
-            "finish": "结束学习模式",
-            "test": "测试或者直接运行系统",
-        })
-
-    def on_match(self, ctx: Context, this: LearningModeThought, result: LLMToolIntention.Result) -> Operator | None:
-        print(result)
-        return None
+#
+# class SpheroLearningModeToolsReaction(LLMToolReaction):
+#
+#     def __init__(self):
+#         super().__init__({
+#             "quit": "退出当前模式",
+#             "finish": "结束学习模式",
+#             "test": "测试或者直接运行系统",
+#         })
+#
+#     def on_match(self, ctx: Context, this: LearningModeThought, result: LLMToolIntentionResult) -> Operator | None:
+#         print(result)
+#         return None
 
 
 class SpheroLearningModeThink(SingleStageThink):
@@ -320,16 +341,54 @@ class SpheroLearningModeThink(SingleStageThink):
         return self._receive_parsed_output(ctx, parsed, this)
 
     def _receive_parsed_output(self, ctx: Context, parsed: LearningModeOutput, this: LearningModeThought) -> Operator:
-        ctx.send_at(this).json(parsed.dict())
-        if parsed.reply:
-            reply = parsed.reply
-            self._driver.say(ctx, this, reply)
-            this.add_message(self._config.ai_role, reply)
+        if self._config.debug:
+            ctx.send_at(this).json(parsed.dict())
+
+        # 完成赋值.
         if parsed.title:
             this.data.title = parsed.title
         if parsed.directions:
             this.data.directions = parsed.directions
 
+        # 解决 title 为空的问题.
+        if parsed.reaction == "save":
+            if not this.data.title:
+                self._driver.say(ctx, this, self._config.ask_for_title)
+                this.add_message(self._config.ai_role, self._config.ask_for_title)
+                return ctx.mind(this).awaits()
+
+        # 发送消息.
+        if parsed.reply:
+            reply = parsed.reply
+            self._driver.say(ctx, this, reply)
+            this.add_message(self._config.ai_role, reply)
+
+        match parsed.reaction:
+            case "restart":
+                return ctx.mind(this).restart()
+            case "test":
+                return self._run_test(ctx, this)
+            case "save":
+                return self._save_case(ctx, this)
+            case "finish":
+                return ctx.mind(this).finish()
+            case _:
+                return ctx.mind(this).awaits()
+
+    def _save_case(self, ctx: Context, this: LearningModeThought) -> Operator:
+        message = SpheroCommandMessage()
+        prompter = ctx.container.force_fetch(LLMPrompter)
+        for direction in this.data.directions:
+            self._driver.parse_command(direction, prompter, message)
+        self._driver.cache_command(this.data.title, message)
+        return ctx.mind(this).awaits()
+
+    def _run_test(self, ctx: Context, this: LearningModeThought) -> Operator:
+        message = SpheroCommandMessage()
+        prompter = ctx.container.force_fetch(LLMPrompter)
+        for direction in this.data.directions:
+            self._driver.parse_command(direction, prompter, message)
+        ctx.send_at(this).output(message)
         return ctx.mind(this).awaits()
 
     def url(self) -> URL:
@@ -360,7 +419,7 @@ class SpheroLearningModeThink(SingleStageThink):
 
     def reactions(self) -> Dict[str, Reaction]:
         return {
-
+            "process": ProcessCmdReaction(),
         }
 
 

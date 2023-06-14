@@ -18,4 +18,4 @@ class LangChainOpenAIAdapter(LLMPrompter):
         self.logger.debug(f"prompt resp: >>> {resp}")
         # 避免高并发
         time.sleep(0.1)
-        return resp.strip()
+        return resp

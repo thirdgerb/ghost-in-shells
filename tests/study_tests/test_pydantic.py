@@ -111,3 +111,16 @@ def test_sub_model_default_value():
 
     foo = Foo(foo="foo")
     assert foo.bar.zoo == "zoo"
+
+
+def test_new_with_sub_model():
+    class Foo(BaseModel):
+        foo: str
+
+        class Bar(BaseModel):
+            zoo: str = "zoo"
+
+        bar: Bar
+
+    foo = Foo(foo="foo", bar=dict(zoo="zoo"))
+    assert foo.bar.zoo == "zoo"

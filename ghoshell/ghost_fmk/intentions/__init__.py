@@ -2,12 +2,13 @@ from ghoshell.ghost_fmk.intentions.command_intention import CommandIntention, Co
     CommandOutput, \
     CommandIntentionKind
 
-from ghoshell.ghost_fmk.intentions.llm_tools_intention import LLMToolIntention, LLMToolsFocusConfig, LLMToolsFocusDriver
+from ghoshell.ghost_fmk.intentions.llm_tools_intention import LLMToolIntention, LLMToolsFocusConfig, \
+    LLMToolsFocusDriver, LLMToolIntentionResult
 
 __all__ = [
     # 命令相关.
     "Command", "CommandOutput", "CommandIntention", "CommandFocusDriver", "CommandIntentionKind",
 
     # tool
-    "LLMToolIntention", "LLMToolsFocusConfig", "LLMToolsFocusDriver",
+    "LLMToolIntention", "LLMToolsFocusConfig", "LLMToolsFocusDriver", "LLMToolIntentionResult",
 ]

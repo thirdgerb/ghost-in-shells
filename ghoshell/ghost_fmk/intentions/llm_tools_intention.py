@@ -11,39 +11,32 @@ from ghoshell.messages import Text
 LLM_TOOL_INTENTION_KIND = "llm_tools"
 
 
+class LLMToolIntentionConfig(BaseModel):
+    name: str
+    desc: str
+
+
+class LLMToolIntentionResult(BaseModel):
+    name: str
+    """
+    输出结果
+    """
+    # 命中的指令.
+    # 调用工具时提供的上下文.
+    context: str
+
+
 class LLMToolIntention(Intention):
     """
     给 大模型用的工具提示
     """
     kind: str = LLM_TOOL_INTENTION_KIND
 
-    class Config(BaseModel):
-        name: str
-        desc: str
-
-    class Result(BaseModel):
-        name: str
-        """
-        输出结果
-        """
-        # 命中的指令.
-        # 调用工具时提供的上下文.
-        context: str
-
     # name: desc
-    config: Config
+    config: LLMToolIntentionConfig
 
     # 输出结果.
-    params: Result | None = None
-
-    @classmethod
-    def new(cls, name: str, desc: str) -> LLMToolIntention:
-        return cls(
-            config=dict(
-                name=name,
-                desc=desc,
-            )
-        )
+    params: LLMToolIntentionResult | None = None
 
 
 class LLMToolsFocusConfig(BaseModel):
@@ -85,13 +78,14 @@ class LLMToolsFocusDriver(FocusDriver):
     def kind(self) -> str:
         return LLM_TOOL_INTENTION_KIND
 
-    def match(self, ctx: Context, *metas: LLMToolIntention) -> Optional[LLMToolIntention]:
+    def match(self, ctx: Context, *metas: Intention) -> Optional[LLMToolIntention]:
+        wrapped = [LLMToolIntention(**meta.dict()) for meta in metas]
         text = Text.read(ctx.input.payload)
         if text is None:
             return None
         if text.is_empty():
             return None
-        return self._match_content(ctx, text.content, *metas)
+        return self._match_content(ctx, text.content, *wrapped)
 
     def _match_content(self, ctx: Context, content: str, *metas: LLMToolIntention) -> Optional[LLMToolIntention]:
         tool_list = []

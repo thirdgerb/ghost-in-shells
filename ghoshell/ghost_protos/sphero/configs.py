@@ -69,7 +69,7 @@ class SpheroLearningModeConfig(BaseModel):
     * test: 运行所有的指令, 当用户明确提到 "测试" 或 "运行" 这类意思时执行. 我会告诉用户 "好的", 然后执行所有 directions. 
     * finish: 结束当前对话模式, 并告知用户. 
     * restart: 清空上下文记忆, 从头开始, 并告知用户. 
-    * save: 保存当前技能, 会存到我的技能记忆库中. 如果我还不知道 title 是什么, 就必须先明确询问用户技能的名称是什么. 
+    * save: 保存当前技能, 会存到我的技能记忆库中. 如果 title 字段仍然为空, 就必须先明确询问用户技能的名称是什么.
     * no: 不执行指令. 
  
 """
@@ -107,6 +107,7 @@ class SpheroLearningModeConfig(BaseModel):
 
 输出: 
 """
+    ask_for_title: str = "请告诉我技能的名称"
 
     def turn_prompt(
             self,
