@@ -530,8 +530,6 @@ class Process(BaseModel):
         """
         if len(tasks) == 0:
             return
-        exists = {ptr.tid: ptr for ptr in self.tasks}
-        orders = [ptr.tid for ptr in self.tasks]
         done = set()
         task_arr = []
         for task in tasks:
@@ -545,6 +543,8 @@ class Process(BaseModel):
             task_arr.append(task)
             done.add(tid)
 
+        exists = {ptr.tid: ptr for ptr in self.tasks}
+        orders = [ptr.tid for ptr in self.tasks]
         for tid in orders:
             if tid in done:
                 continue
@@ -553,7 +553,7 @@ class Process(BaseModel):
             done.add(tid)
 
         self.tasks = task_arr
-        self.clear_cached_indexes()
+        self._clear_cached_indexes()
 
     def set_current(self, tid: str):
         """
@@ -572,13 +572,24 @@ class Process(BaseModel):
         root.restart()
         self.current = self.root
         self.tasks = [root]
-        self.clear_cached_indexes()
+        self._clear_cached_indexes()
 
     def reset_tasks(self, tasks: List[Task]) -> None:
-        self.tasks = tasks
+        done = set()
+        task_arr = []
+        for t in tasks:
+            if t.tid in done:
+                continue
+            task_arr.append(t)
+            done.add(t.tid)
+
+        self.tasks = task_arr
         self.reset_indexes()
 
-    def clear_cached_indexes(self) -> None:
+    def to_saving_dict(self) -> Dict:
+        return self.dict(include={"pid", "sid", "root", "current", "round", "parent_id", "tasks"})
+
+    def _clear_cached_indexes(self) -> None:
         self.tid_indexes = None
         self.status_list_indexes = None
 
@@ -616,8 +627,7 @@ class Process(BaseModel):
         self.tid_indexes = tid_indexes
 
     def brief(self) -> Dict:
-        brief = self.dict(exclude={"tasks", "tid_indexes", "status_list_indexes"})
-        brief["tasks"] = {ptr.tid: ptr.status for ptr in self.tasks}
+        brief = self.dict(exclude={"__tid_indexes", "__status_list_indexes"})
         return brief
 
     def deep_copy(self) -> "Process":

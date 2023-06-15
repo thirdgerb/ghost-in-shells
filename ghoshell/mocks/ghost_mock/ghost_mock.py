@@ -8,9 +8,11 @@ from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
 from ghoshell.ghost_fmk.providers import ContextLoggerProvider
 from ghoshell.ghost_protos.sphero import SpheroGhostBootstrapper
-from ghoshell.llms import LangChainOpenAIPromptProvider, LLMAdapter
+from ghoshell.llms import LLMTextCompletion, LLMChatCompletion
 from ghoshell.llms.discover import GameUndercoverBootstrapper
 from ghoshell.llms.discover import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
+from ghoshell.llms.openai import OpenAIBootstrapper
+from ghoshell.llms.thinks import ConversationalThinksBootstrapper
 from ghoshell.mocks.cache import MockCacheProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
 from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
@@ -45,6 +47,9 @@ class MockGhost(GhostKernel):
         FileLoggerBootstrapper(),
         RegisterThinkDemosBootstrapper(),
         CommandFocusDriverBootstrapper(),
+        OpenAIBootstrapper(),
+
+        ConversationalThinksBootstrapper(),
         LLMConversationalThinkBootstrapper(),
         LLMToolsFocusDriverBootstrapper(),
         # sphero 的逻辑驱动.
@@ -53,14 +58,16 @@ class MockGhost(GhostKernel):
         # 将 configs/llms/unitests 下的文件当成单元测试思维.
         PromptUnitTestsBootstrapper(),
 
-        # 测试加入 undercover 游戏.
+        # 测试加入 undercover 游戏. deprecated
         GameUndercoverBootstrapper(think_name="game/undercover"),
     ]
 
     @classmethod
     def _depend_contracts(cls) -> List:
         contracts = super()._depend_contracts()
-        contracts.append(LLMAdapter)
+        appending = [LLMTextCompletion, LLMChatCompletion]
+        for i in appending:
+            contracts.append(i)
         return contracts
 
     @classmethod
@@ -68,7 +75,7 @@ class MockGhost(GhostKernel):
         return [
             MockCacheProvider(),
             ThinkMetaDriverMockProvider(),
-            LangChainOpenAIPromptProvider(),
+            # LangChainTestLLMAdapterProvider(),
         ]
 
     @classmethod

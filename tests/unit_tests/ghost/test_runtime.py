@@ -49,3 +49,11 @@ def test_process_store_canceled_task():
 
     # canceling fallback
     assert p.fallback() is b
+
+
+def test_process_store_same_task():
+    p = Process.new_process("sid", "pid")
+    a = Task(tid="a", url=URL(resolver="a"))
+    p.store_task(a, a, a, a, a)
+    p.reset_indexes()
+    assert len(p.tasks) == 1

@@ -15,7 +15,7 @@ from ghoshell.ghost_fmk.reactions.commands import ProcessCmdReaction
 from ghoshell.ghost_fmk.thinks import SingleStageThink
 from ghoshell.ghost_protos.sphero.configs import *
 from ghoshell.ghost_protos.sphero.messages import SpheroCommandMessage, Roll, Say, Stop
-from ghoshell.llms import LLMAdapter
+from ghoshell.llms import LLMTextCompletion
 from ghoshell.messages import Text
 
 
@@ -115,8 +115,8 @@ class SpheroThinkDriver(ThinkDriver):
         return LearningModeOutput(**data)
 
     @classmethod
-    def get_prompter(cls, ctx: Context) -> LLMAdapter:
-        return ctx.container.force_fetch(LLMAdapter)
+    def get_prompter(cls, ctx: Context) -> LLMTextCompletion:
+        return ctx.container.force_fetch(LLMTextCompletion)
 
     @classmethod
     def say(cls, ctx: Context, this: Thought, text: str) -> None:
@@ -130,7 +130,7 @@ class SpheroThinkDriver(ThinkDriver):
     def parse_command(
             self,
             command_str: str,
-            prompter: LLMAdapter,
+            prompter: LLMTextCompletion,
             message: SpheroCommandMessage,
     ) -> Tuple[SpheroCommandMessage, bool]:
         """
@@ -377,7 +377,7 @@ class SpheroLearningModeThink(SingleStageThink):
 
     def _save_case(self, ctx: Context, this: LearningModeThought) -> Operator:
         message = SpheroCommandMessage()
-        prompter = ctx.container.force_fetch(LLMAdapter)
+        prompter = ctx.container.force_fetch(LLMTextCompletion)
         for direction in this.data.directions:
             self._driver.parse_command(direction, prompter, message)
         self._driver.cache_command(this.data.title, message)
@@ -385,7 +385,7 @@ class SpheroLearningModeThink(SingleStageThink):
 
     def _run_test(self, ctx: Context, this: LearningModeThought) -> Operator:
         message = SpheroCommandMessage()
-        prompter = ctx.container.force_fetch(LLMAdapter)
+        prompter = ctx.container.force_fetch(LLMTextCompletion)
         for direction in this.data.directions:
             self._driver.parse_command(direction, prompter, message)
         ctx.send_at(this).output(message)

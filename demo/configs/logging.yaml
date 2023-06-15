@@ -9,19 +9,32 @@ formatters:
     format: "%(asctime)s - %(name)s - %(levelname)s: %(message)s - %(trace)s"
 
 handlers:
-  file:
+  rotate_file:
     class: logging.handlers.TimedRotatingFileHandler
     level: DEBUG
     filename: demo/runtime/logs/ghoshell.log
     when: midnight
     encoding: utf-8
     formatter: default
+    backupCount: 6
+  llm_file:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: DEBUG
+    filename: demo/runtime/logs/llm_records.log
+    when: midnight
+    encoding: utf-8
+    formatter: default
+    backupCount: 0
 
 loggers:
   ghoshell:
-    handlers: [file]
+    handlers: [rotate_file]
     level: DEBUG
   ghoshell_context_logger:
-    handlers: [file]
+    handlers: [rotate_file]
     level: DEBUG
     formatter: context_formatter
+  llm:
+    handlers: [ llm_file ]
+    level: DEBUG
+    formatter: default

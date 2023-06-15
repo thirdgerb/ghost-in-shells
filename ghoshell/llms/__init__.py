@@ -1,14 +1,21 @@
-from ghoshell.llms.adapters import LangChainOpenAIAdapter
-from ghoshell.llms.contracts import LLMAdapter
-from ghoshell.llms.providers import *
+from ghoshell.llms.contracts import LLMTextCompletion, LLMTextEmbedding
+from ghoshell.llms.langchain_adapters import LangChainLLMAdapter, LangChainTestLLMAdapterProvider
+from ghoshell.llms.openai import OpenAIBootstrapper
+from ghoshell.llms.openai_contracts import *
 
 __all__ = [
     # contracts
-    "LLMAdapter",
-    # providers
-    "LangChainOpenAIPromptProvider",
+    "LLMTextCompletion",
+    "LLMTextEmbedding",
 
-    # adapters
-    "LangChainOpenAIAdapter",
+    # openai
+    "OpenAIChatChoice",
+    "OpenAIChatMsg",
+    "LLMChatCompletion",
+    "OpenAIFuncSchema",
+
+    # langchain: deprecated
+    "LangChainTestLLMAdapterProvider",
+    "LangChainLLMAdapter",
 
 ]

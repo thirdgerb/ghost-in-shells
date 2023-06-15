@@ -1,2 +1,2 @@
 root_url:
-  resolver: "test"
+  resolver: "chat/baseline"

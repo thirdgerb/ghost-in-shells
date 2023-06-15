@@ -200,7 +200,7 @@ class RuntimeImpl(Runtime):
             # 必须要保存的状态.
             if tid == root_id or tid == awaiting_id:
                 alive.append(ptr)
-            if ptr.callbacks:
+            elif ptr.callbacks:
                 alive.append(ptr)
             elif TaskStatus.is_sleeping(status):
                 alive.append(ptr)
@@ -213,6 +213,7 @@ class RuntimeImpl(Runtime):
             else:
                 # 正常的节点.
                 alive.append(ptr)
+
         process.reset_tasks(alive)
         # 重置 process.
         # process.store_task(*reversed(alive))
@@ -230,15 +231,11 @@ class RuntimeImpl(Runtime):
                 task.instanced = False
                 task.vars = None
 
-        # 重置掉多余数据.
-        process.clear_cached_indexes()
-
         # 保存 process 的数据.
         root_task = process.get_task(process.root)
         process_overdue = root_task.overdue
         if process_overdue <= 0:
             process_overdue = self._config.process_default_overdue
-        process.clear_cached_indexes()
 
         # 删除 process 记忆. 保留长程任务.
         self._driver.save_task_data(process.sid, process.pid, saving)
@@ -306,7 +303,8 @@ class CacheRuntimeDriver(RuntimeDriver):
 
     def save_process_data(self, session_id: str, process_id: str, data: Process, overdue: int):
         #  这里需要实现特殊的序列化逻辑为好.
-        saving = json.dumps(data.dict())
+        data_as_dict = data.to_saving_dict()
+        saving = json.dumps(data_as_dict)
         key = self._get_process_key(session_id, process_id)
         overdue = overdue if overdue > 0 else 0
         self._cache.set(key, saving, overdue)

@@ -50,6 +50,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         self._runtime_path = runtime_path
         container.set(Ghost, self)
         container.set(GhostConfig, config)
+        config = container.force_fetch(GhostConfig)
         # self._messenger: Messenger = messenger
 
     def boostrap(self) -> "Ghost":

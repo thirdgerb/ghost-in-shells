@@ -1,25 +1,27 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from typing import List
 
 
-class LLMAdapter(metaclass=ABCMeta):
+class LLMTextCompletion(metaclass=ABCMeta):
     """
     最基础的 text completions
     """
 
     @abstractmethod
-    def name(self) -> str:
+    def text_completion(self, prompt: str, config_name: str = "") -> str:
+        """
+        同步接口. 未来还需要实现异步接口.
+        """
         pass
 
-    @abstractmethod
-    def register_adapter(self, adapter: LLMAdapter) -> None:
-        pass
+
+class LLMTextEmbedding(metaclass=ABCMeta):
+    """
+    生成 embedding.
+    """
 
     @abstractmethod
-    def get_adapter(self, adapter_name: str = "") -> LLMAdapter | None:
-        pass
-
-    @abstractmethod
-    def text_completion(self, prompt: str) -> str:
+    def text_embedding(self, text: str, config_name: str = "") -> List[float]:
         pass

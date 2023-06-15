@@ -4,7 +4,7 @@ from ghoshell.ghost import *
 from ghoshell.ghost_fmk import Bootstrapper
 from ghoshell.ghost_fmk.intentions import CommandFocusDriver
 from ghoshell.ghost_fmk.intentions import LLMToolsFocusDriver, LLMToolsFocusConfig
-from ghoshell.llms import LLMAdapter
+from ghoshell.llms import LLMTextCompletion
 
 
 class CommandFocusDriverBootstrapper(Bootstrapper):
@@ -36,7 +36,7 @@ class LLMToolsFocusDriverBootstrapper(Bootstrapper):
     def bootstrap(self, ghost: Ghost):
         config = self._load_config(ghost)
         focus = ghost.focus
-        prompter = ghost.container.force_fetch(LLMAdapter)
+        prompter = ghost.container.force_fetch(LLMTextCompletion)
         # register command driver
         driver = LLMToolsFocusDriver(config, prompter)
         ghost.container.set(LLMToolsFocusDriver, driver)
