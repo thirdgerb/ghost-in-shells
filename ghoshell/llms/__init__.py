@@ -1,10 +1,10 @@
-from ghoshell.llms.contracts import LLMPrompter
-from ghoshell.llms.langchain import LangChainOpenAIAdapter
+from ghoshell.llms.adapters import LangChainOpenAIAdapter
+from ghoshell.llms.contracts import LLMAdapter
 from ghoshell.llms.providers import *
 
 __all__ = [
     # contracts
-    "LLMPrompter",
+    "LLMAdapter",
     # providers
     "LangChainOpenAIPromptProvider",
 

@@ -375,7 +375,7 @@ class PromptUnitTestCaseStage(Stage):
             return ctx.mind(this).forward()
         else:
             prompter = fetch_ctx_prompter(ctx)
-            resp = prompter.prompt(self.config.prompt)
+            resp = prompter.text_completion(self.config.prompt)
 
             ctx.send_at(this).markdown(resp).markdown("press anything to continue")
             this.data["committed"] = True

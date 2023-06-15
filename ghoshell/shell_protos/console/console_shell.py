@@ -110,7 +110,15 @@ log:
         self._app.print("Exit, Bye!")
         exit(0)
 
+    def _on_signal(self, signal: Signal):
+        if signal.code == signal.QUIT_CODE:
+            self._quit()
+
     def deliver(self, _output: Output) -> None:
+        signal = Signal.read(_output.payload)
+        if signal is not None:
+            self._on_signal(signal)
+            return
         text = Text.read(_output.payload)
         if text is not None:
             if text.markdown:

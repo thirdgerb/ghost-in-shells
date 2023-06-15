@@ -768,7 +768,7 @@ class _AbsStage(Stage, metaclass=ABCMeta):
             ctx.send_at(this).markdown("# debug mode: feeling prompt \n\n" + prompt)
 
         prompter = fetch_ctx_prompter(ctx)
-        resp = prompter.prompt(prompt)
+        resp = prompter.text_completion(prompt)
         if this.game_info.gaming.debug_mode or not this.game_info.gaming.user_player:
             ctx.send_at(this).markdown(f"# player {player} exiled feeling \n\n" + resp)
         this.game_info.gaming.feelings[player] = resp
@@ -792,7 +792,7 @@ class _AbsStage(Stage, metaclass=ABCMeta):
             ctx.send_at(this).markdown("# debug mode: feeling prompt \n\n" + prompt)
 
         prompter = fetch_ctx_prompter(ctx)
-        resp = prompter.prompt(prompt)
+        resp = prompter.text_completion(prompt)
         this.game_info.gaming.feelings[player] = resp
         return
 
@@ -850,7 +850,7 @@ class _AbsStage(Stage, metaclass=ABCMeta):
             ctx.send_at(this).markdown("# debug mode: prompt \n\n" + prompt)
 
         prompter = fetch_ctx_prompter(ctx)
-        resp = prompter.prompt(prompt)
+        resp = prompter.text_completion(prompt)
         return resp
 
     def _ai_player_commit_vote(self, ctx: "Context", this: UndercoverGameThought, player: str) -> Tuple[str, str]:
@@ -882,7 +882,7 @@ class _AbsStage(Stage, metaclass=ABCMeta):
             ctx.send_at(this).markdown("# debug mode: thought prompt \n\n" + prompt)
 
         prompter = fetch_ctx_prompter(ctx)
-        resp = prompter.prompt(prompt)
+        resp = prompter.text_completion(prompt)
 
         if this.game_info.gaming.debug_mode or not this.game_info.gaming.user_player:
             # debug 模式会打印 prompt

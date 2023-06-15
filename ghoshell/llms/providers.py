@@ -5,8 +5,8 @@ from typing import Dict, Type
 from langchain import OpenAI
 
 from ghoshell.container import Provider, Container, Contract
-from ghoshell.llms.contracts import LLMPrompter
-from ghoshell.llms.langchain import LangChainOpenAIAdapter
+from ghoshell.llms.adapters import LangChainOpenAIAdapter
+from ghoshell.llms.contracts import LLMAdapter
 
 
 class LangChainOpenAIPromptProvider(Provider):
@@ -15,7 +15,7 @@ class LangChainOpenAIPromptProvider(Provider):
         return True
 
     def contract(self) -> Type[Contract]:
-        return LLMPrompter
+        return LLMAdapter
 
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         # todo: 回头根据命名可以进行不同的设置.

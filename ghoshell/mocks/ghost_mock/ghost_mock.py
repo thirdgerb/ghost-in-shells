@@ -8,7 +8,7 @@ from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
 from ghoshell.ghost_fmk.providers import ContextLoggerProvider
 from ghoshell.ghost_protos.sphero import SpheroGhostBootstrapper
-from ghoshell.llms import LangChainOpenAIPromptProvider, LLMPrompter
+from ghoshell.llms import LangChainOpenAIPromptProvider, LLMAdapter
 from ghoshell.llms.discover import GameUndercoverBootstrapper
 from ghoshell.llms.discover import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
 from ghoshell.mocks.cache import MockCacheProvider
@@ -60,7 +60,7 @@ class MockGhost(GhostKernel):
     @classmethod
     def _depend_contracts(cls) -> List:
         contracts = super()._depend_contracts()
-        contracts.append(LLMPrompter)
+        contracts.append(LLMAdapter)
         return contracts
 
     @classmethod

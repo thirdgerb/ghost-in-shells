@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from ghoshell.ghost import Intention, Context, FocusDriver, CtxTool
-from ghoshell.llms import LLMPrompter
+from ghoshell.llms import LLMAdapter
 from ghoshell.messages import Text
 
 LLM_TOOL_INTENTION_KIND = "llm_tools"
@@ -70,7 +70,7 @@ class LLMToolsFocusConfig(BaseModel):
 
 class LLMToolsFocusDriver(FocusDriver):
 
-    def __init__(self, config: LLMToolsFocusConfig, prompter: LLMPrompter):
+    def __init__(self, config: LLMToolsFocusConfig, prompter: LLMAdapter):
         self.global_tools: List[LLMToolIntention] = []
         self.prompter = prompter
         self.config = config
@@ -112,8 +112,8 @@ class LLMToolsFocusDriver(FocusDriver):
             invalid=self.config.invalid_mark,
         )
 
-        prompter = ctx.container.force_fetch(LLMPrompter)
-        resp = prompter.prompt(prompt)
+        prompter = ctx.container.force_fetch(LLMAdapter)
+        resp = prompter.text_completion(prompt)
         # 没有任何匹配.
         if resp == self.config.invalid_mark:
             return None

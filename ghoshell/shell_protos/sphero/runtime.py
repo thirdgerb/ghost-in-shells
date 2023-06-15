@@ -65,6 +65,7 @@ class SpheroBoltKernel:
         self.cmd_ran = -1
         self.front_angle = 0
         self.api.stop_roll()
+        self.api.clear_matrix()
 
     def set_command(self, cmd: SpheroCommand) -> None:
         self.cmd_start_at = time.time()
@@ -135,7 +136,7 @@ class SpheroBoltKernel:
         return False
 
     def close(self) -> None:
-        pass
+        self.reset_command()
 
 
 class SpheroBoltRuntime:
@@ -158,9 +159,13 @@ class SpheroBoltRuntime:
 
         self.ready = False
         self.error: str | None = None
+        self._kernel: SpheroBoltKernel | None = None
 
     def close(self):
         self._running = False
+        if self._kernel is not None:
+            self._kernel.close()
+        self._thread.join()
 
     def _do_run(self):
         """
@@ -170,6 +175,7 @@ class SpheroBoltRuntime:
             bolt = scanner.find_BOLT()
             with SpheroEduAPI(bolt) as api:
                 kernel = SpheroBoltKernel(api, self._console, self._speak)
+                self._kernel = kernel
                 self.ready = True
                 while self._running:
                     now = time.time()

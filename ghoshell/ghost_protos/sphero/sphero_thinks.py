@@ -15,7 +15,7 @@ from ghoshell.ghost_fmk.reactions.commands import ProcessCmdReaction
 from ghoshell.ghost_fmk.thinks import SingleStageThink
 from ghoshell.ghost_protos.sphero.configs import *
 from ghoshell.ghost_protos.sphero.messages import SpheroCommandMessage, Roll, Say, Stop
-from ghoshell.llms import LLMPrompter
+from ghoshell.llms import LLMAdapter
 from ghoshell.messages import Text
 
 
@@ -115,8 +115,8 @@ class SpheroThinkDriver(ThinkDriver):
         return LearningModeOutput(**data)
 
     @classmethod
-    def get_prompter(cls, ctx: Context) -> LLMPrompter:
-        return ctx.container.force_fetch(LLMPrompter)
+    def get_prompter(cls, ctx: Context) -> LLMAdapter:
+        return ctx.container.force_fetch(LLMAdapter)
 
     @classmethod
     def say(cls, ctx: Context, this: Thought, text: str) -> None:
@@ -130,7 +130,7 @@ class SpheroThinkDriver(ThinkDriver):
     def parse_command(
             self,
             command_str: str,
-            prompter: LLMPrompter,
+            prompter: LLMAdapter,
             message: SpheroCommandMessage,
     ) -> Tuple[SpheroCommandMessage, bool]:
         """
@@ -143,7 +143,7 @@ class SpheroThinkDriver(ThinkDriver):
             return message, True
         else:
             prompt = self.config.command_prompt(command_str)
-            resp = prompter.prompt(prompt)
+            resp = prompter.text_completion(prompt)
             if resp == self.config.invalid_mark:
                 return message, False
             message = self._unpack_commands_in_direction(message, resp)
@@ -336,7 +336,7 @@ class SpheroLearningModeThink(SingleStageThink):
 
         this.add_message(self._config.user_role, text.content)
         prompter = self._driver.get_prompter(ctx)
-        resp = prompter.prompt(prompt)
+        resp = prompter.text_completion(prompt)
         parsed = self._driver.unpack_learning_mode_resp(resp)
         return self._receive_parsed_output(ctx, parsed, this)
 
@@ -377,7 +377,7 @@ class SpheroLearningModeThink(SingleStageThink):
 
     def _save_case(self, ctx: Context, this: LearningModeThought) -> Operator:
         message = SpheroCommandMessage()
-        prompter = ctx.container.force_fetch(LLMPrompter)
+        prompter = ctx.container.force_fetch(LLMAdapter)
         for direction in this.data.directions:
             self._driver.parse_command(direction, prompter, message)
         self._driver.cache_command(this.data.title, message)
@@ -385,7 +385,7 @@ class SpheroLearningModeThink(SingleStageThink):
 
     def _run_test(self, ctx: Context, this: LearningModeThought) -> Operator:
         message = SpheroCommandMessage()
-        prompter = ctx.container.force_fetch(LLMPrompter)
+        prompter = ctx.container.force_fetch(LLMAdapter)
         for direction in this.data.directions:
             self._driver.parse_command(direction, prompter, message)
         ctx.send_at(this).output(message)

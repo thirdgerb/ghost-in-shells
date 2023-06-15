@@ -182,7 +182,7 @@ class DefaultConversationalStage(AwaitStage):
 
     def _prompt(self, ctx: Context, prompt: str) -> str:
         prompter = fetch_ctx_prompter(ctx)
-        resp = prompter.prompt(prompt)
+        resp = prompter.text_completion(prompt)
         resp = resp.strip()
         if self.config.dialog_quote_mark:
             if resp.startswith(self._talk_start_quote):

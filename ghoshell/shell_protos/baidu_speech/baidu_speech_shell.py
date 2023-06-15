@@ -17,7 +17,7 @@ from rich.markdown import Markdown
 from ghoshell.container import Container
 from ghoshell.ghost import URL
 from ghoshell.messages import Input, Output
-from ghoshell.messages import Text, ErrMsg
+from ghoshell.messages import Text, ErrMsg, Signal
 from ghoshell.shell_fmk import ShellKernel
 from ghoshell.shell_protos.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
 
@@ -58,6 +58,11 @@ class BaiduSpeechShell(ShellKernel):
         return BaiduSpeechShellConfig(**data)
 
     def deliver(self, _output: Output) -> None:
+        signal = Signal.read(_output.payload)
+        if signal is not None:
+            self._on_signal(signal)
+            return
+
         text = Text.read(_output.payload)
         if self._config.debug:
             self._console.print(_output.payload)
@@ -90,11 +95,20 @@ class BaiduSpeechShell(ShellKernel):
         else:
             self._console.print(text.content)
 
+    def _quit(self, message: str):
+        self._console.print(message)
+        self._stopping_speak = True
+        exit(0)
+
+    def _on_signal(self, signal: Signal):
+        if signal.code == signal.QUIT_CODE:
+            self._quit("bye!")
+
     def on_event(self, e: str) -> Optional[Input]:
         content = e.strip()
         if content == "/exit":
-            self._console.print("bye!")
-            exit(0)
+            self._quit("bye!")
+            return
 
         trace = dict(
             clone_id=self.session_id,

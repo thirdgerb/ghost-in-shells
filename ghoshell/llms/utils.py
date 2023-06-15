@@ -1,6 +1,6 @@
 from ghoshell.ghost import Context
-from ghoshell.llms.contracts import LLMPrompter
+from ghoshell.llms.contracts import LLMAdapter
 
 
-def fetch_ctx_prompter(ctx: Context) -> LLMPrompter:
-    return ctx.container.force_fetch(LLMPrompter)
+def fetch_ctx_prompter(ctx: Context) -> LLMAdapter:
+    return ctx.container.force_fetch(LLMAdapter)

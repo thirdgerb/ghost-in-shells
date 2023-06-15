@@ -62,8 +62,8 @@ class SpheroBoltShell(BaiduSpeechShell):
         super().run_as_app()
 
     def _quit(self, message: str):
-        self._console.print(message)
-        exit(0)
+        self._sphero_runtime.close()
+        super()._quit(message)
 
     def _close(self) -> None:
         if self._sphero_runtime is not None:
