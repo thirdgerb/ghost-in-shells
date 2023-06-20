@@ -73,9 +73,9 @@ class SpheroThinkDriver(ThinkDriver):
 
     def from_meta(self, meta: ThinkMeta) -> "Think":
         match meta.id:
-            case self.config.simple_command_mode.name:
+            case self.config.simple_mode.name:
                 return SpheroSimpleCommandModeThink(self)
-            case self.config.conversational_mode.name:
+            case self.config.learn_mode.name:
                 return SpheroLearningModeThink(self)
             case _:
                 raise MindsetNotFoundException(f"think {meta.id} not found")
@@ -83,8 +83,8 @@ class SpheroThinkDriver(ThinkDriver):
     def to_metas(self) -> List[ThinkMeta]:
         result = []
         modes = [
-            self.config.simple_command_mode.name,
-            self.config.conversational_mode.name,
+            self.config.simple_mode.name,
+            self.config.learn_mode.name,
         ]
         for think_name in modes:
             result.append(ThinkMeta(
@@ -160,6 +160,8 @@ class SpheroThinkDriver(ThinkDriver):
         return self.config.dialog_sep
 
 
+# --- main mode --- #
+
 class SpheroMainModeThink(SingleStageThink):
     """
     主场景. 可以接受命令进入另外两种模式.
@@ -170,6 +172,8 @@ class SpheroMainModeThink(SingleStageThink):
         self._config = driver.config.main_mode
 
 
+# --- simple mode--- #
+
 class SpheroSimpleCommandModeThink(SingleStageThink):
     """
     简单命令模式.
@@ -178,7 +182,7 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
 
     def __init__(self, driver: SpheroThinkDriver):
         self._driver = driver
-        self._config = driver.config.simple_command_mode
+        self._config = driver.config.simple_mode
 
     def url(self) -> URL:
         return URL.new_resolver(self._config.name)
@@ -229,6 +233,8 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
         ctx.send_at(this).output(message)
         return ctx.mind(this).awaits()
 
+
+# --- learn mode--- #
 
 class DialogMessage(BaseModel):
     """
@@ -283,22 +289,6 @@ class LearningModeThought(Thought):
         return
 
 
-# --- conversational mode
-#
-# class SpheroLearningModeToolsReaction(LLMToolReaction):
-#
-#     def __init__(self):
-#         super().__init__({
-#             "quit": "退出当前模式",
-#             "finish": "结束学习模式",
-#             "test": "测试或者直接运行系统",
-#         })
-#
-#     def on_match(self, ctx: Context, this: LearningModeThought, result: LLMToolIntentionResult) -> Operator | None:
-#         print(result)
-#         return None
-
-
 class SpheroLearningModeThink(SingleStageThink):
     """
     多轮对话模式, 支持教学, 技能记忆等等等.
@@ -312,7 +302,7 @@ class SpheroLearningModeThink(SingleStageThink):
 
     def __init__(self, driver: SpheroThinkDriver):
         self._driver = driver
-        self._config: SpheroLearningModeConfig = driver.config.conversational_mode
+        self._config: SpheroLearningModeConfig = driver.config.learn_mode
 
     def on_activate(self, ctx: "Context", this: LearningModeThought) -> Operator | None:
         self._driver.say(ctx, this, self._config.on_activate)
@@ -421,6 +411,81 @@ class SpheroLearningModeThink(SingleStageThink):
         return {
             "process": ProcessCmdReaction(),
         }
+
+
+# --- runtime mode--- #
+
+class RuntimeEvent(BaseModel):
+    GHOST_EVENT: ClassVar[str] = "system"
+    USER_EVENT: ClassVar[str] = "user"
+    SHELL_EVENT: ClassVar[str] = "shell"
+
+    event: str
+    content: str
+
+
+class SpheroRuntimeThought(Thought):
+    priority = -1
+
+    class Runtime(BaseModel):
+        events: List[RuntimeEvent] = Field(default_factory=lambda: [])
+
+    data: Runtime = Runtime()
+
+    def prepare(self, args: Dict) -> None:
+        self.data = self.Runtime()
+
+    def set_variables(self, variables: Dict) -> None:
+        self.data = self.Runtime(**variables)
+
+    def vars(self) -> Dict | None:
+        return self.data.dict()
+
+    def _destroy(self) -> None:
+        del self.data
+
+
+class SpheroRuntimeModeThink(SingleStageThink):
+    """
+    runtime mode
+    """
+
+    def __init__(self, driver: SpheroThinkDriver):
+        self._driver = driver
+        self._config = driver.config.runtime_mode
+
+    def on_activate(self, ctx: "Context", this: SpheroRuntimeThought) -> Operator | None:
+        self._driver.say(ctx, this, self._config.on_activate)
+
+    def on_received(self, ctx: "Context", this: Thought) -> Operator | None:
+        pass
+
+    def url(self) -> URL:
+        return URL(resolver=self._config.name)
+
+    def to_meta(self) -> ThinkMeta:
+        return ThinkMeta(
+            id=self._config.name,
+            kind=self._driver.driver_name(),
+        )
+
+    def description(self, thought: Thought) -> AnyStr:
+        return self._config.desc
+
+    def new_task_id(self, ctx: "Context", args: Dict) -> str:
+        return self.url().new_id()
+
+    def new_thought(self, ctx: "Context", args: Dict) -> Thought:
+        pass
+
+    def result(self, ctx: Context, this: Thought) -> Optional[Dict]:
+        pass
+
+    def intentions(self, ctx: Context) -> List[Intention] | None:
+        pass
+
+    def reactions(self) -> Dict[str, Reaction]:
+        pass
 
 
 # --- reactions

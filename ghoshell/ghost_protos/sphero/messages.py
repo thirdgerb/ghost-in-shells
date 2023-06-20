@@ -8,6 +8,15 @@ from pydantic import BaseModel, Field
 from ghoshell.messages import Message
 
 
+class SpheroEventMessage(Message):
+    KIND = "sphero_event_message"
+
+    direction: str
+    # event 的自然语言描述.
+    events: List[str]
+    stopped: str
+
+
 class SpheroCommand(BaseModel, metaclass=ABCMeta):
     """
     Sphero 指令的抽象. 用于 DSL
@@ -15,7 +24,12 @@ class SpheroCommand(BaseModel, metaclass=ABCMeta):
 
     method: ClassVar[str] = ""
 
-    event: str | None = None  # 是否是事件时触发.
+    # 命令实际开始运行时间.
+    start_at: float = 0
+    # 命令的实际运行帧数.
+    ran_frames: int = 0
+    # 命令的运行日志.
+    runtime_log: str = ""
 
     @classmethod
     @abstractmethod
@@ -37,6 +51,20 @@ class SpheroCommand(BaseModel, metaclass=ABCMeta):
             return cls(**data)
         return None
 
+    @abstractmethod
+    def plan_desc(self) -> str:
+        """
+        对运行计划的自然语言描述
+        """
+        pass
+
+    def on_stop(self, stop_at: float) -> None:
+        """
+        """
+        plan = self.plan_desc()
+        duration = stop_at - self.start_at
+        self.runtime_log = plan + f"实际执行 {duration} 秒."
+
     # @abstractmethod
     # def call(
     #         self,
@@ -53,6 +81,7 @@ class SpheroCommandMessage(Message):
     """
 
     KIND = "sphero_commands_message"
+
     direction: str = ""  # 对命令的基本描述
     runtime_mode: bool = False  # 是否是 runtime 模式. 如果是 runtime 模式, 运行时遇到事件或者命令执行完毕, 都会返回消息给 ghost
     commands: List[Dict] = []
@@ -113,22 +142,9 @@ class Roll(SpheroCommand):
   * heading: int 类型, 定义滚动的方向, 范围是 -360 到 360, 对应圆形的角度. 正前方是 0, 正后方是 180, 向左是 270, 向右是 90. 
   * duration: float 类型, 定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续
 """
-    #
-    # def call(
-    #         self,
-    #         kernel: SpheroBoltKernel,
-    #         duration: float,
-    #         count: int,
-    # ) -> bool:
-    #     if count == 0:
-    #         kernel.api.set_heading(self.heading)
-    #         kernel.api.set_speed(self.speed)
-    #     if self.duration < 0:
-    #         return True
-    #     if duration >= self.duration:
-    #         kernel.api.stop_roll()
-    #         return False
-    #     return False
+
+    def plan_desc(self) -> str:
+        return f"计划以{self.speed}的速度, {self.heading}的角度, 滚动{self.duration}秒."
 
 
 class Spin(SpheroCommand):
@@ -144,17 +160,9 @@ class Spin(SpheroCommand):
   * angle: int 类型. 是一个转动的角度, 会变更我的正面指向. 360 表示 360度, 是一个整圆. 注意, 会变更我面向的角度.  
   * duration: float 类型, 定义转动的时间. 默认值是 1. 单位是秒. 
 """
-    #
-    # def call(
-    #         self,
-    #         kernel: SpheroBoltKernel,
-    #         duration: float,
-    #         count: int
-    # ) -> bool:
-    #     if count == 0:
-    #         kernel.api.spin(self.angle, self.duration)
-    #     return duration < self.duration
-    #
+
+    def plan_desc(self) -> str:
+        return f"计划在{self.duration}秒内, 旋转 {self.angle} 度."
 
 
 class Say(SpheroCommand):
@@ -168,24 +176,21 @@ class Say(SpheroCommand):
     * text: 要说的话的内容. 
 """
 
-    # def call(self, kernel: SpheroBoltKernel, duration: float, count: int) -> bool:
-    #     if count == 0:
-    #         kernel.speaker(self.text)
-    #     return False
+    def plan_desc(self) -> str:
+        return f"计划对用户说: {self.text}"
 
 
 class Stop(SpheroCommand):
     method = "stop"
-    duration: float = 0
-    heading: int = 0
 
     @classmethod
     def desc(cls) -> str:
         return """
 * stop: 强行停止转动. 
-  * heading: 停止转动后, 面朝的方向. 范围是 0 ~ 360, 默认值是 0. 会变更正面指向. 
-  * duration:  float 类型, 定义转动的时间. 默认值是 1. 为负数表示一直持续. 
 """
+
+    def plan_desc(self) -> str:
+        return f"计划停止所有动作."
 
 
 class Loop(SpheroCommand):
@@ -198,6 +203,7 @@ class Loop(SpheroCommand):
     times: int = 1  # 循环执行的次数.
     # 需要执行的 commands 命令.
     commands: List[Dict] = Field(default_factory=lambda: [])
+    runtime_count: int = 0
 
     @classmethod
     def desc(cls) -> str:
@@ -206,6 +212,13 @@ class Loop(SpheroCommand):
     * times: int 类型, 表示循环执行的次数. 
     * direction: string 类型, 用自然语言的方式来描述需要循环执行的命令是什么. 
 """
+
+    def plan_desc(self) -> str:
+        return f"计划循环执行命令 `{self.direction}` 共{self.times}次."
+
+    def on_stop(self, stop_at: float) -> str:
+        duration = stop_at - self.start_at
+        return f"实际运行 {self.runtime_count} 次, 在{duration}秒后停止."
 
 
 class RoundRoll(SpheroCommand):

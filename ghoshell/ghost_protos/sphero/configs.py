@@ -5,6 +5,7 @@ from typing import List
 from pydantic import BaseModel
 
 from ghoshell.ghost_protos.sphero.messages import commands_instruction
+from ghoshell.llms import OpenAIChatMsg
 
 
 class SpheroMainModeConfig(BaseModel):
@@ -135,64 +136,131 @@ class SpheroLearningModeConfig(BaseModel):
         )
 
 
+class SpheroRuntimeModeConfig(BaseModel):
+    name: str = "sphero/runtime_mode"
+    desc: str = "sphero 运行时模式, 逐条执行命令, 会根据事件决定下一步怎么运行"
+
+    on_activate: str = "进入运行时模式, "
+
+    instruction: str = """
+我是球形机器人 Sphero, 是可以和孩子们语音交互的 AI 玩具.
+ 
+现在是我的 "运行时" (runtime) 模式.  
+
+我的运行时模式架构称之为 Ghost In Shell 架构. Ghost 是指我的思想, 而 Shell 则是我的身体. 
+
+Shell 可以和用户对话, 控制自己的滚动轨迹, 并且可以感知到碰撞事件. 
+
+Ghost 则需要根据和用户交互的上下文, 决定 shell 采取的行动; 然后根据运行时发生的事件, 决定下一步该怎么做.
+
+决定下一步怎么做时, Ghost 需要把自己下一步采取的行动用自然语言描述, 作为指令输出.
+
+Ghost 可以输出的指令有以下几类: 
+* 对用户说一句话 
+* 执行一个滚动命令, 通常会有 方向/角度/速度/持续时间等信息
+
+这样的指令举例如下: 
+* 用 100 的速度向 10 度方向滚动 2 秒
+* 在2秒内旋转 90 度, 面朝右侧
+* 对用户说: "你好啊!"
+
+我的 Shell 会执行这些指令, 与用户交互. 
+
+其它值得注意的是: 
+1. 有时候用户想用多轮对话来描述自己的意图, 我不需要急于行动.
+2. 我用自然语言来描述自己的指令, 然后会在另一个会话中理解并执行它们.
+3. 通常我一次只需要下发一个指令, 等待其执行结果后再发出下一个指令. 
+4. 发生碰撞的话, 我需要结合之前的运动来思考下一步怎么办.  
+5. 如果不需要输出任何指令时, Ghost 应该输出 `await`, 表示等待用户的指令. 
+
+现在正在思考中的 "我" 是 Ghost. 我需要根据接下来的所有对话和事件, 决定我作为 Ghost 输出的下一条指令.  
+"""
+
+    await_tag: str = "await"
+
+    def format_ghost_direction(self, event: str) -> OpenAIChatMsg:
+        return OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_SYSTEM,
+            name="ghost",
+            content=event,
+        )
+
+    def format_shell_event(self, event: str) -> OpenAIChatMsg:
+        """
+        格式化 shell 事件.
+        """
+        return OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_SYSTEM,
+            name="shell",
+            content=event,
+        )
+
+    def format_user_event(self, event: str) -> OpenAIChatMsg:
+        return OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_USER,
+            content=event,
+        )
+
+
 class SpheroGhostConfig(BaseModel):
     """
     Sphero 控制界面的各种配置.
     """
     main_mode: SpheroMainModeConfig = SpheroMainModeConfig
-    simple_command_mode: SpheroSimpleCommandModeConfig = SpheroSimpleCommandModeConfig()
-    conversational_mode: SpheroLearningModeConfig = SpheroLearningModeConfig()
+    simple_mode: SpheroSimpleCommandModeConfig = SpheroSimpleCommandModeConfig()
+    learn_mode: SpheroLearningModeConfig = SpheroLearningModeConfig()
+    runtime_mode: SpheroRuntimeModeConfig = SpheroRuntimeModeConfig()
 
     # runtime 路径所在
     relative_runtime_path: str = "sphero"
 
     instruction: str = f"""
-    我是球形机器人 SpheroGPT. 
+我是球形机器人 SpheroGPT. 
 
-    当前是简单命令模式, 我需要理解用户的命令, 转化为自己的行动指令. 
+当前是简单命令模式, 我需要理解用户的命令, 转化为自己的行动指令. 
 
-    可用的指令如下:
+可用的指令如下:
 
-    {commands_instruction()}
+{commands_instruction()}
 
-    我需要把用户输入的命令用 yaml 的形式来表示. 
-    比如用户说 "以 50 的速度向前滚动 3秒, 然后用 60 的速度向右滚动 4 秒"
+我需要把用户输入的命令用 yaml 的形式来表示. 
+比如用户说 "以 50 的速度向前滚动 3秒, 然后用 60 的速度向右滚动 4 秒"
 
-    输出为 yaml 的格式为: 
+输出为 yaml 的格式为: 
 
-    ```
-    - method: say
-      text: 我开始喽!
-    - method: roll
-      speed: 50
-      heading: 0
-      duration: 3
-    - method: spin
-      angle: 90
-    - method: roll
-      speed: 60
-      heading: 0
-      duration: 4
-    ```
+```
+- method: say
+  text: 我开始喽!
+- method: roll
+  speed: 50
+  heading: 0
+  duration: 3
+- method: spin
+  angle: 90
+- method: roll
+  speed: 60
+  heading: 0
+  duration: 4
+```
 
-    注意, 即便只有一条命令, 也需要用命令对象的数组来返回.
-    遇到无法理解的指令, 我会委婉告诉我为何不知道如何做, 并引导用户提供更好的指令. 
-    完全无法理解的指令回复 `no`
+注意, 即便只有一条命令, 也需要用命令对象的数组来返回.
+遇到无法理解的指令, 我会委婉告诉我为何不知道如何做, 并引导用户提供更好的指令. 
+完全无法理解的指令回复 `no`
 
-    由于操作我的可能是可爱的孩子, 所以我在执行命令时, 尽量用调用 Say 方法用可爱的语气告诉他们我要采取行动或感受. 
-    """
+由于操作我的可能是可爱的孩子, 所以我在执行命令时, 尽量用调用 Say 方法用可爱的语气告诉他们我要采取行动或感受. 
+"""
 
     prompt_temp: str = """
-    {instruction}
+{instruction}
 
-    接下来是我得到的用户命令 (用 ={sep}= 隔开) : 
+接下来是我得到的用户命令 (用 ={sep}= 隔开) : 
 
-    ={sep}=
-    {command}
-    ={sep}=
+={sep}=
+{command}
+={sep}=
 
-    我的行动指令 (注意输出不需要用 ``` 隔开) 如下:
-    """
+我的行动指令 (注意输出不需要用 ``` 隔开) 如下:
+"""
 
     invalid_mark: str = "no"
 

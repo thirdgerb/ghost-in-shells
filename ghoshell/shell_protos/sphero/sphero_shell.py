@@ -3,7 +3,7 @@ import time
 from ghoshell.container import Container
 from ghoshell.messages import Output, Text
 from ghoshell.shell_protos.baidu_speech import BaiduSpeechShell
-from ghoshell.shell_protos.sphero.runtime import SpheroBoltRuntime, SpheroCommandMessage
+from ghoshell.shell_protos.sphero.sphero_runtime import SpheroBoltRuntime, SpheroCommandMessage
 
 
 class SpheroBoltShell(BaiduSpeechShell):
@@ -28,22 +28,23 @@ class SpheroBoltShell(BaiduSpeechShell):
         super().__init__(container, config_path, runtime_path, config_filename)
 
     def deliver(self, _output: Output) -> None:
-
         commands = SpheroCommandMessage.read(_output.payload)
         if commands is not None:
             self._sphero_runtime.set_cmd_message(commands)
+
         super().deliver(_output)
         return None
 
     def _output_text(self, text: Text) -> None:
+        # 输出这块重写去掉了 speak, 交给了 runtime 去 speak.
         self._print_text(text)
 
     def run_as_app(self) -> None:
         self._console.print("bootstrap sphero bolt...")
         self._sphero_runtime = SpheroBoltRuntime(
             self._speak_text,
+            self.dispatch,
             self._console,
-            0.1,
         )
         self._sphero_runtime.run()
         count = 0

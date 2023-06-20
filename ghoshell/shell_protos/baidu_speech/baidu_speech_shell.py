@@ -16,7 +16,7 @@ from rich.markdown import Markdown
 
 from ghoshell.container import Container
 from ghoshell.ghost import URL
-from ghoshell.messages import Input, Output
+from ghoshell.messages import Input, Output, Message
 from ghoshell.messages import Text, ErrMsg, Signal
 from ghoshell.shell_fmk import ShellKernel
 from ghoshell.shell_protos.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
@@ -50,6 +50,7 @@ class BaiduSpeechShell(ShellKernel):
         self._listening: bool = False
         self._speaking: bool = False
         self._stopping_speak: bool = False
+        self._shell_event: Message | None = None
 
     def _load_config(self, config_filename: str) -> BaiduSpeechShellConfig:
         config_filename = self.config_path.rstrip("/") + "/" + config_filename.lstrip("/")
@@ -104,11 +105,17 @@ class BaiduSpeechShell(ShellKernel):
         if signal.code == signal.QUIT_CODE:
             self._quit("bye!")
 
-    def on_event(self, e: str) -> Optional[Input]:
-        content = e.strip()
-        if content == "/exit":
-            self._quit("bye!")
-            return
+    def on_event(self, e: str | Message) -> Optional[Input]:
+        if isinstance(e, str):
+            content = e.strip()
+            if content == "/exit":
+                self._quit("bye!")
+                return
+            msg = Text(content=content)
+        elif isinstance(e, Message):
+            msg = e
+        else:
+            raise RuntimeError(f"invalid shell event {e}")
 
         trace = dict(
             clone_id=self.session_id,
@@ -117,11 +124,10 @@ class BaiduSpeechShell(ShellKernel):
             shell_kind="audio_shell",
             subject_id=self.user_id,
         )
-        text = Text(content=content)
         return Input(
             mid=uuid.uuid4().hex,
             url=self._config.root_url.dict(),
-            payload=text.as_payload_dict(),
+            payload=msg.as_payload_dict(),
             trace=trace,
         )
 
@@ -129,17 +135,29 @@ class BaiduSpeechShell(ShellKernel):
         self._welcome()
         self.tick("")
         asyncio.run(self._main())
+        asyncio.run(self._shell_event_loop())
 
     async def _main(self):
         with patch_stdout(raw=True):
             background_task = asyncio.create_task(self.handle_async_output())
             try:
-                await self._loop()
+                await self._input_loop()
             finally:
                 background_task.cancel()
             self._console.print("Quitting event loop. Bye.")
 
-    async def _loop(self):
+    def dispatch(self, e: Message):
+        self._shell_event = e
+
+    async def _shell_event_loop(self):
+        while True:
+            e = self._shell_event
+            if e is not None and isinstance(e, Message):
+                self._shell_event = None
+                self.tick(e)
+            await asyncio.sleep(0.1)
+
+    async def _input_loop(self):
         self.tick("")
         while True:
             try:
@@ -160,10 +178,10 @@ class BaiduSpeechShell(ShellKernel):
         self._console.print("Bye!")
         exit(0)
 
-    def tick(self, text: str) -> None:
+    def tick(self, e: str | Message) -> None:
         self._stop_speak()
         self._console.print("> waiting ghost...")
-        super().tick(text)
+        super().tick(e)
         self._console.print("> ghost replied")
 
     def _welcome(self) -> None:
