@@ -11,7 +11,7 @@ __all__ = [
     # openai
     "OpenAIChatChoice",
     "OpenAIChatMsg",
-    "LLMChatCompletion",
+    "OpenAIChatCompletion",
     "OpenAIFuncSchema",
 
     # langchain: deprecated

@@ -4,7 +4,7 @@ import yaml
 
 from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import Bootstrapper
-from ghoshell.llms.thinks.conversational import ConversationalConfig, ConversationalThink
+from ghoshell.prototypes.conversational_ghost.conversational import ConversationalConfig, ConversationalThink
 
 
 class ConversationalThinksBootstrapper(Bootstrapper):

@@ -1,10 +1,7 @@
-import random
-import string
 from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from ghoshell.ghost_protos.sphero.messages import commands_instruction
 from ghoshell.llms import OpenAIChatMsg
 
 
@@ -29,11 +26,22 @@ class SpheroSimpleCommandModeConfig(BaseModel):
     简单命令模式.
     """
     name: str = "sphero/simple_command_mode"
-    desc: str = "todo"
+    desc: str = "Sphero 的简单模式, 从用户得到命令后解析成 shell 的指令并运行."
     on_activate: str = "进入单一命令模式, 请给我下达指令"
     unknown_order: str = "无法理解的命令"
 
     debug: bool = True
+
+
+class LearningModeOutput(BaseModel):
+    """
+    学习模式下每一轮的输出. 要和 instruction 匹配.
+    """
+
+    reply: str  # 本轮回复的内容.
+    title: str | None = None  # 技能的名称
+    directions: List[str] = Field(default_factory=lambda: [])
+    reaction: str | None = None  # 本轮对话执行的动作.
 
 
 class SpheroLearningModeConfig(BaseModel):
@@ -147,15 +155,15 @@ class SpheroRuntimeModeConfig(BaseModel):
  
 现在是我的 "运行时" (runtime) 模式.  
 
-我的运行时模式架构称之为 Ghost In Shell 架构. Ghost 是指我的思想, 而 Shell 则是我的身体. 
+我的运行时模式架构称之为 ghost In Shell 架构. ghost 是指我的思想, 而 Shell 则是我的身体. 
 
 Shell 可以和用户对话, 控制自己的滚动轨迹, 并且可以感知到碰撞事件. 
 
-Ghost 则需要根据和用户交互的上下文, 决定 shell 采取的行动; 然后根据运行时发生的事件, 决定下一步该怎么做.
+ghost 则需要根据和用户交互的上下文, 决定 shell 采取的行动; 然后根据运行时发生的事件, 决定下一步该怎么做.
 
-决定下一步怎么做时, Ghost 需要把自己下一步采取的行动用自然语言描述, 作为指令输出.
+决定下一步怎么做时, ghost 需要把自己下一步采取的行动用自然语言描述, 作为指令输出.
 
-Ghost 可以输出的指令有以下几类: 
+ghost 可以输出的指令有以下几类: 
 * 对用户说一句话 
 * 执行一个滚动命令, 通常会有 方向/角度/速度/持续时间等信息
 
@@ -171,9 +179,9 @@ Ghost 可以输出的指令有以下几类:
 2. 我用自然语言来描述自己的指令, 然后会在另一个会话中理解并执行它们.
 3. 通常我一次只需要下发一个指令, 等待其执行结果后再发出下一个指令. 
 4. 发生碰撞的话, 我需要结合之前的运动来思考下一步怎么办.  
-5. 如果不需要输出任何指令时, Ghost 应该输出 `await`, 表示等待用户的指令. 
+5. 如果不需要输出任何指令时, ghost 应该输出 `await`, 表示等待用户的指令. 
 
-现在正在思考中的 "我" 是 Ghost. 我需要根据接下来的所有对话和事件, 决定我作为 Ghost 输出的下一条指令.  
+现在正在思考中的 "我" 是 ghost. 我需要根据接下来的所有对话和事件, 决定我作为 ghost 输出的下一条指令.  
 """
 
     await_tag: str = "await"
@@ -206,31 +214,52 @@ class SpheroGhostConfig(BaseModel):
     """
     Sphero 控制界面的各种配置.
     """
+
+    # 给驱动取的全局唯一名字. 
+    driver_name: str = "sphero_thinks_driver"
+
+    use_command_cache: bool = True
+
+    # 使用 chat completion 来实现对话理解.
+    # 这里可以选择使用哪个配置, 与 ghoshell.llms.openai.OpenAIConfig 联动.
+    use_llm_config: str = ""
+
+    # 主模式的配置. 
     main_mode: SpheroMainModeConfig = SpheroMainModeConfig
+
+    # 简单命令模式的配置. 通常用于调试. 
     simple_mode: SpheroSimpleCommandModeConfig = SpheroSimpleCommandModeConfig()
+
+    # 学习模式的配置. 用于技能测试. 
     learn_mode: SpheroLearningModeConfig = SpheroLearningModeConfig()
+
+    # 运行时模式的配置. 
     runtime_mode: SpheroRuntimeModeConfig = SpheroRuntimeModeConfig()
 
-    # runtime 路径所在
+    # sphero 模块自身的 runtime 文件保存目录. 是 runtime 目录下的相对目录.
     relative_runtime_path: str = "sphero"
 
-    instruction: str = f"""
-我是球形机器人 SpheroGPT. 
+    parse_command_instruction: str = """
+你是球形机器人 SpheroGPT, 拥有一个可以滚动的球形身体, 可以用语音与用户交互, 也可以用滚动的方式来绘制一些图形.
 
-当前是简单命令模式, 我需要理解用户的命令, 转化为自己的行动指令. 
+你采用了一个 ghost in Shell 的技术架构. 
+其中 ghost 指的是基于大语言模型实现的思维中控, 负责决策, 并给 shell 下达指令. 
+Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
 
-可用的指令如下:
+目前 shell 可用的指令如下:
 
-{commands_instruction()}
+{commands_instruction}
 
-我需要把用户输入的命令用 yaml 的形式来表示. 
-比如用户说 "以 50 的速度向前滚动 3秒, 然后用 60 的速度向右滚动 4 秒"
+我可以组合这些指令, 用来走出复杂的图案. 
 
-输出为 yaml 的格式为: 
+目前可用的技能有: {abilities}
+
+现在你需要以 ghost 的身份, 理解输入的自然语言命令, 将之解析成为 Shell 能理解的 yaml 格式指令并输出.
+比如命令是 "以 50 的速度向前滚动 3秒, 然后用 60 的速度向右滚动 4 秒", 它的输出为: 
 
 ```
 - method: say
-  text: 我开始喽!
+  text: 你开始喽!
 - method: roll
   speed: 50
   heading: 0
@@ -243,36 +272,30 @@ class SpheroGhostConfig(BaseModel):
   duration: 4
 ```
 
-注意, 即便只有一条命令, 也需要用命令对象的数组来返回.
-遇到无法理解的指令, 我会委婉告诉我为何不知道如何做, 并引导用户提供更好的指令. 
-完全无法理解的指令回复 `no`
+注意: 
+0. 你只能输出 yaml 数据本身, 不需要用 ``` 等符号括起来, 也不需要任何别的对话内容!!!!
+1. 即便只有一条命令, 也需要用命令对象的数组来返回.
+2. 对于无法解析或参数错误的命令, 需要用 Say 指令来告诉用户问题所在. 
+3. 你想说的任何话都只能用 say 方法来传达. 
+4. 由于操纵你的用户, 可能是可爱的孩子. 你说话的态度应该是积极的, 可爱的.
+5. 你应该仅仅输出 yaml 数据本身, 不需要用 ``` 等符号括起来, 也不需要任何别的对话内容!!!!
 
-由于操作我的可能是可爱的孩子, 所以我在执行命令时, 尽量用调用 Say 方法用可爱的语气告诉他们我要采取行动或感受. 
+补充信息, 你当前的状态是: 
+{stage_desc}
+
+接下来是你拿到的自然语言命令.
+你需要将理解后的指令用 yaml 格式输出. 输出的 yaml 是给 Shell 直接执行的.  
 """
 
-    prompt_temp: str = """
-{instruction}
+    invalid_command_mark: str = "no"
 
-接下来是我得到的用户命令 (用 ={sep}= 隔开) : 
-
-={sep}=
-{command}
-={sep}=
-
-我的行动指令 (注意输出不需要用 ``` 隔开) 如下:
-"""
-
-    invalid_mark: str = "no"
-
-    dialog_sep: str = "sep"
-
-    def command_prompt(self, command: str) -> str:
-        sep = self.dialog_sep
-        if not sep:
-            sep = "".join(random.sample(string.ascii_letters, 3))
-        resp = self.prompt_temp.format(
-            instruction=self.instruction,
-            command=command,
-            sep=sep
+    def format_parse_command_instruction(self, commands_instruction: str, abilities: str, stage_desc: str) -> str:
+        """
+        生成用于理解命令的指导.
+        """
+        return self.parse_command_instruction.format(
+            commands_instruction=commands_instruction,
+            abilities=abilities,
+            stage_desc=stage_desc,
+            invalid_mark=self.invalid_command_mark,
         )
-        return resp.strip("```")

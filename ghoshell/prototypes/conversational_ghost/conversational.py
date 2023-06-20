@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from ghoshell.ghost import *
 from ghoshell.ghost_fmk.stages import AwaitStage
-from ghoshell.llms import OpenAIChatMsg, LLMChatCompletion
+from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion
 from ghoshell.messages import *
 
 
@@ -97,7 +97,7 @@ class DefaultConversationalStage(AwaitStage):
         self.stage_name = stage_name
         self._reactions = reactions
 
-    def desc(self) -> str:
+    def desc(self, ctx: "Context") -> str:
         return self.config.desc
 
     def on_received(self, ctx: "Context", this: ConversationalThought, e: OnReceived) -> Operator | None:
@@ -154,14 +154,14 @@ class DefaultConversationalStage(AwaitStage):
         for chat in this.data.context:
             chats.append(chat)
 
-        llm = ctx.container.force_fetch(LLMChatCompletion)
+        llm = ctx.container.force_fetch(OpenAIChatCompletion)
         chat = llm.chat_completion(
             ctx.input.trace.session_id,
             chats,
             config_name=self.config.llm_name,
         )
 
-        this.data.context.append(chat.as_context())
+        this.data.context.append(chat.as_chat_msg())
         return chat.get_content()
 
     @classmethod

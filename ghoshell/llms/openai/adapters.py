@@ -5,7 +5,7 @@ import openai
 from pydantic import BaseModel, Field
 
 from ghoshell.llms.contracts import LLMTextCompletion
-from ghoshell.llms.openai_contracts import LLMChatCompletion, OpenAIChatChoice, OpenAIChatMsg, OpenAIFuncSchema
+from ghoshell.llms.openai_contracts import OpenAIChatCompletion, OpenAIChatChoice, OpenAIChatMsg, OpenAIFuncSchema
 
 
 class TextCompletionConfig(BaseModel):
@@ -26,7 +26,7 @@ class ChatCompletionConfig(BaseModel):
     temperature: float = 0.7
     max_tokens: int = 512
     timeout: float = 30
-    request_timeout: float = 5
+    request_timeout: float = 10
 
     def chat_completion_kwargs(self) -> Dict:
         return self.dict()
@@ -78,7 +78,7 @@ class OpenAIRecordStorage(metaclass=ABCMeta):
         pass
 
 
-class OpenAIAdapter(LLMTextCompletion, LLMChatCompletion):
+class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
     """
     openai 套皮实现
     """
@@ -89,7 +89,7 @@ class OpenAIAdapter(LLMTextCompletion, LLMChatCompletion):
 
     @classmethod
     def contracts(cls) -> List:
-        return [LLMTextCompletion, LLMChatCompletion]
+        return [LLMTextCompletion, OpenAIChatCompletion]
 
     def text_completion(self, prompt: str, config_name: str = "") -> str:
         if not config_name:

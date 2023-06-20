@@ -7,15 +7,15 @@ from ghoshell.ghost_fmk.bootstrapper import FileLoggerBootstrapper, \
 from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
 from ghoshell.ghost_fmk.providers import ContextLoggerProvider
-from ghoshell.ghost_protos.sphero import SpheroGhostBootstrapper
-from ghoshell.llms import LLMTextCompletion, LLMChatCompletion
-from ghoshell.llms.discover import GameUndercoverBootstrapper
-from ghoshell.llms.discover import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
+from ghoshell.llms import LLMTextCompletion, OpenAIChatCompletion
 from ghoshell.llms.openai import OpenAIBootstrapper
-from ghoshell.llms.thinks import ConversationalThinksBootstrapper
 from ghoshell.mocks.cache import MockCacheProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
 from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
+from ghoshell.prototypes.conversational_ghost import ConversationalThinksBootstrapper
+from ghoshell.prototypes.llm_test_ghost import GameUndercoverBootstrapper
+from ghoshell.prototypes.llm_test_ghost import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
+from ghoshell.prototypes.sphero import SpheroGhostBootstrapper
 
 
 class OperatorMock(OperationKernel):
@@ -65,7 +65,7 @@ class MockGhost(GhostKernel):
     @classmethod
     def _depend_contracts(cls) -> List:
         contracts = super()._depend_contracts()
-        appending = [LLMTextCompletion, LLMChatCompletion]
+        appending = [LLMTextCompletion, OpenAIChatCompletion]
         for i in appending:
             contracts.append(i)
         return contracts

@@ -4,7 +4,6 @@ import os
 from typing import Optional, Dict, AnyStr, ClassVar, Tuple
 
 import yaml
-from pydantic import Field
 
 from ghoshell.ghost import MindsetNotFoundException, Operator, Reaction, Intention
 from ghoshell.ghost import RuntimeException, TaskLevel
@@ -13,10 +12,10 @@ from ghoshell.ghost_fmk.intentions import CommandOutput
 from ghoshell.ghost_fmk.reactions import CommandReaction, Command
 from ghoshell.ghost_fmk.reactions.commands import ProcessCmdReaction
 from ghoshell.ghost_fmk.thinks import SingleStageThink
-from ghoshell.ghost_protos.sphero.configs import *
-from ghoshell.ghost_protos.sphero.messages import SpheroCommandMessage, Roll, Say, Stop
 from ghoshell.llms import LLMTextCompletion
 from ghoshell.messages import Text
+from ghoshell.prototypes.sphero.sphero_ghost_configs import *
+from ghoshell.prototypes.sphero.sphero_messages import SpheroCommandMessage, Roll, Say, Stop
 
 
 class LearningModeOutput(BaseModel):
@@ -144,7 +143,7 @@ class SpheroThinkDriver(ThinkDriver):
         else:
             prompt = self.config.command_prompt(command_str)
             resp = prompter.text_completion(prompt)
-            if resp == self.config.invalid_mark:
+            if resp == self.config.invalid_command_mark:
                 return message, False
             message = self._unpack_commands_in_direction(message, resp)
             self._cached_commands.indexes[command_str] = message.commands.copy()

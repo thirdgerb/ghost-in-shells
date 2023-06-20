@@ -9,9 +9,9 @@ from ghoshell.container import Container
 from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import GhostConfig
 from ghoshell.mocks import MockGhost, MockMessageQueueProvider
+from ghoshell.prototypes import ConsoleShell, BaiduSpeechShell, SpheroBoltShell
 from ghoshell.shell import Messenger
 from ghoshell.shell_fmk import SyncGhostMessenger, MessageQueue
-from ghoshell.shell_protos import ConsoleShell, BaiduSpeechShell, SpheroBoltShell
 
 pwd = os.getcwd()
 root_path = pwd + "/demo"

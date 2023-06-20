@@ -10,8 +10,8 @@ from urllib.request import urlopen
 import yaml
 
 from ghoshell.container import Provider, Container, Contract
+from ghoshell.prototypes.baidu_speech.config import BaiduSpeechConfig
 from ghoshell.shell import Shell, BoostrapException
-from ghoshell.shell_protos.baidu_speech.config import BaiduSpeechConfig
 
 
 class BaiduSpeechAdapter:

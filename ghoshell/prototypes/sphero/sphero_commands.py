@@ -1,35 +1,23 @@
 from __future__ import annotations
 
+import math
 from abc import ABCMeta, abstractmethod
 from typing import ClassVar, List, Dict, Type
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from spherov2.types import Color
 
-from ghoshell.messages import Message
+from ghoshell.prototypes.sphero.sphero_kernel import SpheroKernel, SpheroBoltStage
 
-
-class SpheroEventMessage(Message):
-    KIND = "sphero_event_message"
-
-    direction: str
-    # event 的自然语言描述.
-    events: List[str]
-    stopped: str
+xx = math.sin(30)
 
 
-class SpheroCommand(BaseModel, metaclass=ABCMeta):
+class SpheroCommand(SpheroBoltStage, metaclass=ABCMeta):
     """
     Sphero 指令的抽象. 用于 DSL
     """
 
     method: ClassVar[str] = ""
-
-    # 命令实际开始运行时间.
-    start_at: float = 0
-    # 命令的实际运行帧数.
-    ran_frames: int = 0
-    # 命令的运行日志.
-    runtime_log: str = ""
 
     @classmethod
     @abstractmethod
@@ -47,80 +35,13 @@ class SpheroCommand(BaseModel, metaclass=ABCMeta):
     @classmethod
     def read(cls, data: Dict) -> SpheroCommand | None:
         if data.get("method", "") == cls.method:
-            del data["method"]
             return cls(**data)
         return None
 
-    @abstractmethod
-    def plan_desc(self) -> str:
-        """
-        对运行计划的自然语言描述
-        """
-        pass
-
-    def on_stop(self, stop_at: float) -> None:
-        """
-        """
-        plan = self.plan_desc()
-        duration = stop_at - self.start_at
-        self.runtime_log = plan + f"实际执行 {duration} 秒."
-
-    # @abstractmethod
-    # def call(
-    #         self,
-    #         kernel: SpheroBoltKernel,
-    #         duration: float,
-    #         count: int,
-    # ) -> bool:  # 是否继续
-    #     pass
-
-
-class SpheroCommandMessage(Message):
-    """
-    用于 Shell 和 Ghost 通信用的指令.
-    """
-
-    KIND = "sphero_commands_message"
-
-    direction: str = ""  # 对命令的基本描述
-    runtime_mode: bool = False  # 是否是 runtime 模式. 如果是 runtime 模式, 运行时遇到事件或者命令执行完毕, 都会返回消息给 ghost
-    commands: List[Dict] = []
-
-    @classmethod
-    def new(cls, *command: SpheroCommand) -> SpheroCommandMessage:
-        result = cls()
-        result.add(*command)
-        return result
-
-    def add(self, *command: SpheroCommand) -> None:
-        for cmd in command:
-            data = cmd.dict()
-            data['method'] = cmd.method
-            self.commands.append(data)
-
-    @classmethod
-    def wrap(cls, command_list: List[SpheroCommand]) -> SpheroCommandMessage:
-        """
-        使用 Message 合并指令.
-        """
-        result = cls()
-        for cmd in command_list:
-            result.add(cmd)
-        return result
-
-    def to_commands(self) -> List[SpheroCommand]:
-        return command_message_to_commands(self)
-
-
-class SpheroRuntimeMessage(Message):
-    """
-    sphero 运行时的上下文
-    """
-
-    KIND = "sphero_runtime_message"
-
-    direction: str  # 运行命令的描述
-    history: List[str] = Field(default_factory=lambda: [])  # 运行时的完整记录. 用自然语言描述.
+    def to_command_data(self) -> Dict:
+        data = self.dict()
+        data["method"] = self.method
+        return data
 
 
 class Roll(SpheroCommand):
@@ -146,8 +67,23 @@ class Roll(SpheroCommand):
     def plan_desc(self) -> str:
         return f"计划以{self.speed}的速度, {self.heading}的角度, 滚动{self.duration}秒."
 
+    def _run_frame(self, kernel: SpheroKernel, at: float):
+        if self.start_at + self.duration < at:
+            kernel.api.stop_roll()
+            kernel.api.set_front_led(Color(0, 0, 0))
+            return False
+        if self.ran_frames_count == 0:
+            kernel.api.set_front_led(Color(0, 200, 0))
+            kernel.api.set_speed(self.speed)
+            heading = kernel.toward(self.heading)
+            kernel.api.set_heading(heading)
+        return True
+
 
 class Spin(SpheroCommand):
+    """
+    旋转的命令, 需要变更朝向. 
+    """
     method = "spin"
 
     angle: int = 90
@@ -164,8 +100,23 @@ class Spin(SpheroCommand):
     def plan_desc(self) -> str:
         return f"计划在{self.duration}秒内, 旋转 {self.angle} 度."
 
+    def _run_frame(self, kernel: SpheroKernel, at: float):
+        if self.ran_frames_count == 0:
+            kernel.api.set_front_led(Color(0, 200, 0))
+            kernel.api.spin(self.angle, self.duration)
+        if self.start_at + self.duration >= at:
+            return True
+        # 变更角度.
+        kernel.front_angle = kernel.toward(self.angle)
+        kernel.api.set_front_led(Color(0, 0, 0))
+        return False
+
 
 class Say(SpheroCommand):
+    """
+    说话
+    """
+
     method = "say"
     text: str
 
@@ -179,18 +130,37 @@ class Say(SpheroCommand):
     def plan_desc(self) -> str:
         return f"计划对用户说: {self.text}"
 
+    def _run_frame(self, kernel: SpheroKernel, at: float):
+        if self.ran_frames_count == 0:
+            kernel.api.set_main_led(Color(0, 0, 200))
+            kernel.speak(self.text)
+        kernel.api.clear_matrix()
+        return False
+
 
 class Stop(SpheroCommand):
     method = "stop"
+    duration: int = 1
 
     @classmethod
     def desc(cls) -> str:
         return """
 * stop: 强行停止转动. 
+    * duration: 停止动作持续的时间, 默认是 1秒. 通常不需要改动. 
 """
 
     def plan_desc(self) -> str:
         return f"计划停止所有动作."
+
+    def _run_frame(self, kernel: SpheroKernel, at: float):
+        if self.ran_frames_count == 0:
+            kernel.api.set_front_led(Color(200, 0, 0))
+            kernel.api.set_back_led(Color(200, 0, 0))
+            kernel.api.stop_roll()
+        in_duration = self.start_at + self.duration > at
+        if not in_duration:
+            kernel.api.clear_matrix()
+        return in_duration
 
 
 class Loop(SpheroCommand):
@@ -203,14 +173,15 @@ class Loop(SpheroCommand):
     times: int = 1  # 循环执行的次数.
     # 需要执行的 commands 命令.
     commands: List[Dict] = Field(default_factory=lambda: [])
-    runtime_count: int = 0
+    # 已经运行的次数.
+    loop_count: int = 0
 
     @classmethod
     def desc(cls) -> str:
         return """
 * loop: 循环执行一段指令
     * times: int 类型, 表示循环执行的次数. 
-    * direction: string 类型, 用自然语言的方式来描述需要循环执行的命令是什么. 
+    * direction: str 类型, 用自然语言描述需要循环执行的命令. 比如 `画正方形`
 """
 
     def plan_desc(self) -> str:
@@ -218,7 +189,16 @@ class Loop(SpheroCommand):
 
     def on_stop(self, stop_at: float) -> str:
         duration = stop_at - self.start_at
-        return f"实际运行 {self.runtime_count} 次, 在{duration}秒后停止."
+        return f"实际运行 {self.loop_count} 次, 在{duration}秒后停止."
+
+    def _run_frame(self, kernel: SpheroKernel, at: float) -> bool:
+        is_finished = self.loop_count >= self.times
+        if is_finished:
+            return False
+        self.loop_count += 1
+        stages = command_data_to_commands(self.commands)
+        kernel.insert_stages(stages)
+        return True
 
 
 class RoundRoll(SpheroCommand):
@@ -235,11 +215,32 @@ class RoundRoll(SpheroCommand):
     @classmethod
     def desc(cls) -> str:
         return """
-* round_roll: 从当前位置出发, 以圆弧的曲线进行滚动. 
-    * speed: int 类型, 范围是 0 ~ 255, 表示滚动的速度. 
+* round_roll: 从当前位置出发, 会按照圆形的弧线进行滚动. 不适合用来走出直线. 
+    * speed: int 类型, 范围是 0 ~ 255, 表示滚动的速度. 默认是 50. 
     * angle: int 类型, 负数表示逆时针旋转, 正数为顺时针旋转. 表示滚动时要经过的角度. 比如 360 表示会沿圆弧滚动回起点.
     * duration: float 类型, 单位是秒. 表示完成滚动的时间. 
 """
+
+    def plan_desc(self) -> str:
+        return f"计划以{self.speed} 的速度, 在 {self.duration} 秒内完成 {self.angle} 度的圆弧"
+
+    def _run_frame(self, kernel: SpheroKernel, at: float) -> bool:
+        in_duration = self.start_at + self.duration > at
+        if not in_duration:
+            kernel.api.stop_roll()
+            kernel.api.set_front_led(Color(0, 0, 0))
+            return False
+
+        if self.ran_frames_count == 0:
+            kernel.api.set_front_led(Color(0, 200, 0))
+
+        passed = at - self.start_at
+        angle = round(self.angle * passed / self.duration)
+        heading = kernel.toward(angle)
+        kernel.api.set_heading(heading)
+        kernel.api.set_speed(self.speed)
+        # 不改变朝向.
+        return in_duration
 
 
 class LambdaRoll(SpheroCommand):
@@ -256,13 +257,35 @@ class LambdaRoll(SpheroCommand):
     @classmethod
     def desc(cls) -> str:
         return """
-* lambda_roll: 允许使用 python lambda 函数来定义滚动轨迹的方法
+* lambda_roll: 允许使用 python lambda 函数来定义滚动轨迹的方法. 可以使用 python 的 math 库. 对于直线轨迹不该用 lambda_roll, 还是 roll + spin 组合使用更合理.  
     * speed: str 类型, 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒), 返回值是 int 类型, 表示速度, 范围是 -255 ~ 255. 例如 `lambda t: 100`, 表示速度恒定为 100
-    * heading: str 类型, 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒), 返回值是 int 类型, 表示角度. 例如 `lambda t: 10`, 表示滚动指向固定为 10 
+    * heading: str 类型, 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒), 返回值是 int 类型, 表示角度. 例如 `lambda t: 10`, 表示滚动指向固定为 10. 注意 
 """
 
+    def plan_desc(self) -> str:
+        return f"计划在 {self.duration} 秒内, 以经过时间 t 为变量, 运行速度按函数 `{self.speed}`, 朝向按函数 `{self.heading}` 来滚动"
 
-class AbilityRoll(SpheroCommand):
+    def _run_frame(self, kernel: SpheroKernel, at: float) -> bool:
+        in_duration = self.start_at + self.duration > at
+        if not in_duration:
+            kernel.api.stop_roll()
+            kernel.api.set_front_led(Color(0, 0, 0))
+            return False
+
+        if self.ran_frames_count == 0:
+            kernel.api.set_front_led(Color(0, 200, 0))
+        t = at - self.start_at
+        speed_fn = eval(self.speed)
+        heading_fn = eval(self.heading)
+        speed = speed_fn(t)
+        heading = heading_fn(t)
+        toward = kernel.toward(heading)
+        kernel.api.set_heading(toward)
+        kernel.api.set_speed(speed)
+        return in_duration
+
+
+class Ability(SpheroCommand):
     """
     使用一个已知的技能运动.
     """
@@ -280,40 +303,31 @@ class AbilityRoll(SpheroCommand):
 """
 
 
-class OnCollision(SpheroCommand):
-    """
-    等待服务端指令.
-    """
-    method = "on_collision"
-    direction: str
-    reset: bool
-    commands: List[Dict] = Field(default_factory=lambda: [])
-
-    event = "on_collision"
-
-    @classmethod
-    def desc(cls) -> str:
-        return """
-* on_collision: 发生碰撞事件时, 需要执行的命令. 默认是会中断当前命令, 然后继续运行.  
-    * reset: bool 类型, 表示如果碰撞发生时, 是否要重置我运行中的所有命令. 
-    * direction: string 类型, 发生碰撞时我要执行的命令, 用自然语言进行描述. 
-"""
-
-
 defined_commands: [Type[SpheroCommand]] = {cmd.method: cmd for cmd in [
     Roll,
     Spin,
     Stop,
     Say,
+    Loop,
+    # RoundRoll,
+    LambdaRoll,
 ]}
 
 
-def command_message_to_commands(message: SpheroCommandMessage) -> List[SpheroCommand]:
+def loop_check(command_data: Dict) -> Loop | None:
+    return Loop.read(command_data)
+
+
+def ability_check(command_data: Dict) -> Ability | None:
+    return Ability.read(command_data)
+
+
+def command_data_to_commands(commands: List[Dict]) -> List[SpheroCommand]:
     """
     将消息解析成一个个的命令对象.
     """
     result = []
-    for message_data in message.commands:
+    for message_data in commands:
         method = message_data.get("method", "")
         if method in defined_commands:
             wrapped = defined_commands[method].read(message_data)

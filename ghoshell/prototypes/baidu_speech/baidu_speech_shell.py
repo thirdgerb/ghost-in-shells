@@ -18,8 +18,8 @@ from ghoshell.container import Container
 from ghoshell.ghost import URL
 from ghoshell.messages import Input, Output, Message
 from ghoshell.messages import Text, ErrMsg, Signal
+from ghoshell.prototypes.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
 from ghoshell.shell_fmk import ShellKernel
-from ghoshell.shell_protos.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
 
 
 class BaiduSpeechShellConfig(BaseModel):
@@ -51,6 +51,7 @@ class BaiduSpeechShell(ShellKernel):
         self._speaking: bool = False
         self._stopping_speak: bool = False
         self._shell_event: Message | None = None
+        self._ticking: bool = False
 
     def _load_config(self, config_filename: str) -> BaiduSpeechShellConfig:
         config_filename = self.config_path.rstrip("/") + "/" + config_filename.lstrip("/")
@@ -179,10 +180,12 @@ class BaiduSpeechShell(ShellKernel):
         exit(0)
 
     def tick(self, e: str | Message) -> None:
+        self._ticking = True
         self._stop_speak()
         self._console.print("> waiting ghost...")
         super().tick(e)
         self._console.print("> ghost replied")
+        self._ticking = False
 
     def _welcome(self) -> None:
         """
@@ -211,10 +214,13 @@ class BaiduSpeechShell(ShellKernel):
         """
         说话.
         """
+        if self._listening:
+            self._console.print("> not speaking cause of listening")
+            return
         adapter = self.container.force_fetch(BaiduSpeechAdapter)
         self._console.print("> text to speech...")
-        speech_data = adapter.text2speech(text.content)
-        self._speak(speech_data)
+        # speech_data = adapter.text2speech(text.content)
+        # self._speak(speech_data)
 
     def _speak(self, wave_data: bytes) -> None:
         if self._listening:

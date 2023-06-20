@@ -70,7 +70,7 @@ class OpenAIChatChoice(BaseModel):
     def get_content(self) -> str | None:
         return self.message.get("content", None)
 
-    def as_context(self) -> OpenAIChatMsg:
+    def as_chat_msg(self) -> OpenAIChatMsg:
         return OpenAIChatMsg(
             role=self.get_role(),
             content=self.get_content(),
@@ -85,7 +85,7 @@ class OpenAIChatResponse(BaseModel):
     usage: Dict
 
 
-class LLMChatCompletion(metaclass=ABCMeta):
+class OpenAIChatCompletion(metaclass=ABCMeta):
 
     @abstractmethod
     def chat_completion(

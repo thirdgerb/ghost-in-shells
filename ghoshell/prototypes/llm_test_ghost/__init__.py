@@ -1,10 +1,11 @@
-from ghoshell.llms.discover.bootstrapper import *
-from ghoshell.llms.discover.conversational import ConversationalThinkConfig
-from ghoshell.llms.discover.prompt_unittest import PromptUnitTestConfig, PromptUnitTestThink, PromptUnitTestThinkDriver
-from ghoshell.llms.discover.undercover import UndercoverGameDriver
+from ghoshell.prototypes.llm_test_ghost.bootstrapper import *
+from ghoshell.prototypes.llm_test_ghost.conversational import ConversationalThinkConfig
+from ghoshell.prototypes.llm_test_ghost.prompt_unittest import *
+from ghoshell.prototypes.llm_test_ghost.undercover import *
 
 #
 # 探索过程中开发的 think
+# deprecated: 不应该用于测试之外的目的.
 #
 
 __all__ = [
