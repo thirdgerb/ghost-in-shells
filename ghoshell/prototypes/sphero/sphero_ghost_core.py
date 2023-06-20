@@ -5,7 +5,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost import Context, Thought, CtxTool
-from ghoshell.llms import OpenAIChatCompletion, OpenAIChatMsg
+from ghoshell.llms import OpenAIChatCompletion, OpenAIChatMsg, OpenAIChatChoice
 from ghoshell.prototypes.sphero.sphero_commands import Say, commands_instruction, loop_check, ability_check
 from ghoshell.prototypes.sphero.sphero_ghost_configs import SpheroGhostConfig, LearningModeOutput
 from ghoshell.prototypes.sphero.sphero_messages import SpheroCommandMessage
@@ -46,11 +46,13 @@ class SpheroGhostCore:
         ])
 
     @classmethod
-    def unpack_learning_mode_resp(cls, msg: OpenAIChatMsg) -> LearningModeOutput:
+    def unpack_learning_mode_resp(cls, msg: OpenAIChatChoice) -> LearningModeOutput:
         """
         理解学习模式的输出.
         """
-        yaml_str = cls._unpack_yaml_in_text(msg.content)
+        yaml_str = cls._unpack_yaml_in_text(msg.as_chat_msg().content)
+        if yaml_str.startswith("yaml"):
+            yaml_str = yaml_str[4:]
         data = yaml.safe_load(yaml_str)
         return LearningModeOutput(**data)
 

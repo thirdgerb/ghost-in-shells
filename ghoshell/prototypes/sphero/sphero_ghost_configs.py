@@ -28,7 +28,6 @@ class SpheroSimpleCommandModeConfig(BaseModel):
     name: str = "sphero/simple_command_mode"
     desc: str = "Sphero 的简单模式, 从用户得到命令后解析成 shell 的指令并运行."
     on_activate: str = "进入单一命令模式, 请给我下达指令"
-    unknown_order: str = "无法理解的命令"
 
     debug: bool = True
 
@@ -51,8 +50,8 @@ class SpheroLearningModeConfig(BaseModel):
 
     name: str = "sphero/learning_mode"
 
-    on_activate: str = "我已经进入学习模式. 您可以用多轮对话来教导我应该怎么做, 当说测试或运行时我会执行它们. " \
-                       "也可以要求我将这些指令保存为一个技能. 现在请您开始教学吧!"
+    on_activate: str = "我已经进入学习模式. 您可以用多轮对话来教导我应该怎么做, 当说测试或运行时我才会执行它们. " \
+                       "最后可以将这些指令保存为我的一个技能. 现在请您开始教学吧!"
 
     desc: str = "todo"
 
@@ -67,81 +66,100 @@ class SpheroLearningModeConfig(BaseModel):
 我是球形机器人 SpheroGPT. 
 我可以滚动 旋转 说话来响应用户的请求, 可以滚动画出图形. 可以执行各种技能. 
 
-当前是学习模式, 用户通过多轮对话来告知教会我复杂指令. 
+我采用了一个 ghost in Shell 的技术架构. 
+其中 ghost 指的是基于大语言模型实现的思维中控, 负责决策, 并给 shell 下达指令. 
+Shell 指的是控制球形身体的模块, 执行 ghost 下发的 yaml 结构的指令. 
 
-每一轮对话我都需要把自己当前的想法以 yaml object 形式输出. 输出可用的字段如下: 
+当前是学习模式, 用户会通过多轮对话来告知教会我复杂指令. 我最终可以把这些指令保存为一个指定名称的技能. 
+
+我的最终输出需要用 Yaml 格式的领域语言输出, 让我的 Shell 可以执行它. 可用的字段和规则如下: 
 
 * reply: str, 必填, 本轮我对用户回复的话. 如果用户只提供了新的指令, 我只需要回复 "然后呢"
-* title: str, 默认为空字符. 表示用户对当前复杂指令的技能名称. 必须由用户明确告知. 
-* directions: List[str], 根据所有上下文, 得到的多轮对话完整指令集, 用自然语言形式来表示, 是一个数组. 每轮都要返回完整指令集. 
-* reaction: str, 默认为空字符. 本轮对话结束时我要执行的动作的名字.可用的动作名如下.
-    * test: 运行所有的指令, 当用户明确提到 "测试" 或 "运行" 这类意思时执行. 我会告诉用户 "好的", 然后执行所有 directions. 
-    * finish: 结束当前对话模式, 并告知用户. 
-    * restart: 清空上下文记忆, 从头开始, 并告知用户. 
+* title: str, 默认为空字符. 表示用户对当前复杂指令的技能名称. 必须通过询问用户获得, 不能我自己设想. 
+* directions: List[str], 根据所有上下文, 得到的多轮对话完整指令集, 是一个数组. 每一条命令都用自然语言形式来表示, 比如 `用100的速度向前走5秒`
+* reaction: str, 默认为 `no`. 根据用户上一轮的要求, 我接下来要执行的动作的名字. 可用的动作名如下.
+    * test: 运行所有的 directions. 只有当用户明确说 "测试" 或 "运行" 时才会执行.  
+    * finish: 结束当前对话模式, 并告知用户. 当用户要求退出当前模式时可用. 
+    * restart: 按用户的要求, 清空上下文记忆, 从头开始, 并告知用户. 
     * save: 保存当前技能, 会存到我的技能记忆库中. 如果 title 字段仍然为空, 就必须先明确询问用户技能的名称是什么.
-    * no: 不执行指令. 
- 
+    * no: 不执行任何命令. 
+    
+以下是我与用户的对话内容. 
 """
 
-    prompt_temp: str = """
-# instruction
-
-{instruction}
-
+    context_temp: str = """
 根据之前对话上下文, 我已经记住需要执行的指令集是: 
 
 ```
 {directions}
 ```
-
-当指令集不为空时, 应该在回复的 yaml 对象的 directions 字段中包含它们. 
-
 当前的技能名称是 `{title}`.
-
-最近的 {max_turns} 轮对话内容 (用 `={sep}=` 分割): 
-
-{conversation}
-
-用户本轮对我说的是: 
-
-={sep}= {user_message} ={sep}=
-
-接下来我需要输出本轮对话的 yaml 数据. 注意: 
-    
-1. 当得到一个命令时, reply 字段只需要引导用户给出下一个指令, 比如 "好的" 或 "然后呢". 不要重复用户的话. 
-2. 除非 reaction 为 test, 否则我不会执行指令. 
-3. 只有用户明确询问我记忆的指令时, 我才需要在 reply 字段中介绍它们. 
-5. reaction 为 save 时, title 字段必须存在. 不存在时, 我需要询问用户技能的名称. 
-6. yaml 不需要用任何符号括起来 
-
-输出: 
 """
+
+    prompt_temp: str = """
+接下来我需要输出 yaml 格式的指令. 
+
+注意: 
+1. 任何要对用户说的话, 都只能通过 reply 字段输出. 
+2. 返回的 directions 字段, 需要包含所有要执行的指令.
+3. 仅仅当用户明确要求我测试或运行时, 我才会让 reaction=test
+
+接下来我的 yaml 输出是 (不能包含 yaml 之外的任何信息): 
+"""
+
     ask_for_title: str = "请告诉我技能的名称"
 
-    def turn_prompt(
+    def generate_chat_context(
             self,
             title: str,
-            conversation: str,
             directions: List[str],
-            user_message: str,
-            max_turns: int,
-            sep: str,
-    ) -> str:
-        if not conversation:
-            conversation = "无"
-        directions_text = "无"
-        if directions:
-            directions_text = "\n- " + "\n- ".join(directions)
+            dialog: List[OpenAIChatMsg]
+    ) -> List[OpenAIChatMsg]:
+        direction_str = ""
+        for d in directions:
+            direction_str += f"\n- {d}"
+        context: List[OpenAIChatMsg] = [
+            OpenAIChatMsg(
+                role=OpenAIChatMsg.ROLE_SYSTEM,
+                content=self.instruction,
+            ),
+            # OpenAIChatMsg(
+            #     role=OpenAIChatMsg.ROLE_SYSTEM,
+            #     content=self.context_temp.format(directions=direction_str, title=title)
+            # )
+        ]
+        for m in dialog:
+            context.append(m)
+        context.append(OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_ASSISTANT,
+            content=self.prompt_temp,
+        ))
+        return context
 
-        return self.prompt_temp.format(
-            instruction=self.instruction,
-            title=title,
-            directions=directions_text,
-            conversation=conversation,
-            user_message=user_message,
-            max_turns=max_turns,
-            sep=sep,
-        )
+    # def turn_prompt(
+    #         self,
+    #         title: str,
+    #         conversation: str,
+    #         directions: List[str],
+    #         user_message: str,
+    #         max_turns: int,
+    #         sep: str,
+    # ) -> str:
+    #     if not conversation:
+    #         conversation = "无"
+    #     directions_text = "无"
+    #     if directions:
+    #         directions_text = "\n- " + "\n- ".join(directions)
+    #
+    #     return self.prompt_temp.format(
+    #         instruction=self.instruction,
+    #         title=title,
+    #         directions=directions_text,
+    #         conversation=conversation,
+    #         user_message=user_message,
+    #         max_turns=max_turns,
+    #         sep=sep,
+    #     )
 
 
 class SpheroRuntimeModeConfig(BaseModel):
@@ -223,6 +241,9 @@ class SpheroGhostConfig(BaseModel):
     # 使用 chat completion 来实现对话理解.
     # 这里可以选择使用哪个配置, 与 ghoshell.llms.openai.OpenAIConfig 联动.
     use_llm_config: str = ""
+
+    #
+    unknown_order: str = "无法理解的命令"
 
     # 主模式的配置. 
     main_mode: SpheroMainModeConfig = SpheroMainModeConfig

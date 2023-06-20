@@ -4,6 +4,7 @@ import yaml
 
 from ghoshell.ghost import Ghost, ThinkDriver, ThinkMeta, Think, MindsetNotFoundException
 from ghoshell.ghost_fmk import Bootstrapper
+from ghoshell.prototypes.sphero.mode_learn import SpheroLearningModeThink
 from ghoshell.prototypes.sphero.mode_simple import SpheroSimpleCommandModeThink
 from ghoshell.prototypes.sphero.sphero_ghost_configs import SpheroGhostConfig
 from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore, SpheroCommandsCache
@@ -40,8 +41,8 @@ class SpheroThinkDriver(ThinkDriver):
         match meta.id:
             case self.config.simple_mode.name:
                 return SpheroSimpleCommandModeThink(self._core)
-            # case self.config.learn_mode.name:
-            # return SpheroLearningModeThink(self._core)
+            case self.config.learn_mode.name:
+                return SpheroLearningModeThink(self._core)
             case _:
                 raise MindsetNotFoundException(f"think {meta.id} not found")
 

@@ -69,10 +69,9 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
         message = SpheroCommandMessage()
         commands, ok = self._core.parse_direction(ctx, text.content, prompter, True)
         if not ok:
-            ctx.send_at(this).err(self._config.unknown_order)
+            ctx.send_at(this).err(self._core.config.unknown_order)
             return ctx.mind(this).rewind()
 
         message.commands = commands
         ctx.send_at(this).output(message)
         return ctx.mind(this).awaits()
-
