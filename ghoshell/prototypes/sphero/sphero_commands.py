@@ -21,16 +21,21 @@ class SpheroCommand(SpheroBoltStage, metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def desc(cls) -> str:
-        pass
+    def yaml_desc(cls) -> str:
+        """
+        对 yaml 格式的自我描述.
+        """
+        return """
+各种指令可能会用到的标准参数有: 
 
-    #         return """
-    # 各种指令可能用到的参数:
-    # * speed: int 类型, 定义我的速度, 范围是 -255 到 255, 负数表示向后滚动, 0 表示停止. 默认值是 100
-    # * heading: int 类型, 定义我的方向, 范围是 -360 到 360, 对应圆形的角度. 默认值是 0
-    # * duration: float 类型, 定义指令持续的时间, 单位是秒. 默认值是 0, 表示只执行一次. 为负数表示一直持续
-    # * angle: int 类型, 表示一个旋转角度, 负数表示逆时针旋转, 正数表示顺时针旋转. 360 表示一个圆.
-    # """
+* speed: int 类型, 定义滚动的速度, 范围是 0 到 255, 0 表示停止. 默认值是 100
+* heading: int 类型, 定义滚动的方向, 范围是 -360 到 360, 对应圆形的角度. 正前方是 0, 正后方是 180, 向左是 270, 向右是 90. 
+* duration: float 类型, 定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续
+* angle: int 类型. 是一个转动的角度, 会变更我的正面指向. 360 表示 360度, 是一个整圆.
+ 
+以下是现有的指令: 
+
+"""
 
     @classmethod
     def read(cls, data: Dict) -> SpheroCommand | None:
@@ -55,14 +60,17 @@ class Roll(SpheroCommand):
     duration: float = 1
 
     @classmethod
-    def desc(cls) -> str:
-        # todo: 看起来参数可以提前定义.
+    def yaml_desc(cls) -> str:
         return """
-* roll: 控制我的身体滚动. 
-  * speed: int 类型, 定义滚动的速度, 范围是 0 到 255, 0 表示停止. 默认值是 100
-  * heading: int 类型, 定义滚动的方向, 范围是 -360 到 360, 对应圆形的角度. 正前方是 0, 正后方是 180, 向左是 270, 向右是 90. 
-  * duration: float 类型, 定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续
+* roll: 控制我的身体滚动. 参数有 speed, heading, duration
 """
+
+    #         return """
+    # * roll: 控制我的身体滚动.
+    #   * speed: int 类型, 定义滚动的速度, 范围是 0 到 255, 0 表示停止. 默认值是 100
+    #   * heading: int 类型, 定义滚动的方向, 范围是 -360 到 360, 对应圆形的角度. 正前方是 0, 正后方是 180, 向左是 270, 向右是 90.
+    #   * duration: float 类型, 定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续
+    # """
 
     def plan_desc(self) -> str:
         return f"计划以{self.speed}的速度, {self.heading}的角度, 滚动{self.duration}秒."
@@ -90,12 +98,16 @@ class Spin(SpheroCommand):
     duration: float = 1
 
     @classmethod
-    def desc(cls) -> str:
+    def yaml_desc(cls) -> str:
         return """
-* spin: 原地转动
-  * angle: int 类型. 是一个转动的角度, 会变更我的正面指向. 360 表示 360度, 是一个整圆. 注意, 会变更我面向的角度.  
-  * duration: float 类型, 定义转动的时间. 默认值是 1. 单位是秒. 
+* spin: 原地转动. 注意, 会改变朝向. 参数有 angle, duration
 """
+
+    #         return """
+    # * spin: 原地转动
+    #   * angle: int 类型. 是一个转动的角度, 会变更我的正面指向. 360 表示 360度, 是一个整圆. 注意, 会变更我面向的角度.
+    #   * duration: float 类型, 定义转动的时间. 默认值是 1. 单位是秒.
+    # """
 
     def plan_desc(self) -> str:
         return f"计划在{self.duration}秒内, 旋转 {self.angle} 度."
@@ -121,9 +133,9 @@ class Say(SpheroCommand):
     text: str
 
     @classmethod
-    def desc(cls) -> str:
+    def yaml_desc(cls) -> str:
         return """
-* say: 用我的声音模块说话    
+* say: 用我的声音模块说话. 参数如下: 
     * text: 要说的话的内容. 
 """
 
@@ -143,10 +155,9 @@ class Stop(SpheroCommand):
     duration: int = 1
 
     @classmethod
-    def desc(cls) -> str:
+    def yaml_desc(cls) -> str:
         return """
 * stop: 强行停止转动. 
-    * duration: 停止动作持续的时间, 默认是 1秒. 通常不需要改动. 
 """
 
     def plan_desc(self) -> str:
@@ -177,9 +188,9 @@ class Loop(SpheroCommand):
     loop_count: int = 0
 
     @classmethod
-    def desc(cls) -> str:
+    def yaml_desc(cls) -> str:
         return """
-* loop: 循环执行一段指令
+* loop: 循环执行一段指令. 参数如下:
     * times: int 类型, 表示循环执行的次数. 
     * direction: str 类型, 用自然语言描述需要循环执行的命令. 比如 `画正方形`
 """
@@ -213,7 +224,7 @@ class RoundRoll(SpheroCommand):
     duration: float
 
     @classmethod
-    def desc(cls) -> str:
+    def yaml_desc(cls) -> str:
         return """
 * round_roll: 从当前位置出发, 会按照圆形的弧线进行滚动. 不适合用来走出直线. 
     * speed: int 类型, 范围是 0 ~ 255, 表示滚动的速度. 默认是 50. 
@@ -255,7 +266,7 @@ class LambdaRoll(SpheroCommand):
     duration: float  # 运行时间
 
     @classmethod
-    def desc(cls) -> str:
+    def yaml_desc(cls) -> str:
         return """
 * lambda_roll: 允许使用 python lambda 函数来定义滚动轨迹的方法. 可以使用 python 的 math 库. 对于直线轨迹不该用 lambda_roll, 还是 roll + spin 组合使用更合理.  
     * speed: str 类型, 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒), 返回值是 int 类型, 表示速度, 范围是 -255 ~ 255. 例如 `lambda t: 100`, 表示速度恒定为 100
@@ -295,12 +306,24 @@ class Ability(SpheroCommand):
     name: str
     commands: List[Dict] = Field(default_factory=lambda: [])
 
+    ran: bool = False
+
     @classmethod
-    def desc(cls) -> str:
+    def yaml_desc(cls) -> str:
         return """
-* ability_roll: 使用一个已有的技能. 所谓技能, 是我已经掌握的一连串命令. 
-    * name: str 类型, 表示技能的名字, 也是技能的 id.
+* ability_roll: 使用一个已有的技能. 所谓技能, 是我已经掌握的一组指令, 可以用一个名字来运行. 
+    * name: str 类型, 表示技能的名字.
 """
+
+    def plan_desc(self) -> str:
+        return f"运行技能 {self.name}"
+
+    def _run_frame(self, kernel: SpheroKernel, at: float) -> bool:
+        if self.ran:
+            return False
+        stages = command_data_to_commands(self.commands)
+        kernel.insert_stages(stages)
+        return True
 
 
 defined_commands: [Type[SpheroCommand]] = {cmd.method: cmd for cmd in [
@@ -311,6 +334,7 @@ defined_commands: [Type[SpheroCommand]] = {cmd.method: cmd for cmd in [
     Loop,
     # RoundRoll,
     LambdaRoll,
+    Ability,
 ]}
 
 
@@ -336,12 +360,12 @@ def command_data_to_commands(commands: List[Dict]) -> List[SpheroCommand]:
     return result
 
 
-def commands_instruction() -> str:
+def commands_yaml_instruction() -> str:
     """
     所有命令的描述的集合.
     """
     desc = []
     for key in sorted(defined_commands.keys()):
         cmd = defined_commands[key]
-        desc.append(cmd.desc())
+        desc.append(cmd.yaml_desc())
     return "\n".join(desc)

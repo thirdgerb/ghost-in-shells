@@ -91,19 +91,21 @@ class SpheroLearningModeThink(SingleStageThink):
         if text is None or text.is_empty():
             return ctx.mind(this).rewind()
         this.data.round += 1
-        this.add_message(text.content, True)
         prompter = self._core.get_prompter(ctx)
         session_id = ctx.input.trace.session_id
         chat_context = self._config.generate_chat_context(
+            nature_direction_instruction=self._core.nature_directions_instruction(),
             title=this.data.title,
             directions=this.data.directions,
-            dialog=this.data.dialog
+            dialog=this.data.dialog,
+            last_user_direction=text.content
         )
 
         resp = prompter.chat_completion(session_id, chat_context, config_name=self._core.config.use_llm_config)
         if resp.as_chat_msg().content == "await":
             return ctx.mind(this).awaits()
 
+        this.add_message(text.content, True)
         parsed = self._core.unpack_learning_mode_resp(resp)
         return self._receive_parsed_output(ctx, parsed, this)
 
@@ -117,6 +119,12 @@ class SpheroLearningModeThink(SingleStageThink):
         if parsed.directions:
             this.data.directions = parsed.directions
 
+        # 发送消息.
+        if parsed.reply:
+            reply = parsed.reply
+            self._core.say(ctx, this, reply)
+            this.add_message(reply, False)
+
         # 解决 title 为空的问题.
         if parsed.reaction == "save":
             if not this.data.title:
@@ -124,17 +132,10 @@ class SpheroLearningModeThink(SingleStageThink):
                 this.add_message(self._config.ask_for_title, False)
                 return ctx.mind(this).awaits()
 
-        # 发送消息.
-        if parsed.reply:
-            reply = parsed.reply
-            self._core.say(ctx, this, reply)
-            this.add_message(reply, False)
-
         match parsed.reaction:
             case "restart":
                 return ctx.mind(this).restart()
             case "test":
-                this.add_system_message("运行了已知的指令")
                 return self._run_test(ctx, this)
             case "save":
                 this.add_system_message(f"保存所有指令为 `{parsed.title}`")
@@ -171,6 +172,9 @@ class SpheroLearningModeThink(SingleStageThink):
                 return self._send_unknown_message(ctx, this)
             for cmd in commands:
                 message.commands.append(cmd)
+
+        direction_str = "\n -".join(this.data.directions)
+        this.add_system_message(f"运行了以下指令: \n- {direction_str}")
 
         ctx.send_at(this).output(message)
         return ctx.mind(this).awaits()

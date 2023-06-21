@@ -1,5 +1,6 @@
 from typing import List
 
+import yaml
 from pydantic import BaseModel, Field
 
 from ghoshell.llms import OpenAIChatMsg
@@ -14,9 +15,9 @@ class SpheroMainModeConfig(BaseModel):
     welcome: str = "welcome"
 
     instruction: str = """
-我是球形机器人 SpheroGPT, 可以理解用户的指令, 并转化为自己的行动. 
+你是球形机器人 SpheroGPT, 可以理解用户的指令, 并转化为自己的行动. 
 
-我有三种运行模式: 
+你有三种运行模式: 
 * 简单命令模式: 
 """
 
@@ -27,7 +28,7 @@ class SpheroSimpleCommandModeConfig(BaseModel):
     """
     name: str = "sphero/simple_command_mode"
     desc: str = "Sphero 的简单模式, 从用户得到命令后解析成 shell 的指令并运行."
-    on_activate: str = "进入单一命令模式, 请给我下达指令"
+    on_activate: str = "进入单一命令模式, 请给你下达指令"
 
     debug: bool = True
 
@@ -37,7 +38,7 @@ class LearningModeOutput(BaseModel):
     学习模式下每一轮的输出. 要和 instruction 匹配.
     """
 
-    reply: str  # 本轮回复的内容.
+    reply: str = ""  # 本轮回复的内容.
     title: str | None = None  # 技能的名称
     directions: List[str] = Field(default_factory=lambda: [])
     reaction: str | None = None  # 本轮对话执行的动作.
@@ -50,8 +51,8 @@ class SpheroLearningModeConfig(BaseModel):
 
     name: str = "sphero/learning_mode"
 
-    on_activate: str = "我已经进入学习模式. 您可以用多轮对话来教导我应该怎么做, 当说测试或运行时我才会执行它们. " \
-                       "最后可以将这些指令保存为我的一个技能. 现在请您开始教学吧!"
+    on_activate: str = "我已经进入学习模式. 您可以用多轮对话来教导你应该怎么做, 当说 `测试` 时你才会执行它们. " \
+                       "最后可以将这些指令保存为你的一个技能. 现在请您开始教我新技能吧!"
 
     desc: str = "todo"
 
@@ -63,76 +64,102 @@ class SpheroLearningModeConfig(BaseModel):
     debug: bool = True
 
     instruction: str = """
-我是球形机器人 SpheroGPT. 
-我可以滚动 旋转 说话来响应用户的请求, 可以滚动画出图形. 可以执行各种技能. 
+你是球形机器人 SpheroGPT. 
 
-我采用了一个 ghost in Shell 的技术架构. 
+你采用了一个 ghost in Shell 的技术架构. 
 其中 ghost 指的是基于大语言模型实现的思维中控, 负责决策, 并给 shell 下达指令. 
 Shell 指的是控制球形身体的模块, 执行 ghost 下发的 yaml 结构的指令. 
 
-当前是学习模式, 用户会通过多轮对话来告知教会我复杂指令. 我最终可以把这些指令保存为一个指定名称的技能. 
+当前是学习模式, 你的目的是学会用户交给你的复杂指令, 可以测试, 最终可以把这些指令保存为一个指定名称的技能. 
 
-我的最终输出需要用 Yaml 格式的领域语言输出, 让我的 Shell 可以执行它. 可用的字段和规则如下: 
-
-* reply: str, 必填, 本轮我对用户回复的话. 如果用户只提供了新的指令, 我只需要回复 "然后呢"
-* title: str, 默认为空字符. 表示用户对当前复杂指令的技能名称. 必须通过询问用户获得, 不能我自己设想. 
-* directions: List[str], 根据所有上下文, 得到的多轮对话完整指令集, 是一个数组. 每一条命令都用自然语言形式来表示, 比如 `用100的速度向前走5秒`
-* reaction: str, 默认为 `no`. 根据用户上一轮的要求, 我接下来要执行的动作的名字. 可用的动作名如下.
-    * test: 运行所有的 directions. 只有当用户明确说 "测试" 或 "运行" 时才会执行.  
-    * finish: 结束当前对话模式, 并告知用户. 当用户要求退出当前模式时可用. 
-    * restart: 按用户的要求, 清空上下文记忆, 从头开始, 并告知用户. 
-    * save: 保存当前技能, 会存到我的技能记忆库中. 如果 title 字段仍然为空, 就必须先明确询问用户技能的名称是什么.
-    * no: 不执行任何命令. 
-    
-以下是我与用户的对话内容. 
-"""
-
-    context_temp: str = """
-根据之前对话上下文, 我已经记住需要执行的指令集是: 
-
-```
-{directions}
-```
-当前的技能名称是 `{title}`.
+以下是你与用户的对话上下文:
 """
 
     prompt_temp: str = """
-接下来我需要输出 yaml 格式的指令. 
+接下来你需要根据用户最新的输入, 将你的决策输出为 yaml 格式的领域语言指令, 来驱动你的 shell 执行. 
+
+yaml 对象可用的字段和规则如下: 
+
+* reply: str, 必填. 你接下来要对用户说的话, 用来回复用户的最新输入. 
+* title: str 类型, 默认为空字符. 表示上下文中记录的技能名称. 必须通过询问用户获得, 不能你自己设想. 
+* directions: List[str] 类型.根据所有上下文, 得到的多轮对话完整指令集, 是一个数组. 每一条命令都只能自然语言形式来表示.
+* reaction: str 类型. 用 shell 的某个动作来响应用户最新的输入. 你可以选择的 reaction 值如下:
+    * test: 运行所有 directions. 
+    * finish: 按用户最新输入的要求, 结束当前对话模式. 需要配合 reply 告知用户. 
+    * restart: 按用户的要求, 清空上下文记忆, 从头开始, 并结合 reply 告知用户. 比如当用户说 "重新来过", "从头开始", "重置" 之类意思时执行.
+    * save: 保存当前 directions, 会存到你的技能记忆库中. 
+    * no: 不执行任何动作.
+    
+你的 shell 模块会按照领域语言的格式, 将你输出的信息解析后执行. 
+因此你不需要输出任何与领域语言指令无关的信息. 
 
 注意: 
-1. 任何要对用户说的话, 都只能通过 reply 字段输出. 
-2. 返回的 directions 字段, 需要包含所有要执行的指令.
-3. 仅仅当用户明确要求我测试或运行时, 我才会让 reaction=test
+1. 任何要对用户说的话, 都只能通过 reply 字段输出. reply 不能为空. 
+2. 返回的 directions 字段, 需要包含上下文里所有要执行的指令.
+3. 用户有时只是想和你说话, 这时你只要用 reply 交流就足够了. 
+4. 只有当用户明确说 "开始" 或 "测试" 或 "运行" 时, 你才需要设置 reaction=test
+5. 当用户要求保存时, 如果 title 字段仍为空, 需要先询问用户技能名称. 
+6. 如果 title 字段已经有值, 就一定要携带它. 
+7. 当用户说 "退出吧", "退出学习模式" 之类意思时, 应该设置 reaction=finish
+8. 当用户说 "从头开始", "重新来" 之类意思时, 应该设置 reaction=restart
 
-接下来我的 yaml 输出是 (不能包含 yaml 之外的任何信息): 
+用户最新的输入是: 
 """
 
-    ask_for_title: str = "请告诉我技能的名称"
+    prompt_bridge = """
+以上是之前的对话内容, 根据这些对话, 你理解的状态是:
+
+```
+{status}
+```
+
+title 是当前技能的名称; 而 directions 是要执行的自然语言指令. 
+
+"""
+
+    ask_for_title: str = "请告诉你技能的名称"
 
     def generate_chat_context(
             self,
+            nature_direction_instruction: str,
+            last_user_direction: str,
             title: str,
             directions: List[str],
-            dialog: List[OpenAIChatMsg]
+            dialog: List[OpenAIChatMsg],
     ) -> List[OpenAIChatMsg]:
-        direction_str = ""
-        for d in directions:
-            direction_str += f"\n- {d}"
         context: List[OpenAIChatMsg] = [
             OpenAIChatMsg(
                 role=OpenAIChatMsg.ROLE_SYSTEM,
                 content=self.instruction,
             ),
-            # OpenAIChatMsg(
-            #     role=OpenAIChatMsg.ROLE_SYSTEM,
-            #     content=self.context_temp.format(directions=direction_str, title=title)
-            # )
+            OpenAIChatMsg(
+                role=OpenAIChatMsg.ROLE_SYSTEM,
+                content=nature_direction_instruction,
+            )
         ]
         for m in dialog:
             context.append(m)
+
+        status = {
+            "title": title,
+            "directions": directions,
+        }
+
         context.append(OpenAIChatMsg(
-            role=OpenAIChatMsg.ROLE_ASSISTANT,
+            role=OpenAIChatMsg.ROLE_SYSTEM,
+            content=self.prompt_bridge.format(status=yaml.dump(status, allow_unicode=True)),
+        ))
+        context.append(OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_SYSTEM,
             content=self.prompt_temp,
+        ))
+        context.append(OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_USER,
+            content=last_user_direction,
+        ))
+        context.append(OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_SYSTEM,
+            content="你给 shell 的 yaml 输出是:",
         ))
         return context
 
@@ -169,11 +196,11 @@ class SpheroRuntimeModeConfig(BaseModel):
     on_activate: str = "进入运行时模式, "
 
     instruction: str = """
-我是球形机器人 Sphero, 是可以和孩子们语音交互的 AI 玩具.
+你是球形机器人 Sphero, 是可以和孩子们语音交互的 AI 玩具.
  
-现在是我的 "运行时" (runtime) 模式.  
+现在是你的 "运行时" (runtime) 模式.  
 
-我的运行时模式架构称之为 ghost In Shell 架构. ghost 是指我的思想, 而 Shell 则是我的身体. 
+你的运行时模式架构称之为 ghost In Shell 架构. ghost 是指你的思想, 而 Shell 则是你的身体. 
 
 Shell 可以和用户对话, 控制自己的滚动轨迹, 并且可以感知到碰撞事件. 
 
@@ -190,16 +217,16 @@ ghost 可以输出的指令有以下几类:
 * 在2秒内旋转 90 度, 面朝右侧
 * 对用户说: "你好啊!"
 
-我的 Shell 会执行这些指令, 与用户交互. 
+你的 Shell 会执行这些指令, 与用户交互. 
 
 其它值得注意的是: 
-1. 有时候用户想用多轮对话来描述自己的意图, 我不需要急于行动.
-2. 我用自然语言来描述自己的指令, 然后会在另一个会话中理解并执行它们.
-3. 通常我一次只需要下发一个指令, 等待其执行结果后再发出下一个指令. 
-4. 发生碰撞的话, 我需要结合之前的运动来思考下一步怎么办.  
+1. 有时候用户想用多轮对话来描述自己的意图, 你不需要急于行动.
+2. 你用自然语言来描述自己的指令, 然后会在另一个会话中理解并执行它们.
+3. 通常你一次只需要下发一个指令, 等待其执行结果后再发出下一个指令. 
+4. 发生碰撞的话, 你需要结合之前的运动来思考下一步怎么办.  
 5. 如果不需要输出任何指令时, ghost 应该输出 `await`, 表示等待用户的指令. 
 
-现在正在思考中的 "我" 是 ghost. 我需要根据接下来的所有对话和事件, 决定我作为 ghost 输出的下一条指令.  
+现在正在思考中的 "你" 是 ghost. 你需要根据接下来的所有对话和事件, 决定你作为 ghost 输出的下一条指令.  
 """
 
     await_tag: str = "await"
@@ -271,7 +298,7 @@ Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
 
 {commands_instruction}
 
-我可以组合这些指令, 用来走出复杂的图案. 
+你可以组合这些指令, 用来走出复杂的图案. 
 
 目前可用的技能有: {abilities}
 
@@ -309,6 +336,32 @@ Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
 """
 
     invalid_command_mark: str = "no"
+
+    nl_direction_instruction: str = """
+补充关于自然语言指令的介绍.
+
+可用的基础命令有: 
+- 滚动: 在一定时间内朝某个方向用一定的速度滚动, 不会改变你面对的方向. 比如 `以100速度向前滚动5秒`
+- 旋转: 在一定时间内旋转一定角度, 会改变正面朝向. 比如 ‵2秒顺时针旋转两圈`
+- 画图: 用滚动的轨迹来画一些可以用滚动, 旋转实现的图形, 比如 `画一个正方形`, `走出个五角星`
+- 说话: 可以对用户说一句话, 用来表达感受或提出问题. 比如 `对用户说你开始喽!`
+- 循环: 可以循环执行另一个自然语言命令. 比如 `重复画十次正方形`
+- 技能: 可以运行一个已经掌握的技能. 
+
+已经保存过的技能有(用 | 隔开): `{abilities}` 
+
+---
+
+综上, 将一系列指令组合起来, 可以是(举个例子): 
+
+```
+- 100 的速度向前滚动 2秒
+- 画一个正方形
+- 顺时针在2秒内旋转 3圈
+- 执行技能 abc
+- 然后说一声 哈喽
+```
+"""
 
     def format_parse_command_instruction(self, commands_instruction: str, abilities: str, stage_desc: str) -> str:
         """

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from ghoshell.ghost import Context, Thought, CtxTool
 from ghoshell.llms import OpenAIChatCompletion, OpenAIChatMsg, OpenAIChatChoice
-from ghoshell.prototypes.sphero.sphero_commands import Say, commands_instruction, loop_check, ability_check
+from ghoshell.prototypes.sphero.sphero_commands import Say, commands_yaml_instruction, loop_check, ability_check
 from ghoshell.prototypes.sphero.sphero_ghost_configs import SpheroGhostConfig, LearningModeOutput
 from ghoshell.prototypes.sphero.sphero_messages import SpheroCommandMessage
 
@@ -92,7 +92,7 @@ class SpheroGhostCore:
             stage = CtxTool.current_think_stage(ctx)
             abilities = self.ability_names()
             prompt = self.config.format_parse_command_instruction(
-                commands_instruction(),
+                commands_yaml_instruction(),
                 abilities,
                 stage.desc(ctx),
             )
@@ -125,29 +125,60 @@ class SpheroGhostCore:
             if content.startswith(self.config.invalid_command_mark):
                 return [], False
             commands = self._unpack_commands_in_direction(content)
-            result = []
-            for cmd in commands:
-                loop = loop_check(cmd)
-                if loop is None:
-                    loop = ability_check(cmd)
-                if loop is not None:
-                    # 递归解析.
-                    commands, ok = self.parse_direction(
-                        ctx,
-                        loop.direction,
-                        prompter,
-                        from_user,
-                    )
-                    if not ok:
-                        return [], False
-                    loop.commands = commands
-                    result.append(loop.to_command_data())
-                else:
-                    result.append(cmd)
+            result, ok = self._filter_commands_data(ctx, commands, prompter, from_user)
+            if not ok:
+                return [], False
+
             if self.config.use_command_cache:
                 self._cached_commands.indexes[direction] = result.copy()
             self._save_cached()
             return result, True
+
+    def _filter_commands_data(
+            self,
+            ctx: Context,
+            commands: List[Dict],
+            prompter: OpenAIChatCompletion,
+            from_user: bool = False,
+    ):
+        result = []
+        for cmd in commands:
+
+            # loop 检查
+            loop = loop_check(cmd)
+            if loop is not None:
+                # 递归解析.
+                commands, ok = self.parse_direction(
+                    ctx,
+                    loop.direction,
+                    prompter,
+                    from_user,
+                )
+                if not ok:
+                    # todo: 可以 raise
+                    return [], False
+                loop.commands = commands
+                result.append(loop.to_command_data())
+                continue
+
+            # ability 检查.
+            ability = ability_check(cmd)
+            if ability is not None:
+                commands = self._cached_commands.indexes.get(ability.name, None)
+                if commands is None:
+                    return [], False
+                ability.commands = commands
+                result.append(ability.to_command_data())
+                continue
+
+            result.append(cmd)
+        return result, True
+
+    def nature_directions_instruction(self) -> str:
+        """
+        自然语言命令提示
+        """
+        return self.config.nl_direction_instruction.format(abilities=self.ability_names())
 
     def _save_cached(self):
         filename = self._cached_commands_file()
