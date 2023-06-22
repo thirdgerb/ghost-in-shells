@@ -22,7 +22,9 @@ class UniformResolverLocator(BaseModel):
     # def is_same(self, url: "UniformMindLocator") -> bool:
     #     return (self.ghost == url.ghost or url.ghost == "") and self.Resolver == url.Resolver
     @classmethod
-    def new(cls, resolver: str, stage: str, args: Dict):
+    def new(cls, resolver: str, stage: str = "", args: Dict | None = None):
+        if args is None:
+            args = {}
         return URL(resolver=resolver, stage=stage, args=args)
 
     def copy_with(self, stage: str | None = None, args: Dict | None = None) -> "URL":

@@ -124,3 +124,20 @@ def test_new_with_sub_model():
 
     foo = Foo(foo="foo", bar=dict(zoo="zoo"))
     assert foo.bar.zoo == "zoo"
+
+
+def test_schema():
+    class Foo(BaseModel):
+        foo: str = Field(description="foo")
+
+    schema = Foo.schema()
+    assert len(schema["properties"]) == 1
+    assert schema["properties"]["foo"]["description"] == "foo"
+
+
+def test_validate():
+    class Foo(BaseModel):
+        foo: str = Field(description="foo")
+
+    print("+++++++++++++++++", Foo.validate(dict(foo="foo")))
+    print(Foo.validate(dict(foo=123)))

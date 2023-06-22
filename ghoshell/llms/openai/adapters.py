@@ -147,9 +147,6 @@ class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
                 request["function_call"] = function_call
             resp = openai.ChatCompletion.create(**request)
             resp_dict = resp.to_dict_recursive()
-        except Exception as e:
-            err = e
-            raise e
         finally:
             self._storage.record(request, resp_dict, err)
 

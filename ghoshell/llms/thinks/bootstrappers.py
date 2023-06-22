@@ -4,7 +4,8 @@ import yaml
 
 from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import Bootstrapper
-from ghoshell.prototypes.conversational_ghost.conversational import ConversationalConfig, ConversationalThink
+from ghoshell.llms.thinks.agent import FileAgentMindset
+from ghoshell.llms.thinks.conversational import ConversationalConfig, ConversationalThink
 
 
 class ConversationalThinksBootstrapper(Bootstrapper):
@@ -26,3 +27,18 @@ class ConversationalThinksBootstrapper(Bootstrapper):
                 config = ConversationalConfig(**config_data)
                 think = ConversationalThink(config)
                 mindset.register_think(think)
+
+
+class FileAgentMindsetBootstrapper(Bootstrapper):
+    """
+    基于本地文件实现 agent 的配置.
+    """
+
+    def __init__(self, relative_config_dir="agent_thinks", prefix: str = "agents"):
+        self.relative_config_dir = relative_config_dir
+        self.think_prefix = prefix
+
+    def bootstrap(self, ghost: Ghost):
+        config_path = ghost.config_path.rstrip("/") + "/" + self.relative_config_dir.lstrip("/")
+        mindset = FileAgentMindset(config_path, self.think_prefix)
+        ghost.mindset.register_sub_mindset(mindset)

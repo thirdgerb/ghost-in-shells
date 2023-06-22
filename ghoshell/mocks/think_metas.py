@@ -2,17 +2,17 @@ from typing import Iterator, Optional, Dict, Type
 
 from ghoshell.container import Provider, Container, Contract
 from ghoshell.ghost.mindset import ThinkMeta
-from ghoshell.ghost_fmk import ThinkMetaDriver
+from ghoshell.ghost_fmk import ThinkMetaStorage
 
 
-class ThinkMetaDriverMock(ThinkMetaDriver):
+class ThinkMetaDriverMock(ThinkMetaStorage):
 
     def __init__(self):
         self.__metas = {}
         self.__metas_order = []
 
-    def fetch_local_meta(self, thinking: str, clone_id: str | None) -> Optional[ThinkMeta]:
-        got = self.__metas.get(thinking, None)
+    def fetch_meta(self, think_name: str, clone_id: str | None) -> Optional[ThinkMeta]:
+        got = self.__metas.get(think_name, None)
         return got
 
     def iterate_think_metas(self, clone_id: str | None) -> Iterator[ThinkMeta]:
@@ -31,7 +31,7 @@ class ThinkMetaDriverMockProvider(Provider):
         return True
 
     def contract(self) -> Type[Contract]:
-        return ThinkMetaDriver
+        return ThinkMetaStorage
 
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         return ThinkMetaDriverMock()

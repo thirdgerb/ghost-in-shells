@@ -6,13 +6,13 @@ from ghoshell.ghost_fmk.bootstrapper import FileLoggerBootstrapper, \
     CommandFocusDriverBootstrapper, LLMToolsFocusDriverBootstrapper
 from ghoshell.ghost_fmk.ghost import GhostKernel
 from ghoshell.ghost_fmk.operators import ReceiveInputOperator
-from ghoshell.ghost_fmk.providers import ContextLoggerProvider
+from ghoshell.ghost_fmk.providers import ContextLoggerProvider, LocalThinkMetaStorageProvider
 from ghoshell.llms import LLMTextCompletion, OpenAIChatCompletion
 from ghoshell.llms.openai import OpenAIBootstrapper
+from ghoshell.llms.thinks import ConversationalThinksBootstrapper, FileAgentMindsetBootstrapper
 from ghoshell.mocks.cache import MockCacheProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
-from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
-from ghoshell.prototypes.conversational_ghost import ConversationalThinksBootstrapper
+# from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
 from ghoshell.prototypes.llm_test_ghost import GameUndercoverBootstrapper
 from ghoshell.prototypes.llm_test_ghost import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
 from ghoshell.prototypes.sphero import SpheroGhostBootstrapper
@@ -49,7 +49,11 @@ class MockGhost(GhostKernel):
         CommandFocusDriverBootstrapper(),
         OpenAIBootstrapper(),
 
+        # 使用 llm chat completion 实现的思维
         ConversationalThinksBootstrapper(),
+        # 使用 llm chat completion + function call 实现的思维.
+        FileAgentMindsetBootstrapper(),
+
         LLMConversationalThinkBootstrapper(),
         LLMToolsFocusDriverBootstrapper(),
         # sphero 的逻辑驱动.
@@ -63,23 +67,23 @@ class MockGhost(GhostKernel):
     ]
 
     @classmethod
-    def _depend_contracts(cls) -> List:
-        contracts = super()._depend_contracts()
+    def depending_contracts(cls) -> List:
+        contracts = super().depending_contracts()
         appending = [LLMTextCompletion, OpenAIChatCompletion]
         for i in appending:
             contracts.append(i)
         return contracts
 
     @classmethod
-    def _contracts_providers(cls) -> List[Provider]:
+    def contracts_providers(cls) -> List[Provider]:
         return [
             MockCacheProvider(),
-            ThinkMetaDriverMockProvider(),
+            LocalThinkMetaStorageProvider(),
             # LangChainTestLLMAdapterProvider(),
         ]
 
     @classmethod
-    def _context_providers(cls) -> List[Provider]:
+    def context_providers(cls) -> List[Provider]:
         return [
             ContextLoggerProvider(),
         ]

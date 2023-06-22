@@ -94,7 +94,7 @@ class SpheroGhostCore:
             prompt = self.config.format_parse_command_instruction(
                 commands_yaml_instruction(),
                 abilities,
-                stage.desc(ctx),
+                stage.desc(ctx, None),
             )
             session_id = ctx.input.trace.session_id
             chat_context = [

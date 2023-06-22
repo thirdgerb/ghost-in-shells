@@ -14,14 +14,17 @@ class OpenAIFuncSchema:
     def __init__(self, name: str, desc: str | None = None, parameters_schema: Dict | None = None):
         self.name = name
         self.desc = desc
+        if parameters_schema is None:
+            parameters_schema = BaseModel.schema()
+        if "title" in parameters_schema:
+            del parameters_schema["title"]
         self.parameters_schema = parameters_schema
 
     def dict(self) -> Dict:
         result = {"name": self.name}
         if self.desc is not None:
             result["description"] = self.desc
-        if self.parameters_schema is not None:
-            result["parameters"] = self.parameters_schema
+        result["parameters"] = self.parameters_schema
         return result
 
 
@@ -54,9 +57,13 @@ class OpenAIChatChoice(BaseModel):
     finish_reason: str
 
     def get_function_called(self) -> str | None:
+        if self.message.get("role", None) != OpenAIChatMsg.ROLE_FUNCTION:
+            return None
         return self.message.get("function_call", {}).get("name", None)
 
     def get_function_params(self) -> Dict | None:
+        if self.message.get("role", None) != OpenAIChatMsg.ROLE_FUNCTION:
+            return None
         called = self.message.get("function_call", None)
         if called is None:
             return None
@@ -70,10 +77,14 @@ class OpenAIChatChoice(BaseModel):
     def get_content(self) -> str | None:
         return self.message.get("content", None)
 
-    def as_chat_msg(self) -> OpenAIChatMsg:
+    def as_chat_msg(self) -> OpenAIChatMsg | None:
+        content = self.get_content()
+        role = self.get_role()
+        if content is None or role is None:
+            return None
         return OpenAIChatMsg(
-            role=self.get_role(),
-            content=self.get_content(),
+            role=role,
+            content=content,
         )
 
 

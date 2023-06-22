@@ -3,6 +3,8 @@ from __future__ import annotations
 from logging import Logger
 from typing import Optional, Dict, List, Tuple
 
+from pydantic import ValidationError
+
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.exceptions import MindsetNotFoundException, RuntimeException
 from ghoshell.ghost.mindset import Think, Thought, Stage, Event
@@ -340,6 +342,12 @@ class RuntimeTool:
         并没有执行实例化
         """
         think = ctx.clone.mindset.force_fetch(url.resolver)
+        args_type = think.args_type()
+        if args_type is not None:
+            try:
+                args_type(**url.args)
+            except ValidationError as e:
+                raise RuntimeException(str(e))
         thought = think.new_thought(ctx, url.args)
         return thought
 
@@ -390,8 +398,7 @@ class RuntimeTool:
             tid=tid,
             url=url.dict(),
         )
-        think = CtxTool.force_fetch_think(ctx, url.resolver)
-        thought = think.new_thought(ctx, url.args)
+        thought = cls.new_thought(ctx, url)
         cls.merge_thought_to_task(thought, task)
         return task
 

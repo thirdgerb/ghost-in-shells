@@ -6,10 +6,10 @@ from ghoshell.ghost.runtime import Process
 from ghoshell.messages import Tasked
 
 
-class ThinkMetaDriver(metaclass=ABCMeta):
+class ThinkMetaStorage(metaclass=ABCMeta):
 
     @abstractmethod
-    def fetch_local_meta(self, thinking: str, clone_id: str | None) -> Optional[ThinkMeta]:
+    def fetch_meta(self, think_name: str, clone_id: str | None) -> Optional[ThinkMeta]:
         pass
 
     @abstractmethod

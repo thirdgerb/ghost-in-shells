@@ -131,11 +131,6 @@ class Task(BaseModel):
     # vars: 任务运行中的变量. 保存的时候非指针的信息需要清除掉.
     vars: Dict | None = None
 
-    # 是任务的运行状态. 如果我们把任务理解成一段代码, stage 则指向了代码中的某一行.
-    # 值得注意的是, await_stage 只记录任务中断时的位置, 但 resolver 可能有大量的 stages
-    # 只有会进入 await 状态的 stage 才会记录到这里.
-    await_stage: str = ""
-
     # status: 当前任务在 runtime 中排列用的状态.
     # 用来让 runtime 调度多个同时存在的 tasks
     status: TASK_STATUS = TaskStatus.NEW

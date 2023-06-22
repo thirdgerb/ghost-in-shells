@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Dict, List, AnyStr
+from typing import Optional, Dict, List, AnyStr, Type
 
 from pydantic import BaseModel, Field
 
@@ -46,7 +46,11 @@ class Think(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def description(self, thought: Thought) -> AnyStr:
+    def desc(self, ctx: Context, thought: Thought | None) -> AnyStr:
+        """
+        自我描述
+        thought 存在时允许 desc 变更.
+        """
         pass
 
     @abstractmethod
@@ -57,6 +61,14 @@ class Think(metaclass=ABCMeta):
         用来做隔离, 在设计上决定是全局唯一的任务, 还是会话唯一, 又或是 clone 唯一等等.
         """
         pass
+
+    def args_type(self) -> Type[BaseModel] | None:
+        """
+        如果 think 是有参数的, 可以通过重写这个函数为它定义参数的类型.
+        这样得到 url 时会先用 args_type 对它进行校验.
+        同样也使得 think 本身可以作为一个函数使用, 它的返回结果是 result 方法.
+        """
+        return None
 
     @abstractmethod
     def new_thought(self, ctx: "Context", args: Dict) -> Thought:

@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from typing import Optional, Dict, AnyStr, ClassVar, Tuple
 
-import yaml
-
 from ghoshell.ghost import MindsetNotFoundException, Operator, Reaction, Intention
 from ghoshell.ghost import RuntimeException, TaskLevel
 from ghoshell.ghost import Think, Context, Thought, ThinkMeta, URL, ThinkDriver, DictThought
@@ -192,7 +190,7 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
             driver=SpheroThinkDriver.sphero_driver_name,
         )
 
-    def description(self, thought: Thought) -> AnyStr:
+    def desc(self, ctx: Context, thought: Thought) -> AnyStr:
         return self._config.desc
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:
@@ -389,7 +387,7 @@ class SpheroLearningModeThink(SingleStageThink):
             kind=self._driver.driver_name(),
         )
 
-    def description(self, thought: Thought) -> AnyStr:
+    def desc(self, ctx: Context, thought: Thought) -> AnyStr:
         return self._config.desc
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:
@@ -468,7 +466,7 @@ class SpheroRuntimeModeThink(SingleStageThink):
             kind=self._driver.driver_name(),
         )
 
-    def description(self, thought: Thought) -> AnyStr:
+    def desc(self, ctx: Context, thought: Thought) -> AnyStr:
         return self._config.desc
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:

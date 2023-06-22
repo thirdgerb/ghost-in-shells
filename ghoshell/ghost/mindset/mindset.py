@@ -56,10 +56,8 @@ class Mindset(metaclass=ABCMeta):
     @abstractmethod
     def register_sub_mindset(self, mindset: Mindset) -> None:
         """
-        注册子级 intentions
-        父级里查不到, 就到 sub intentions 里查
-        这样的话, 就可以实现 intentions 的继承和重写.
-        Clone 可以因此拥有和 Ghost 不同的 Mindset
+        注册子级 mindset
+        父级里查不到, 就到 sub mindset 里查
         """
         pass
 
@@ -67,7 +65,12 @@ class Mindset(metaclass=ABCMeta):
     def register_driver(self, driver: ThinkDriver) -> None:
         """
         注册 think 的驱动.
+        deprecated: 似乎没有 sub mindset 的形式好.
         """
+        pass
+
+    @abstractmethod
+    def get_driver(self, driver_name: str) -> ThinkDriver | None:
         pass
 
     @abstractmethod
@@ -76,6 +79,8 @@ class Mindset(metaclass=ABCMeta):
         注册一个 thinking
         当然, Mindset 可以有自己的实现, 从某个配置体系中获取.
         或者合并多个 Mindset.
+
+        deprecated: mindset 可以自己实现特殊配置的读取机制. 不需要用 ThinkMeta 这种形式.
         """
         pass
 

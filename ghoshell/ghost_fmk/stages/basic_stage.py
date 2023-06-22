@@ -5,7 +5,7 @@ from ghoshell.ghost import *
 
 # 为一些最常见的节点提供开发范式.
 
-class AwaitStage(Stage, metaclass=ABCMeta):
+class BasicStage(Stage, metaclass=ABCMeta):
     """
     一个等待节点的实例, 很简单的等待节点.
     作为示范.
@@ -40,19 +40,14 @@ class AwaitStage(Stage, metaclass=ABCMeta):
     def on_activating(self, ctx: "Context", this: Thought, e: Event) -> Operator | None:
         pass
 
-    @abstractmethod
     def on_quiting(self, ctx: "Context", this: Thought, e: OnQuiting) -> Operator | None:
-        pass
+        return None
 
-    @abstractmethod
     def on_canceling(self, ctx: "Context", this: Thought, e: OnCanceling) -> Operator | None:
-        pass
+        return None
 
-    @abstractmethod
     def on_preempt(self, ctx: "Context", this: Thought, e: OnPreempted) -> Operator | None:
-        pass
+        return None
 
     def on_withdrawing(self, ctx: "Context", this: Thought, e: OnWithdrawing) -> Operator | None:
         return None
-
-

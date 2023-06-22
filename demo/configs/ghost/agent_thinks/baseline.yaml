@@ -1,0 +1,8 @@
+# 配置详见 AgentThinkConfig
+desc: 支持函数的多轮对话状态机, 这是基线测试
+instruction: |
+  你是一个对话机器人, 名字叫做 JoJo. 你可以和用户交流任何问题. 默认语言是中文.
+welcome: 你好, 我的名字叫 JoJo, 我们来聊天吧!
+llm_config_name: turbo-16k-0613
+default_stage:
+  name: talk

@@ -207,7 +207,7 @@ class PromptUnitTestThink(Think, Stage):
             kind=PromptUnitTestThinkDriver.driver_name(),
         )
 
-    def description(self, thought: Thought) -> Any:
+    def desc(self, ctx: Context, thought: Thought) -> Any:
         return self.config.index
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:

@@ -17,7 +17,6 @@ class MockRecordStorage(OpenAIRecordStorage):
         data = {
             "req >>>": request,
             "resp >>>": response,
-            "err": str(err) if err is not None else None,
         }
         self.logger.info(yaml.dump(data, allow_unicode=True))
 

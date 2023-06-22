@@ -16,7 +16,7 @@ class Stage(metaclass=ABCMeta):
     Think 作为一个有限状态机, Stage 是它的状态位.
     """
 
-    def desc(self, ctx: Context) -> str:
+    def desc(self, ctx: Context, this: Thought | None) -> str:
         """
         stage 的自我描述, 通常用于 LLM
         """

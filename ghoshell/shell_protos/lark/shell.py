@@ -115,7 +115,7 @@ class LarkShell(ShellKernel):
         )
 
     def kind(self) -> str:
-        return self.config.name if self.config.name else LARK_SHELL_KIND
+        return self.config._name if self.config._name else LARK_SHELL_KIND
 
     def run(self):
         # 注册消息处理

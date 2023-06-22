@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Optional, TYPE_CHECKING
 
-from ghoshell.ghost.exceptions import OperatorException, ErrMessageException
+from ghoshell.ghost.exceptions import OperatorException
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
@@ -69,7 +69,6 @@ class OperationKernel(metaclass=ABCMeta):
         """
         像推倒多米诺骨牌一样, 运行各种算子.
         """
-
         op = initial_op
         try:
             count = 0
@@ -79,11 +78,11 @@ class OperationKernel(metaclass=ABCMeta):
                 count += 1
 
                 # 正式运行.
-                try:
-                    after = op.run(ctx)
-                except ErrMessageException as e:
-                    ctx.send_at(None).err(e.message, e.CODE, at=e.at)
-                    after = ctx.mind(None).rewind()
+                # try:
+                after = op.run(ctx)
+                # except ErrMessageException as e:
+                #     ctx.send_at(None).err(e.message, e.CODE, at=e.at)
+                #     after = ctx.mind(None).rewind()
                 # 检查死循环问题. 每一轮 op 都需要是一个新的 op, 基本要求.
                 if after is op:
                     # todo: 写一个好点的 exception
@@ -92,10 +91,10 @@ class OperationKernel(metaclass=ABCMeta):
                 # 原始 op 销毁.
                 op.destroy()
                 op = after
-        except OperatorException as e:
-            raise e
-        except Exception as e:
-            raise OperatorException(message=str(e), at=str(op), e=e)
+        # except OperatorException as e:
+        #     raise e
+        # except Exception as e:
+        #     raise OperatorException(message=str(e), at=str(op), e=e)
         finally:
             self.save_records()
 

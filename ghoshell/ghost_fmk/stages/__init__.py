@@ -1,5 +1,5 @@
-from ghoshell.ghost_fmk.stages.await_stage import AwaitStage
+from ghoshell.ghost_fmk.stages.basic_stage import BasicStage
 
 __all__ = [
-    "AwaitStage",
+    "BasicStage",
 ]

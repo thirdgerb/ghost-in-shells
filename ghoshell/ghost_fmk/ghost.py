@@ -12,7 +12,7 @@ from ghoshell.ghost import RuntimeException, GhostException
 from ghoshell.ghost_fmk.clone import CloneImpl
 from ghoshell.ghost_fmk.config import GhostConfig
 from ghoshell.ghost_fmk.context import ContextImpl
-from ghoshell.ghost_fmk.contracts import ThinkMetaDriver
+from ghoshell.ghost_fmk.contracts import ThinkMetaStorage
 from ghoshell.ghost_fmk.middleware import CtxMiddleware, ExceptionHandlerMiddleware, CtxPipe, CtxPipeline
 from ghoshell.ghost_fmk.providers import CacheRuntimeDriverProvider, MindsetProvider, FocusProvider, MemoryProvider
 from ghoshell.messages import Input, Output, ErrMsg
@@ -59,7 +59,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         for boot in self.bootstrapper:
             boot.bootstrap(self)
 
-        for depending in self._depend_contracts():
+        for depending in self.depending_contracts():
             if not self._container.bound(depending):
                 raise GhostException(f"ghost depending contract {depending} is not bound")
         return self
@@ -67,38 +67,49 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     def _init_container(self):
         self._container.set(Ghost, self)
         self._container.set(GhostConfig, self._config)
-        for provider in self._ghost_providers():
+
+        for provider in self.ghost_providers():
             self._container.register(provider)
-        for provider in self._contracts_providers():
+
+        for provider in self.contracts_providers():
             self._container.register(provider)
 
     @classmethod
-    def _context_middleware(cls) -> List[CtxMiddleware]:
+    def context_middleware(cls) -> List[CtxMiddleware]:
+        """
+        上下文相关的中间件.
+        """
         return [
             ExceptionHandlerMiddleware(),
         ]
 
     @classmethod
-    def _depend_contracts(cls) -> List:
+    def depending_contracts(cls) -> List:
+        """
+        用来检查容器里是否实现了绑定.
+        """
         return [
             Cache,
-            ThinkMetaDriver,
+            ThinkMetaStorage,
         ]
 
     @classmethod
     @abstractmethod
-    def _contracts_providers(cls) -> List[Provider]:
+    def contracts_providers(cls) -> List[Provider]:
+        """
+        与 Ghost 无关的各种 providers.
+        """
         pass
 
     @classmethod
     @abstractmethod
-    def _context_providers(cls) -> List[Provider]:
+    def context_providers(cls) -> List[Provider]:
         """
-        context 初始化时执行的 providers
+        context 初始化时才执行的 providers
         """
         pass
 
-    def _ghost_providers(self) -> List[Provider]:
+    def ghost_providers(self) -> List[Provider]:
         """
         ghost 启动的时候执行的 providers
         """
@@ -130,7 +141,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         # bound instances
         ctx_container.set(Clone, clone)
         ctx_container.set(Context, ctx)
-        for provider in self._context_providers():
+        for provider in self.context_providers():
             ctx_container.register(provider)
         return ctx
 
@@ -221,7 +232,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         """
         pipes: List[CtxPipe] = []
         # 用 run 方法组成 pipes
-        for m in self._context_middleware():
+        for m in self.context_middleware():
             pipe = m.new(self)
             pipes.append(pipe)
         # 返回 pipeline
@@ -237,7 +248,8 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             # 实例化一个上下文级别的 operator manager.
             # 用于解决 stack overflow 等问题.
             kernel = self.new_operation_kernel()
-            kernel.run_dominos(ctx, kernel.init_operator())
+            op = kernel.init_operator()
+            kernel.run_dominos(ctx, op)
             # 记得随手清空对象, 避免内存泄漏
             kernel.destroy()
             return ctx

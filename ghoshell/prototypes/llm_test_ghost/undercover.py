@@ -589,7 +589,7 @@ class UndercoverGameDemoThink(Think):
     def to_meta(self) -> ThinkMeta:
         return self.driver.to_meta()
 
-    def description(self, thought: Thought) -> Any:
+    def desc(self, ctx: Context, thought: Thought) -> Any:
         """
         描述未来会用到机器人里, 让机器人可以识别各种任务.
         """

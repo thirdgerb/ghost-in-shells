@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost import *
-from ghoshell.ghost_fmk.stages import AwaitStage
+from ghoshell.ghost_fmk.stages import BasicStage
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion
 from ghoshell.messages import *
 
@@ -85,7 +85,7 @@ class ConversationalThought(Thought):
         del self.data
 
 
-class DefaultConversationalStage(AwaitStage):
+class DefaultConversationalStage(BasicStage):
 
     def __init__(
             self,
@@ -238,7 +238,7 @@ class ConversationalThink(Think, ThinkDriver):
             kind=f"{self.driver_name()}",
         )
 
-    def description(self, thought: Thought) -> Any:
+    def desc(self, ctx: Context, thought: Thought) -> Any:
         # todo: 考虑让 AI 自己 description
         return self.config.desc
 

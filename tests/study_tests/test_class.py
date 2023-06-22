@@ -56,3 +56,55 @@ def test_class_name() -> None:
     assert c.name() == Child.__name__
     assert c.name() != Parent.__name__
     assert Parent.__name__ != Child.__name__
+
+
+def test_function_doc():
+    class Foo:
+
+        def foo(self) -> None:
+            """
+            doc
+            """
+            return None
+
+    f = Foo()
+    foo = getattr(f, "foo")
+    assert foo.__doc__.strip() == "doc"
+
+
+def test_method_call():
+    class Foo:
+        def foo(self, bar: str) -> str:
+            """
+            doc
+            """
+            return bar
+
+    f = Foo()
+    # 不需要传入 self.
+    foo = getattr(f, "foo")
+    assert foo("bar") == "bar"
+
+
+def test_func_doc():
+    def foo():
+        """
+        bar
+        """
+        return "foo"
+
+    assert foo.__doc__.strip() == "bar"
+
+
+def test_super_from_abc_class():
+    class Foo:
+        @abc.abstractmethod
+        def foo(self) -> str:
+            return "foo"
+
+    class Bar(Foo):
+        def foo(self) -> str:
+            return super().foo()
+
+    b = Bar()
+    assert b.foo() == "foo"

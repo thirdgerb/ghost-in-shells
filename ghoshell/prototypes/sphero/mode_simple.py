@@ -33,7 +33,7 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
             driver=self._core.config.driver_name,
         )
 
-    def description(self, thought: Thought) -> AnyStr:
+    def desc(self, ctx: Context, thought: Thought) -> AnyStr:
         return self._config.desc
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:

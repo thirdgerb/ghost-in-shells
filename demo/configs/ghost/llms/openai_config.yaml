@@ -16,3 +16,15 @@ chat_completions:
     max_tokens: 3000
     timeout: 25
     request_timeout: 30
+  turbo-0613:
+    model: "gpt-3.5-turbo-0613"
+    temperature: 0.7
+    max_tokens: 3000
+    timeout: 30
+    request_timeout: 25
+  turbo-16k-0613:
+    model: "gpt-3.5-turbo-16k-0613"
+    temperature: 0.7
+    max_tokens: 3000
+    timeout: 30
+    request_timeout: 25

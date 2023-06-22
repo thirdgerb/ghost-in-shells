@@ -2,7 +2,7 @@ from typing import Optional, Any, ClassVar
 
 from ghoshell.ghost import *
 from ghoshell.ghost_fmk.reactions.commands import *
-from ghoshell.ghost_fmk.stages import AwaitStage
+from ghoshell.ghost_fmk.stages import BasicStage
 from ghoshell.messages import *
 
 
@@ -24,7 +24,7 @@ class HelloWorldThink(Think, ThinkDriver):
     def from_meta(self, meta: ThinkMeta) -> "Think":
         return self
 
-    def description(self, thought: Thought) -> Any:
+    def desc(self, ctx: Context, thought: Thought) -> Any:
         return "hello world!"
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:
@@ -45,7 +45,7 @@ class HelloWorldThink(Think, ThinkDriver):
         return None
 
 
-class HelloWorldStage(AwaitStage):
+class HelloWorldStage(BasicStage):
 
     def url(self) -> URL:
         return URL(resolver=HelloWorldThink.name, stage="")

@@ -1,14 +1,18 @@
+import hashlib
+import os
 from typing import Optional, Iterator, List, Dict
+
+import yaml
 
 from ghoshell.ghost import Mindset, Think, Focus
 from ghoshell.ghost.mindset import ThinkMeta, ThinkDriver
-from ghoshell.ghost_fmk.contracts import ThinkMetaDriver  # ThinkMetaDriverProvider
+from ghoshell.ghost_fmk.contracts import ThinkMetaStorage  # ThinkMetaDriverProvider
 
 
 class MindsetImpl(Mindset):
 
-    def __init__(self, driver: ThinkMetaDriver, focus: Focus, clone_id: str | None):
-        self._think_metas_driver = driver
+    def __init__(self, driver: ThinkMetaStorage, focus: Focus, clone_id: str | None):
+        self._think_metas_driver = driver  # 这个 driver 专门用于保存 ThinkMeta. 用于动态存储.
         self._clone_id = clone_id
         self._sub_mindsets: List[Mindset] = []
         self._think_drivers: Dict[str, ThinkDriver] = {}
@@ -24,25 +28,19 @@ class MindsetImpl(Mindset):
         return mindset
 
     def fetch(self, thinking: str) -> Optional[Think]:
-        meta = self._think_metas_driver.fetch_local_meta(thinking, self._clone_id)
+        meta = self.fetch_meta(thinking)
         if meta is not None:
-            think = self._wrap_meta(meta)
-            if think is not None:
-                return think
-        for sub in self._sub_mindsets:
-            think = sub.fetch(thinking)
-            if think is not None:
-                return think
+            return self._wrap_meta(meta)
         return None
 
     def _wrap_meta(self, meta: ThinkMeta) -> Think | None:
-        driver = self._think_drivers.get(meta.kind, None)
+        driver = self.get_driver(meta.kind)
         if driver is None:
             return None
         return driver.from_meta(meta)
 
     def fetch_meta(self, thinking: str) -> Optional[ThinkMeta]:
-        meta = self._think_metas_driver.fetch_local_meta(thinking, self._clone_id)
+        meta = self._think_metas_driver.fetch_meta(thinking, self._clone_id)
         if meta is not None:
             return meta
         for sub in self._sub_mindsets:
@@ -58,6 +56,16 @@ class MindsetImpl(Mindset):
         # 实现得复杂一些, 可以在这里放各种准入机制.
         key = driver.driver_name()
         self._think_drivers[key] = driver
+
+    def get_driver(self, driver_name: str) -> ThinkDriver | None:
+        if driver_name in self._think_drivers:
+            return self._think_drivers[driver_name]
+        for sub in self._sub_mindsets:
+            driver = sub.get_driver(driver_name)
+            if driver is not None:
+                self._think_drivers[driver_name] = driver
+                return driver
+        return None
 
     def foreach_think(self) -> Iterator[Think]:
         names = set()
@@ -95,34 +103,49 @@ class MindsetImpl(Mindset):
             del self._think_drivers
             del self._sub_mindsets
 
-#
-# class MockThinkMetaDriver(ThinkMetaDriver):
-#     """
-#     基于 dict 实现的 mind set.
-#     显然, 只能作为 demo 使用.
-#     真实的 intentions 应该要实现分布式配置中心.
-#     """
-#
-#     def __init__(self):
-#         self._local_metas: Dict[str, ThinkMeta] = {}
-#         super().__init__()
-#
-#     def with_clone_id(self, clone_id: str) -> "ThinkMetaDriver":
-#         return self
-#
-#     def fetch_local_meta(self, thinking: str) -> Optional[ThinkMeta]:
-#         return self._local_metas.get(thinking, None)
-#
-#     def foreach_local_think_metas(self) -> Iterator[ThinkMeta]:
-#         for key in self._local_metas:
-#             meta = self._local_metas[key]
-#             yield meta
-#
-#     def register_meta(self, meta: ThinkMeta) -> None:
-#         self._local_metas[meta.url.resolver] = meta
-#
-#
-# class MockThinkMetaDriverProvider(ThinkMetaDriverProvider):
-#
-#     def factory(self, con: Container) -> ThinkMetaDriver | None:
-#         return MockThinkMetaDriver()
+
+class LocalFileThinkMetaStorage(ThinkMetaStorage):
+    """
+    基于本地文件的 think meta storage
+    """
+
+    def __init__(self, dirname: str):
+        self.dirname = dirname
+        self._cached_metas: Dict[str, ThinkMeta | None] = {}
+        self._cached_filename_2_think: Dict[str, str] = {}
+
+    def fetch_meta(self, think_name: str, clone_id: str | None) -> Optional[ThinkMeta]:
+        if think_name in self._cached_metas:
+            return self._cached_metas[think_name]
+        filename = self._make_filename(think_name)
+        if not os.path.exists(filename):
+            self._cached_metas[think_name] = None
+            return None
+        return self._get_meta_by_filename(filename)
+
+    def _get_meta_by_filename(self, filename) -> ThinkMeta:
+        if filename in self._cached_filename_2_think:
+            think_name = self._cached_filename_2_think[filename]
+            return self._cached_metas.get(think_name)
+        with open(filename) as f:
+            data = yaml.safe_load(f)
+            meta = ThinkMeta(**data)
+            self._cached_metas[meta.id] = meta
+            self._cached_filename_2_think[filename] = meta.id
+            return meta
+
+    def _make_filename(self, think_name: str):
+        basename = hashlib.md5(think_name.encode()).hexdigest()
+        return self.dirname.rstrip("/") + "/" + basename + ".yaml"
+
+    def iterate_think_metas(self, clone_id: str | None) -> Iterator[ThinkMeta]:
+        for root, ds, fs in os.walk(self.dirname):
+            for fullname in fs:
+                filename = self.dirname.rstrip("/") + "/" + fullname
+                yield self._get_meta_by_filename(filename)
+
+    def register_meta(self, meta: ThinkMeta, clone_id: str | None) -> None:
+        self._cached_metas[meta.id] = meta
+        filename = self._make_filename(meta.id)
+        with open(filename, 'w') as f:
+            yaml.safe_dump(meta.dict(), f, allow_unicode=True)
