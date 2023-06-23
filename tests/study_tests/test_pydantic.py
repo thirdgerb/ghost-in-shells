@@ -133,11 +133,3 @@ def test_schema():
     schema = Foo.schema()
     assert len(schema["properties"]) == 1
     assert schema["properties"]["foo"]["description"] == "foo"
-
-
-def test_validate():
-    class Foo(BaseModel):
-        foo: str = Field(description="foo")
-
-    print("+++++++++++++++++", Foo.validate(dict(foo="foo")))
-    print(Foo.validate(dict(foo=123)))

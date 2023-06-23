@@ -6,3 +6,6 @@ welcome: 你好, 我的名字叫 JoJo, 我们来聊天吧!
 llm_config_name: turbo-16k-0613
 default_stage:
   name: talk
+  thinks_as_func:
+    # 加入多轮对话询问天气的能力.
+    - agents/ask_weather|ask_weather

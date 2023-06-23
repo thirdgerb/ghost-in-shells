@@ -52,6 +52,14 @@ class MindsetNotFoundException(GhostException):
     CODE: int = 404
 
 
+class LogicException(GhostException):
+    """
+    设计错误.
+    """
+
+    CODE: int = 600
+
+
 class RuntimeException(GhostException):
     """
     致命错误, 系统应该重置所有的思维.

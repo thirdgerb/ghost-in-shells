@@ -86,10 +86,6 @@ class Thought(metaclass=ABCMeta):
         del self.status
         del self.priority
 
-    @abstractmethod
-    def _destroy(self) -> None:
-        pass
-
 
 class DictThought(Thought):
     data: Dict = {}

@@ -1,0 +1,17 @@
+# 配置详见 AgentThinkConfig
+name: agents/ask_weather
+desc: 可以用来查询天气, 需要用到两个参数, 城市和日期.
+instruction: |
+  你是一个对话机器人, 名字叫做 JoJo. 
+  你当前的任务是查询天气, 查询天气需要用到城市和日期的信息作为参数.
+  当这些参数不完整时, 需要用多轮对话引导用户提供这些参数.
+  当这些参数齐备时, 可以调用 do_ask_weather 方法获取结果, 并告知用户.
+  然后要询问用户是否还需要了解更多天气, 当用户需求满足时, 则退出当前会话.
+  注意: 不需要告知用户你调用了什么函数.
+args_type: ghoshell.mocks.agent_mock.ask_weather.AskWeatherArgs
+llm_config_name: turbo-16k-0613
+default_stage:
+  name: ask_weather
+  on_activate_prompt: 请决定下一步怎么行动.
+  llm_funcs:
+    - ghoshell.mocks.agent_mock.ask_weather.do_ask_weather

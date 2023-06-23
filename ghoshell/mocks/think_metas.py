@@ -6,6 +6,10 @@ from ghoshell.ghost_fmk import ThinkMetaStorage
 
 
 class ThinkMetaDriverMock(ThinkMetaStorage):
+    """
+    测试的 think meta storage.
+    deprecated.
+    """
 
     def __init__(self):
         self.__metas = {}

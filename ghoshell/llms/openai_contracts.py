@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from abc import ABCMeta, abstractmethod
 from typing import List, Dict, ClassVar
 
@@ -35,13 +36,13 @@ class OpenAIChatMsg(BaseModel):
     ROLE_FUNCTION: ClassVar[str] = "function"
 
     role: str = Field(enum={"system", "user", "assistant", "function"})
-    content: str | None = None
     name: str | None = None
+    content: str | None = None
 
     function_call: Dict | None = None
 
     def to_message(self) -> Dict:
-        data = self.dict(include={"role", "content", "name"})
+        data = self.dict(include={"role", "content", "name", "function_call"})
         result = {}
         for key in data:
             value = data[key]
@@ -51,25 +52,20 @@ class OpenAIChatMsg(BaseModel):
         return result
 
 
+class OpenAIFuncCalled(BaseModel):
+    # function name
+    name: str
+    # arguments json
+    arguments: Dict
+
+
 class OpenAIChatChoice(BaseModel):
     index: int
     message: Dict
     finish_reason: str
 
-    def get_function_called(self) -> str | None:
-        if self.message.get("role", None) != OpenAIChatMsg.ROLE_FUNCTION:
-            return None
-        return self.message.get("function_call", {}).get("name", None)
-
-    def get_function_params(self) -> Dict | None:
-        if self.message.get("role", None) != OpenAIChatMsg.ROLE_FUNCTION:
-            return None
-        called = self.message.get("function_call", None)
-        if called is None:
-            return None
-        params = self.message.copy()
-        del (params["function_call"])
-        return params
+    def get_function_called(self) -> Dict | None:
+        return self.message.get("function_call", None)
 
     def get_role(self) -> str | None:
         return self.message.get("role", None)
@@ -77,10 +73,20 @@ class OpenAIChatChoice(BaseModel):
     def get_content(self) -> str | None:
         return self.message.get("content", None)
 
+    def as_func_called(self) -> OpenAIFuncCalled | None:
+        called = self.get_function_called()
+        if called is None:
+            return None
+        arguments = called.get("arguments")
+        return OpenAIFuncCalled(
+            name=called.get("name"),
+            arguments=json.loads(arguments),
+        )
+
     def as_chat_msg(self) -> OpenAIChatMsg | None:
         content = self.get_content()
         role = self.get_role()
-        if content is None or role is None:
+        if content is None or role == OpenAIChatMsg.ROLE_FUNCTION:
             return None
         return OpenAIChatMsg(
             role=role,
@@ -104,7 +110,7 @@ class OpenAIChatCompletion(metaclass=ABCMeta):
             session_id: str,
             chat_context: List[OpenAIChatMsg],
             functions: List[OpenAIFuncSchema] | None = None,
-            function_call: str = "none",
+            function_call: str = "",
             config_name: str = "",  # 选择哪个预设的配置
     ) -> OpenAIChatChoice:
         pass

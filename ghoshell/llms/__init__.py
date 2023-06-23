@@ -13,6 +13,7 @@ __all__ = [
     "OpenAIChatMsg",
     "OpenAIChatCompletion",
     "OpenAIFuncSchema",
+    "OpenAIFuncCalled",
 
     # langchain: deprecated
     "LangChainTestLLMAdapterProvider",

@@ -159,7 +159,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         except GhostException as e:
             return [self._failure_message(_input=inpt, err=e)]
         except Exception as e:
-            ex = GhostException(message=e.__repr__())
+            ex = GhostException("unexpected ghost err", e=e)
             return [self._failure_message(_input=inpt, err=ex)]
         finally:
             # todo: handle exception

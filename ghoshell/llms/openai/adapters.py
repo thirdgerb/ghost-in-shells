@@ -142,9 +142,19 @@ class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
             for msg in chat_context:
                 messages.append(msg.to_message())
             request["messages"] = messages
+
+            # functions
             if functions:
                 request["functions"] = [func.dict() for func in functions]
-                request["function_call"] = function_call
+
+            # function_call
+            if function_call:
+                request["function_call"] = {"name": function_call}
+            elif functions:
+                request["function_call"] = "auto"
+            else:
+                request["function_call"] = "none"
+
             resp = openai.ChatCompletion.create(**request)
             resp_dict = resp.to_dict_recursive()
         finally:

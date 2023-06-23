@@ -568,7 +568,7 @@ class UnhandledInputOperator(AbsOperator):
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         awaiting_task = RuntimeTool.fetch_current_task(ctx)
         #  让 current 对话任务来做兜底
-        after = self._fallback_to_task(ctx, awaiting_task)
+        after = self._task_on_received(ctx, awaiting_task)
         if after is not None:
             return after
         # 让 root 级别的对话任务来做兜底.
@@ -583,10 +583,11 @@ class UnhandledInputOperator(AbsOperator):
         return None
 
     @classmethod
-    def _fallback_to_task(cls, ctx: "Context", task: Task) -> Optional[Operator]:
+    def _task_on_received(cls, ctx: "Context", task: Task) -> Optional[Operator]:
         # 当前任务.  fallback
         event = OnReceived(task.tid, task.url.stage, None)
-        return RuntimeTool.fire_event(ctx, event)
+        op = RuntimeTool.fire_event(ctx, event)
+        return op
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         # 装作没听懂.

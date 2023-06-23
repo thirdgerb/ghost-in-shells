@@ -108,3 +108,23 @@ def test_super_from_abc_class():
 
     b = Bar()
     assert b.foo() == "foo"
+
+
+def test_method_decorator():
+    def maker(zoo: str):
+        def decorator(method):
+            def caller(obj, bar: str):
+                return method(obj, bar) + zoo
+
+            return caller
+
+        return decorator
+
+    class Foo:
+
+        @maker("zoo")
+        def foo(self, bar: str) -> str:
+            return bar
+
+    f = Foo()
+    assert f.foo("bar_") == "bar_zoo"

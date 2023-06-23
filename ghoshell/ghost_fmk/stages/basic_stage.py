@@ -15,21 +15,17 @@ class BasicStage(Stage, metaclass=ABCMeta):
         if isinstance(event, OnActivating):
             return self.on_activating(ctx, this, event)
         if isinstance(event, OnReceived):
-            received = self.on_received(ctx, this, event)
-            if received is None:
-                return ctx.mind(this).awaits()
+            op = self.on_received(ctx, this, event)
+            return ctx.mind(this).awaits() if op is None else op
         if isinstance(event, OnCanceling):
             op = self.on_canceling(ctx, this, event)
-            if op is None:
-                return self.on_withdrawing(ctx, this, event)
+            return self.on_withdrawing(ctx, this, event) if op is None else op
         if isinstance(event, OnQuiting):
             op = self.on_quiting(ctx, this, event)
-            if op is None:
-                return self.on_withdrawing(ctx, this, event)
+            return self.on_withdrawing(ctx, this, event) if op is None else op
         if isinstance(event, OnPreempted):
             op = self.on_preempt(ctx, this, event)
-            if op is None:
-                return self.on_activating(ctx, this, event)
+            return self.on_activating(ctx, this, event) if op is None else op
         return None
 
     @abstractmethod
@@ -50,4 +46,7 @@ class BasicStage(Stage, metaclass=ABCMeta):
         return None
 
     def on_withdrawing(self, ctx: "Context", this: Thought, e: OnWithdrawing) -> Operator | None:
+        """
+        公共的异常拦截事件.
+        """
         return None

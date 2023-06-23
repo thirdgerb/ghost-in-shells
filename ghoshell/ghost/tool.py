@@ -271,6 +271,7 @@ class RuntimeTool:
 
         # 保存 task 变更后的状态.
         cls.store_task(ctx, task)
+
         # 帮助 python 做 gc 的准备工作.
         thought.destroy()
         event.destroy()

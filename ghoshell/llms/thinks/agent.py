@@ -6,10 +6,11 @@ from typing import Dict, List, Callable, Type, Optional, AnyStr, Iterator
 import yaml
 from pydantic import BaseModel, Field
 
+from ghoshell.ghost import LogicException
 from ghoshell.ghost import Think, Event, OnReceived, CtxTool, Stage, ThinkMeta, Reaction, Intention, ThinkDriver, Focus
 from ghoshell.ghost import Thought, Operator, Context, URL, Mindset
 from ghoshell.ghost_fmk.stages import BasicStage
-from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion, OpenAIFuncSchema
+from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion, OpenAIFuncSchema, OpenAIFuncCalled
 from ghoshell.messages import Text
 from ghoshell.utils import import_module_value
 
@@ -26,7 +27,23 @@ class AgentStageConfig(BaseModel):
     name: str
 
     # prompt 所用的系统提示. role==system, 会在对话记录最前面.
+    # 如果为空的话, 会复用 AgentThinkConfig.instruction
     instruction: str = ""
+
+    # 调用大模型时是否有指定的 config
+    llm_config_name: str = ""
+
+    # 启动时是否要使用一个 prompt 来引导对话. 让 Ghost 自己决定如何回应用户.
+    # 这个 prompt 也会调用 function
+    # 如果为空的话, 不会调用.
+    on_activate_prompt: str = ""
+
+    # 当前状态对用户的引导用语. 在 on_activate_prompt 不存在时, 可以给 Ghost 设计固定的话术.
+    on_activate_text: str = ""
+
+    # 接受到消息时默认的 prompt.
+    # 如果这个 prompt 为空, 则会用 on_activate_prompt
+    on_receive_prompt: str = ""
 
     # 类名.
     class_name: str = ""
@@ -38,11 +55,11 @@ class AgentStageConfig(BaseModel):
     llm_funcs: List[str] = Field(default_factory=list)
 
     # 使用类的方法作为函数, 方法必须存在, 并且通过 llm_func_decorator 封装过.
-    methods_as_funcs: List[str] = Field(default_factory=lambda: [
-        "op_finish",
-        "op_restart",
-        "op_cancel",
-    ])
+    methods_as_funcs: Dict[str, str | None] = Field(default_factory=lambda: {
+        "op_finish": None,
+        "op_restart": None,
+        "op_cancel": None,
+    })
 
     # 将其它状态位作为 func 引用. stage_name 就是方法名.
     # 如果需要取一个别名, 则用 : 隔开. 比如 `stage_name:func_alias`
@@ -53,17 +70,7 @@ class AgentStageConfig(BaseModel):
     thinks_as_func: List[str] = Field(default_factory=list)
 
     # openai chat completion 的 func call 字段.
-    default_func_call: str = "auto"
-
-    # 调用大模型时是否有指定的 config
-    llm_config_name: str = ""
-
-    # 启动时是否要使用一个 prompt 来引导对话. 这个 prompt 也会调用 function
-    # 如果为空的话, 不会调用.
-    initial_prompt: str = ""
-
-    # 接受到消息时默认的 prompt.
-    on_receive_prompt: str = ""
+    default_func_call: str = ""
 
     extra: Dict = Field(default_factory=lambda: {})
 
@@ -169,9 +176,6 @@ class AgentThought(Thought):
         data = self.data.dict()
         return data
 
-    def _destroy(self) -> None:
-        del self.data
-
 
 # ----- functions ----- #
 
@@ -193,7 +197,7 @@ class LLMFunc(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def call(self, ctx: Context, this: Thought, params: Dict | None) -> Operator | None:
+    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
         pass
 
 
@@ -206,13 +210,13 @@ class MethodAsFunc(LLMFunc):
             self,
             name: str,  # 对于 LLM 而言的方法名
             desc: str,  # 对于 LLM 的描述
-            caller: LLMCallable,  # 可运行的方法.
-            params_type: Type[BaseModel] | None,  # 参数类型. 用 BaseModel 来处理.
+            method: LLMCallable,  # 可运行的方法.
+            args_type: Type[BaseModel] | None,  # 参数类型. 用 BaseModel 来处理.
     ):
         self._name = name
         self._desc = desc
-        self._caller = caller
-        self._params_type = params_type
+        self._method = method
+        self._params_type = args_type
 
     def name(self) -> str:
         return self._name
@@ -224,14 +228,14 @@ class MethodAsFunc(LLMFunc):
             parameters_schema=self._params_type.schema() if self._params_type is not None else None
         )
 
-    def call(self, ctx: Context, this: Thought, params: Dict | None) -> Operator | None:
+    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
         """
         支持被大模型的返回结果调用这个方法.
         """
         wrapped_params = None
         if self._params_type is not None:
-            wrapped_params = self._params_type(**params) if params is not None else self._params_type()
-        return self._caller(ctx, this, wrapped_params)
+            wrapped_params = self._params_type(**arguments) if arguments else self._params_type()
+        return self._method(ctx, this, wrapped_params)
 
 
 class RedirectFunc(LLMFunc):
@@ -259,11 +263,11 @@ class RedirectFunc(LLMFunc):
             parameters_schema=args_type.schema() if args_type else None,
         )
 
-    def call(self, ctx: Context, this: Thought, params: Dict | None) -> Operator | None:
+    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
         """
         跳转到另一个会话.
         """
-        url = URL.new(resolver=self._think, args=params)
+        url = URL.new(resolver=self._think, args=arguments.copy())
         return ctx.mind(this).redirect(url)
 
 
@@ -290,16 +294,16 @@ class StageAsFunc(LLMFunc):
             desc=stage.desc(ctx, this),
         )
 
-    def call(self, ctx: Context, this: Thought, params: Dict | None) -> Operator | None:
+    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
         return ctx.mind(this).forward(self._stage)
 
 
 # ----- decorators ----- #
 
-def llm_func_decorator(
+def agent_func_decorator(
         name: str,
-        params_type: BaseModel | None = None,
         desc: str = "",  # desc 为空, 则会用方法的 __doc__ 作为 desc
+        params_type: Type[BaseModel] | None = None,
 ) -> Callable[[LLMCallable], LLMFunc]:
     """
     decorator, 将一个方法封装成一个 LLM 函数
@@ -309,8 +313,8 @@ def llm_func_decorator(
         return MethodAsFunc(
             name=name,
             desc=desc if desc else method.__doc__.strip(),
-            caller=method,
-            params_type=params_type,
+            method=method,
+            args_type=params_type,
         )
 
     return decorator
@@ -345,6 +349,22 @@ class AgentThink(Think, Stage):
 
     def __init__(self, config: AgentThinkConfig):
         self.config = config
+        self._validate_config()
+
+    def _validate_config(self):
+        stages = set()
+        stages.add("")
+        if self.config.default_stage:
+            name = self.config.default_stage.name
+            if name in stages:
+                raise LogicException(f"duplicated stage name {name}")
+            stages.add(name)
+        if self.config.stages:
+            for config in self.config.stages:
+                name = config.name
+                if name in stages:
+                    raise LogicException(f"duplicated stage name {name}")
+                stages.add(name)
 
     def url(self) -> URL:
         return URL.new(resolver=self.config.name)
@@ -370,7 +390,7 @@ class AgentThink(Think, Stage):
 
     @abstractmethod
     def result(self, ctx: Context, this: Thought) -> Optional[Dict]:
-        pass
+        return None
 
     def all_stages(self) -> List[str]:
         stage_names = {stage_config.name for stage_config in self.config.stages}
@@ -395,6 +415,9 @@ class AgentThink(Think, Stage):
         if not config.llm_config_name:
             # 默认每个 stage 使用的 llm config name 都和 think 的一致.
             config.llm_config_name = self.config.llm_config_name
+
+        if not config.instruction:
+            config.instruction = self.config.instruction
 
         if config.class_name:
             wrapper = import_module_value(config.class_name)
@@ -451,8 +474,12 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         当前 stage 启动时的动作.
         给出一个默认的实现.
         """
-        if self.config.initial_prompt:
-            return self.call_llm_with_funcs(ctx, this, self.config.initial_prompt)
+        # 默认用 prompt 来驱动 ghost 主动采取行动.
+        if self.config.on_activate_prompt:
+            return self.call_llm_with_funcs(ctx, this, self.config.on_activate_prompt)
+        # 否则尝试用固定的话术.
+        if self.config.on_activate_text:
+            this.say(ctx, self.config.on_activate_text)
         return ctx.mind(this).awaits()
 
     @abstractmethod
@@ -478,7 +505,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         this.say(ctx, message)
         return ctx.mind(this).awaits()
 
-    def on_llm_null_resp(self, ctx: Context, this: AgentThought) -> Operator:
+    def on_llm_text_resp(self, ctx: Context, this: AgentThought) -> Operator:
         """
         llm 没有返回任何有效结果时 (很可能由于 prompt 自身导致?), 采取的行动.
         """
@@ -512,12 +539,21 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         if self.config.methods_as_funcs:
             for method_name in self.config.methods_as_funcs:
                 method = getattr(self, method_name)
-                if isinstance(method, LLMFunc):
-                    funcs.append(method)
+                args_type_import = self.config.methods_as_funcs[method_name]
+                if args_type_import:
+                    args_type = import_module_value(args_type_import)
+                else:
+                    args_type = None
+                funcs.append(MethodAsFunc(
+                    name=method_name,
+                    desc=method.__doc__.strip(),
+                    method=method,
+                    args_type=args_type,
+                ))
 
         if self.config.stages_as_func:
             for stage in self.config.stages_as_func:
-                parts = stage.split(":")
+                parts = stage.split("|")
                 stage_name = parts[0]
                 func_name = parts[1] if len(parts) > 1 else stage_name
                 if func_name in done:
@@ -528,7 +564,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
 
         if self.config.thinks_as_func:
             for think in self.config.thinks_as_func:
-                parts = think.split(":")
+                parts = think.split("|")
                 think_name = parts[0]
                 func_name = parts[1] if len(parts) > 1 else think_name
                 if func_name in done:
@@ -568,13 +604,13 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
             chat_context.append(
                 OpenAIChatMsg(
                     role=OpenAIChatMsg.ROLE_SYSTEM,
-                    content="args schema: " + json.dumps(args_type.schema())
+                    content="args schema: " + json.dumps(args_type.schema(), ensure_ascii=True)
                 )
             )
             chat_context.append(
                 OpenAIChatMsg(
                     role=OpenAIChatMsg.ROLE_SYSTEM,
-                    content="args: " + json.dumps(this.url.args)
+                    content="args: " + json.dumps(this.url.args, ensure_ascii=True)
                 )
             )
 
@@ -611,54 +647,50 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         # 如果是一般的消息, 走消息处理.
         msg = choice.as_chat_msg()
         if msg is not None:
-            return self.on_llm_text_message(ctx, this, msg.content)
+            this.say(ctx, msg.content)
 
         # 如果返回值是 函数, 走函数处理.
-        called = choice.get_function_called()
+        called = choice.as_func_called()
         if called is not None:
-            params = choice.get_function_params()
-            return self.call_llm_func(ctx, this, called, params)
-        op = self.on_llm_null_resp(ctx, this)
-        return op
+            # 需要考虑异步场景如何解决....
+            return self.call_llm_func(ctx, this, called)
+        return self.on_llm_text_resp(ctx, this)
 
     def call_llm_func(
             self,
             ctx: Context,
             this: AgentThought,
-            called: str | None,
-            params: Dict | None,
+            called: OpenAIFuncCalled,
     ) -> Operator:
         """
         运行一个 method.
         """
         mapping = {fn.name(): fn for fn in self.llm_funcs()}
-        if called not in mapping:
-            return self.on_llm_null_resp(ctx, this)
-        fn: LLMFunc = mapping[called]
-        op = fn.call(ctx, this, params)
+        called_name = called.name
+        if called_name not in mapping:
+            return self.on_llm_text_resp(ctx, this)
+        fn: LLMFunc = mapping[called_name]
+        op = fn.call(ctx, this, called.arguments)
         # 如果方法返回了任何信息, 就继续.
         if op is not None:
             return op
         return self.after_func_called(ctx, this)
 
-    @llm_func_decorator("op_finish")
     def op_finish(self, ctx: Context, this: AgentThought, params: None) -> Operator | None:
         """
-        finish current task
+        系统指令: 当前任务的目的已完成, 结束当前任务.
         """
         return ctx.mind(this).finish()
 
-    @llm_func_decorator("op_restart")
     def op_restart(self, ctx: Context, this: AgentThought, params: None) -> Operator | None:
         """
-        clear dialog context, restart conversation
+        系统指令: 重新开始当前进行中的任务
         """
         return ctx.mind(this).restart()
 
-    @llm_func_decorator("op_cancel")
     def op_cancel(self, ctx: Context, this: AgentThought, params: None) -> Operator | None:
         """
-        cancel current task
+        系统指令: 取消当前进行中的任务.
         """
         return ctx.mind(this).cancel()
 
@@ -672,11 +704,15 @@ class DefaultAgentStage(AgentStage):
         text = ctx.read(Text)
         if text is not None:
             this.data.add_user_message(text.content)
-            return self.call_llm_with_funcs(ctx, this, self.config.on_receive_prompt)
+            on_receive_prompt = self.config.on_receive_prompt
+            if not on_receive_prompt:
+                on_receive_prompt = self.config.on_activate_prompt
+            op = self.call_llm_with_funcs(ctx, this, on_receive_prompt)
+            return op
         return ctx.mind(this).rewind()
 
     def after_func_called(self, ctx: Context, this: AgentThought) -> Operator:
-        return ctx.mind(this).repeat()
+        return ctx.mind(this).awaits()
 
     def intentions(self, ctx: Context) -> List[Intention] | None:
         return None
