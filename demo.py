@@ -47,7 +47,7 @@ def run_console_shell():
     run console shell with local demo ghost
     """
     container = root_container
-    config_path = "/".join([root_path, "configs", "console_shell"])
+    config_path = "/".join([root_path, "configs", "shells/console"])
     runtime_path = "/".join([root_path, "runtime"])
     # 分享相同的 path.
     shell = ConsoleShell(container, config_path, runtime_path)
@@ -59,7 +59,7 @@ def run_sphero_shell():
     run console shell with local demo ghost
     """
     container = root_container
-    config_path = "/".join([root_path, "configs", "sphero_shell"])
+    config_path = "/".join([root_path, "configs", "shells/sphero"])
     runtime_path = "/".join([root_path, "runtime"])
     # 分享相同的 path.
     shell = SpheroBoltShell(container, config_path, runtime_path)
@@ -68,7 +68,7 @@ def run_sphero_shell():
 
 def run_speech_shell():
     container = root_container
-    config_path = "/".join([root_path, "configs", "baidu_speech_shell"])
+    config_path = "/".join([root_path, "configs", "shells/baidu_speech"])
     runtime_path = "/".join([root_path, "runtime"])
     shell = BaiduSpeechShell(container, config_path, runtime_path)
     shell.bootstrap().run_as_app()

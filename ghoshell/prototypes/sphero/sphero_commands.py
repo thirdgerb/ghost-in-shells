@@ -124,6 +124,34 @@ class Spin(SpheroCommand):
         return False
 
 
+class LambdaSay(SpheroCommand):
+    method = "lambda_say"
+    func: str
+
+    @classmethod
+    def yaml_desc(cls) -> str:
+        return """
+    * say: 用我的声音模块说话. 参数如下
+        * func: 用 python lambda 函数返回要说的话. 比如 `lambda: "你好啊!"` 
+    """
+
+    def plan_desc(self) -> str:
+        text = self._get_text()
+        return f"计划对用户说: {text}"
+
+    def _get_text(self) -> str:
+        fn = eval(self.func)
+        return fn()
+
+    def _run_frame(self, kernel: SpheroKernel, at: float):
+        if self.ran_frames_count == 0:
+            text = self._get_text()
+            kernel.api.set_main_led(Color(0, 0, 200))
+            kernel.speak(text)
+        kernel.api.clear_matrix()
+        return False
+
+
 class Say(SpheroCommand):
     """
     说话
@@ -332,6 +360,7 @@ defined_commands: [Type[SpheroCommand]] = {cmd.method: cmd for cmd in [
     Stop,
     Say,
     Loop,
+    LambdaSay,
     # RoundRoll,
     LambdaRoll,
     Ability,

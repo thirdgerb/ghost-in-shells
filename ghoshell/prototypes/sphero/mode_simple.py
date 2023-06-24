@@ -57,7 +57,6 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
         }
 
     def on_activate(self, ctx: "Context", this: Thought) -> Operator | None:
-        self._core.say(ctx, this, self._config.on_activate)
         return ctx.mind(this).awaits()
 
     def on_received(self, ctx: "Context", this: Thought) -> Operator | None:
@@ -65,9 +64,8 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
         if text is None or text.is_empty():
             return ctx.mind(this).rewind()
 
-        prompter = self._core.get_prompter(ctx)
         message = SpheroCommandMessage()
-        commands, ok = self._core.parse_direction(ctx, text.content, prompter, True)
+        commands, ok = self._core.parse_direction(ctx, text.content)
         if not ok:
             ctx.send_at(this).err(self._core.config.unknown_order)
             return ctx.mind(this).rewind()

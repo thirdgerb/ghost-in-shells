@@ -4,11 +4,10 @@ from typing import Dict, List, Tuple
 import yaml
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost import Context, Thought, CtxTool
+from ghoshell.ghost import Context, CtxTool
 from ghoshell.llms import OpenAIChatCompletion, OpenAIChatMsg, OpenAIChatChoice
 from ghoshell.prototypes.sphero.sphero_commands import Say, commands_yaml_instruction, loop_check, ability_check
 from ghoshell.prototypes.sphero.sphero_ghost_configs import SpheroGhostConfig, LearningModeOutput
-from ghoshell.prototypes.sphero.sphero_messages import SpheroCommandMessage
 
 
 class SpheroCommandsCache(BaseModel):
@@ -60,11 +59,6 @@ class SpheroGhostCore:
     def get_prompter(cls, ctx: Context) -> OpenAIChatCompletion:
         return ctx.container.force_fetch(OpenAIChatCompletion)
 
-    @classmethod
-    def say(cls, ctx: Context, this: Thought, text: str) -> None:
-        msg = SpheroCommandMessage.new(Say(text=text))
-        ctx.send_at(this).output(msg)
-
     def cache_command(self, command_name: str, commands: List[Dict], is_ability: bool) -> None:
         self._cached_commands.indexes[command_name] = commands.copy()
         if is_ability:
@@ -78,13 +72,12 @@ class SpheroGhostCore:
     def parse_direction(
             self,
             ctx: Context,
-            direction: str,
-            prompter: OpenAIChatCompletion,
-            from_user: bool = False,
+            direction: str
     ) -> Tuple[List[Dict], bool]:  # 返回加工过的消息, 和 解析失败的信息.
         """
         理解一个指令, 并将它解析为 SpheroCommandMessage
         """
+        prompter = ctx.container.force_fetch(OpenAIChatCompletion)
         if self.config.use_command_cache and direction in self._cached_commands.indexes:
             command_data = self._cached_commands.indexes[direction].copy()
             return command_data, True
@@ -125,7 +118,7 @@ class SpheroGhostCore:
             if content.startswith(self.config.invalid_command_mark):
                 return [], False
             commands = self._unpack_commands_in_direction(content)
-            result, ok = self._filter_commands_data(ctx, commands, prompter, from_user)
+            result, ok = self._filter_commands_data(ctx, commands)
             if not ok:
                 return [], False
 
@@ -138,8 +131,6 @@ class SpheroGhostCore:
             self,
             ctx: Context,
             commands: List[Dict],
-            prompter: OpenAIChatCompletion,
-            from_user: bool = False,
     ):
         result = []
         for cmd in commands:
@@ -151,8 +142,6 @@ class SpheroGhostCore:
                 commands, ok = self.parse_direction(
                     ctx,
                     loop.direction,
-                    prompter,
-                    from_user,
                 )
                 if not ok:
                     # todo: 可以 raise

@@ -36,8 +36,8 @@ class OpenAIChatMsg(BaseModel):
     ROLE_FUNCTION: ClassVar[str] = "function"
 
     role: str = Field(enum={"system", "user", "assistant", "function"})
+    content: str = ""
     name: str | None = None
-    content: str | None = None
 
     function_call: Dict | None = None
 

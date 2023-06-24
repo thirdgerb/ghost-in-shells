@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Dict
 
 from ghoshell.messages import Message
-from ghoshell.prototypes.sphero.sphero_commands import SpheroCommand, defined_commands
+from ghoshell.prototypes.sphero.sphero_commands import SpheroCommand, defined_commands, Say
 
 
 class SpheroEventMessage(Message):
@@ -32,6 +32,9 @@ class SpheroCommandMessage(Message):
         result = cls()
         result.add(*command)
         return result
+
+    def say(self, content: str) -> None:
+        self.commands.append(Say(text=content).to_command_data())
 
     def add(self, *command: SpheroCommand) -> None:
         for cmd in command:

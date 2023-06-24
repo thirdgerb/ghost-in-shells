@@ -452,7 +452,7 @@ class SpheroRuntimeModeThink(SingleStageThink):
         self._config = driver.config.runtime_mode
 
     def on_activate(self, ctx: "Context", this: SpheroRuntimeThought) -> Operator | None:
-        self._driver.say(ctx, this, self._config.on_activate)
+        self._driver.say(ctx, this, self._config.on_activate_text)
 
     def on_received(self, ctx: "Context", this: Thought) -> Operator | None:
         pass
