@@ -4,7 +4,7 @@ import yaml
 
 from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import Bootstrapper
-from ghoshell.llms.thinks.agent import FileAgentMindset
+from ghoshell.llms.thinks.agent import FileAgentMindset, FileAgentFuncStorage, AgentFuncStorage
 from ghoshell.llms.thinks.conversational import ConversationalConfig, ConversationalThink
 
 
@@ -27,6 +27,19 @@ class ConversationalThinksBootstrapper(Bootstrapper):
                 config = ConversationalConfig(**config_data)
                 think = ConversationalThink(config)
                 mindset.register_think(think)
+
+
+class FileAgentFuncStorageBootstrapper(Bootstrapper):
+    """
+    基于本地文件提供全局可用的 agent func.
+    """
+
+    def __init__(self, relative_config_file="agent_funcs/agent_funcs.yaml"):
+        self.relative_config_file = relative_config_file
+
+    def bootstrap(self, ghost: Ghost):
+        storage = FileAgentFuncStorage(ghost.config_path, self.relative_config_file)
+        ghost.container.set(AgentFuncStorage, storage)
 
 
 class FileAgentMindsetBootstrapper(Bootstrapper):

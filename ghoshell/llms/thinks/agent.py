@@ -6,6 +6,7 @@ from typing import Dict, List, Callable, Type, Optional, AnyStr, Iterator
 import yaml
 from pydantic import BaseModel, Field
 
+from ghoshell.container import Container
 from ghoshell.ghost import LogicException
 from ghoshell.ghost import Think, Event, OnReceived, CtxTool, Stage, ThinkMeta, Reaction, Intention, ThinkDriver, Focus
 from ghoshell.ghost import Thought, Operator, Context, URL, Mindset
@@ -25,6 +26,9 @@ class AgentStageConfig(BaseModel):
     """
 
     name: str
+
+    # 当前状态的自我描述.
+    desc: str = ""
 
     # prompt 所用的系统提示. role==system, 会在对话记录最前面.
     # 如果为空的话, 会复用 AgentThinkConfig.instruction
@@ -48,11 +52,11 @@ class AgentStageConfig(BaseModel):
     # 类名.
     class_name: str = ""
 
-    # 当前状态的自我描述.
-    desc: str = ""
+    # 注册全局函数, 通过 get_agent_func 函数来获取.
+    global_funcs: List[str] = Field(default_factory=list)
 
     # 可以被引用的 func. 会通过 importlib 来引用.
-    llm_funcs: List[str] = Field(default_factory=list)
+    import_funcs: List[str] = Field(default_factory=list)
 
     # 使用类的方法作为函数, 方法必须存在, 并且通过 llm_func_decorator 封装过.
     methods_as_funcs: Dict[str, str | None] = Field(default_factory=lambda: {
@@ -201,6 +205,30 @@ class LLMFunc(metaclass=ABCMeta):
         pass
 
 
+class AdapterAsFunc(LLMFunc):
+    """
+    用于封装另外一个 LLMFunc, 仅仅修改名称.
+    """
+
+    def __init__(self, func: LLMFunc, alias: str, desc: str = ""):
+        self.alias = alias
+        self.desc = desc
+        self.func = func
+
+    def name(self) -> str:
+        return self.alias
+
+    def schema(self, ctx: Context, this: AgentThought) -> OpenAIFuncSchema:
+        schema = self.func.schema(ctx, this)
+        schema.name = self.name()
+        if self.desc:
+            schema.desc = self.desc
+        return schema
+
+    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
+        return self.func.call(ctx, this, arguments)
+
+
 class MethodAsFunc(LLMFunc):
     """
     可以被大模型驱动, 又和 Ghoshell 机制一致的 function.
@@ -303,7 +331,7 @@ class StageAsFunc(LLMFunc):
 def agent_func_decorator(
         name: str,
         desc: str = "",  # desc 为空, 则会用方法的 __doc__ 作为 desc
-        params_type: Type[BaseModel] | None = None,
+        args_type: Type[BaseModel] | None = None,
 ) -> Callable[[LLMCallable], LLMFunc]:
     """
     decorator, 将一个方法封装成一个 LLM 函数
@@ -314,7 +342,7 @@ def agent_func_decorator(
             name=name,
             desc=desc if desc else method.__doc__.strip(),
             method=method,
-            args_type=params_type,
+            args_type=args_type,
         )
 
     return decorator
@@ -490,13 +518,12 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
     def after_func_called(self, ctx: Context, this: AgentThought) -> Operator:
         """
         如果一个 method 请求完毕了, 仍然没有后续反馈时, 就会调用这个方法.
         默认的做法是, 不断重复当前 stage, 直到有结果.
         """
-        pass
+        return ctx.mind(this).awaits()
 
     def on_llm_text_message(self, ctx: Context, this: AgentThought, message: str) -> Operator:
         """
@@ -511,23 +538,38 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         """
         return ctx.mind(this).awaits()
 
-    def llm_funcs(self) -> List[LLMFunc]:
+    def llm_funcs(self, ctx: Context) -> List[LLMFunc]:
         """
         缓存一下
         """
         if self._cached_funcs is None:
-            self._cached_funcs = self._llm_funcs()
+            self._cached_funcs = self._llm_funcs(ctx)
         return self._cached_funcs
 
-    def _llm_funcs(self) -> List[LLMFunc]:
+    def _llm_funcs(self, ctx: Context) -> List[LLMFunc]:
         """
         当前状态可以被 llm 调用的 funcs
         也可以人工修改加入新的方法.
         """
         done = set()
         funcs = []
-        if self.config.llm_funcs:
-            for fn_path in self.config.llm_funcs:
+        # 注册全局方法
+        if self.config.global_funcs:
+            for name in self.config.global_funcs:
+                if name in done:
+                    continue
+                func = get_agent_func(ctx.container, name)
+                if func is not None:
+                    done.add(name)
+                    funcs.append(func)
+                else:
+                    raise LogicException(
+                        f"global func {name} not registered, required by {self.think_name}:{self.config.name} "
+                    )
+
+        # 引用局部方法.
+        if self.config.import_funcs:
+            for fn_path in self.config.import_funcs:
                 value: LLMFunc = import_module_value(fn_path)
                 name = value.name()
                 if name in done:
@@ -536,6 +578,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
                     done.add(name)
                 funcs.append(value)
 
+        #
         if self.config.methods_as_funcs:
             for method_name in self.config.methods_as_funcs:
                 method = getattr(self, method_name)
@@ -578,7 +621,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         """
         获得所有方法的 openai function schemas
         """
-        funcs = self.llm_funcs()
+        funcs = self.llm_funcs(ctx)
         return [fn.schema(ctx, this) for fn in funcs]
 
     def call_llm_with_funcs(self, ctx: Context, this: AgentThought, prompt: str | None) -> Operator:
@@ -711,9 +754,6 @@ class DefaultAgentStage(AgentStage):
             return op
         return ctx.mind(this).rewind()
 
-    def after_func_called(self, ctx: Context, this: AgentThought) -> Operator:
-        return ctx.mind(this).awaits()
-
     def intentions(self, ctx: Context) -> List[Intention] | None:
         return None
 
@@ -732,10 +772,96 @@ class DefaultAgentThink(AgentThink):
 
 # todo: 还要解决 depend on 这种情况. 可以用来分割上下文.
 
+# ---- agent funcs driver ---- #
+
+class AgentFuncConfig(BaseModel):
+    # 方法的全局命名.
+    name: str
+    # 方法的描述.
+    desc: str
+
+    # 方法的路径, 只需要符合 import_module_value 的 LLMCallable 都可以引用.
+    # 也可以是一个实例化的 LLMFunc
+    func: str
+
+    # 方法使用的参数类, BaseModel 类型
+    # 系统会自动引用这个类, 作为方法的参数.
+    args_type: str | None = None
+
+    def llm_func(self) -> LLMFunc:
+        func = import_module_value(self.func)
+        if isinstance(func, LLMFunc):
+            return AdapterAsFunc(
+                alias=self.name,
+                desc=self.desc,
+                func=func
+            )
+        args_type: Type[BaseModel] | None = None
+        if self.args_type:
+            args_type = import_module_value(self.args_type)
+        return agent_func_decorator(
+            name=self.name,
+            desc=self.desc,
+            args_type=args_type,
+        )(func)
+
+
+class AgentFuncStorage(metaclass=ABCMeta):
+
+    @abstractmethod
+    def get_func(self, name: str) -> LLMFunc | None:
+        pass
+
+
+class FileAgentFuncStorage(AgentFuncStorage):
+    """
+    通过文件配置来获取所有的可复用的方法.
+    需要通过 Provider 注册到 container 中.
+    """
+
+    def __init__(self, config_path: str, relative_path: str = "agent_funcs/agent_funcs.yaml"):
+        self.config_path = config_path
+        self.relative_path = relative_path
+        self._cached_funcs: Dict[str, LLMFunc] = {}
+        self._cached_configs: Dict[str, AgentFuncConfig] = {}
+        self._load_config()
+
+    def _load_config(self):
+        filename = self.config_path.rstrip("/") + "/" + self.relative_path.lstrip("/")
+        with open(filename) as f:
+            data = yaml.safe_load(f)
+            for config_data in data:
+                config = AgentFuncConfig(config_data)
+                self._cached_configs[config.name] = config
+
+    def get_func(self, name: str) -> LLMFunc | None:
+        """
+        获取一个全局的方法.
+        """
+        if name in self._cached_funcs:
+            return self._cached_funcs[name]
+        config = self._cached_configs[name]
+        if config is None:
+            return None
+
+
+def get_agent_func(container: Container, name: str) -> LLMFunc | None:
+    """
+    提供一个获取全局注册 agent func 的方法.
+    """
+    storage = container.fetch(AgentFuncStorage)
+    if storage is None:
+        return None
+    return storage.get_func(name)
+
+
 # ---- mindset and driver ---- #
 
 
 class FileAgentMindset(Mindset, ThinkDriver):
+    """
+    通过文件配置来获取所有的 Agent
+    """
 
     def __init__(self, dirname: str, prefix: str | None = None):
         self._dirname = dirname

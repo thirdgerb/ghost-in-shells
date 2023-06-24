@@ -12,7 +12,7 @@ class AskWeatherArgs(BaseModel):
     date: str = Field(description="询问天气时的日期", default="today")
 
 
-@agent_func_decorator(name="do_ask_weather", desc="运行查询天气, 会立刻返回结果.", params_type=AskWeatherArgs)
+@agent_func_decorator(name="do_ask_weather", desc="运行查询天气, 会立刻返回结果.", args_type=AskWeatherArgs)
 def do_ask_weather(ctx: Context, this: AgentThought, arguments: AskWeatherArgs) -> Operator:
     this.say(ctx, f"查询结果: {arguments.city} 在 {arguments.date} 的天气是晴转多云, 气温 20 度")
     return ctx.mind(this).repeat()
