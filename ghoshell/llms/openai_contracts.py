@@ -56,7 +56,8 @@ class OpenAIFuncCalled(BaseModel):
     # function name
     name: str
     # arguments json
-    arguments: Dict
+    arguments: Dict | str
+    content: str | None
 
 
 class OpenAIChatChoice(BaseModel):
@@ -77,16 +78,22 @@ class OpenAIChatChoice(BaseModel):
         called = self.get_function_called()
         if called is None:
             return None
-        arguments = called.get("arguments")
+        arguments_data = called.get("arguments")
+        try:
+            arguments = json.loads(arguments_data)
+        except json.decoder.JSONDecodeError:
+            arguments = arguments_data
+
         return OpenAIFuncCalled(
             name=called.get("name"),
-            arguments=json.loads(arguments),
+            content=self.get_content(),
+            arguments=arguments,
         )
 
     def as_chat_msg(self) -> OpenAIChatMsg | None:
         content = self.get_content()
         role = self.get_role()
-        if content is None or role == OpenAIChatMsg.ROLE_FUNCTION:
+        if role == OpenAIChatMsg.ROLE_FUNCTION:
             return None
         return OpenAIChatMsg(
             role=role,

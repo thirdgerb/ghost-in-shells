@@ -49,9 +49,6 @@ class AgentStageConfig(BaseModel):
     # 如果这个 prompt 为空, 则会用 on_activate_prompt
     on_receive_prompt: str = ""
 
-    # openai chat completion 的 func call 字段.
-    default_func_call: str = ""
-
     # 类名.
     class_name: str = ""
 
@@ -205,8 +202,23 @@ class LLMFunc(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | str | None:
+    def call(self, ctx: Context, this: Thought, content: str, arguments: Dict | str | None) -> Operator | str | None:
         pass
+
+    @classmethod
+    def wrap(cls, args_type: Type[BaseModel], arguments: Dict | str | None):
+        if arguments is None:
+            return None
+        if isinstance(arguments, Dict):
+            return args_type(**arguments)
+        if isinstance(arguments, str):
+            properties = args_type.schema().get("properties")
+            if len(properties) == 1:
+                params = {}
+                for key in properties:
+                    params[key] = arguments
+                return args_type(**params)
+        raise ValueError(f"invalid arguments {arguments}")
 
 
 class AdapterAsFunc(LLMFunc):
@@ -229,8 +241,8 @@ class AdapterAsFunc(LLMFunc):
             schema.desc = self.desc
         return schema
 
-    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
-        return self.func.call(ctx, this, arguments)
+    def call(self, ctx: Context, this: Thought, content, arguments: Dict | str | None) -> Operator | None:
+        return self.func.call(ctx, this, content, arguments)
 
 
 class MethodAsFunc(LLMFunc):
@@ -260,14 +272,17 @@ class MethodAsFunc(LLMFunc):
             parameters_schema=self._params_type.schema() if self._params_type is not None else None
         )
 
-    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
+    def call(self, ctx: Context, this: AgentThought, content: str, arguments: Dict | str | None) -> Operator | None:
         """
         支持被大模型的返回结果调用这个方法.
         """
-        wrapped_params = None
-        if self._params_type is not None:
-            wrapped_params = self._params_type(**arguments) if arguments else self._params_type()
-        return self._method(ctx, this, wrapped_params)
+        if content:
+            this.say(ctx, content)
+
+        if self._params_type is None or arguments is None:
+            return self._method(ctx, this, None)
+        args = self.wrap(self._params_type, arguments)
+        return self._method(ctx, this, args)
 
 
 class RedirectFunc(LLMFunc):
@@ -295,10 +310,15 @@ class RedirectFunc(LLMFunc):
             parameters_schema=args_type.schema() if args_type else None,
         )
 
-    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
+    def call(self, ctx: Context, this: AgentThought, content: str, arguments: Dict) -> Operator | str | None:
         """
         跳转到另一个会话.
         """
+        if not isinstance(arguments, Dict):
+            return f"error occur: arguments must be dict"
+        if content:
+            this.say(ctx, content)
+
         url = URL.new(resolver=self._think, args=arguments.copy())
         return ctx.mind(this).redirect(url)
 
@@ -326,7 +346,9 @@ class StageAsFunc(LLMFunc):
             desc=stage.desc(ctx, this),
         )
 
-    def call(self, ctx: Context, this: Thought, arguments: Dict) -> Operator | None:
+    def call(self, ctx: Context, this: AgentThought, content: str, arguments: None) -> Operator | None:
+        if content:
+            this.say(ctx, content)
         return ctx.mind(this).forward(self._stage)
 
 
@@ -532,12 +554,13 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         """
         return ctx.mind(this).awaits()
 
-    def on_llm_text_message(self, ctx: Context, this: AgentThought, message: str) -> Operator:
-        """
-        llm 返回了一个文字消息, 而不是函数调用.
-        """
-        this.say(ctx, message)
-        return ctx.mind(this).awaits()
+    #
+    # def on_llm_text_message(self, ctx: Context, this: AgentThought, message: str) -> Operator:
+    #     """
+    #     llm 返回了一个文字消息, 而不是函数调用.
+    #     """
+    #     this.say(ctx, message)
+    #     return ctx.mind(this).awaits()
 
     def on_llm_text_resp(self, ctx: Context, this: AgentThought) -> Operator:
         """
@@ -676,29 +699,29 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         # 加入 functions.
         if allow_func:
             func_schemas = self.get_funcs_schemas(ctx, this)
-            default_function_call = self.config.default_func_call
+            # default_function_call = self.config.default_func_call
         else:
             func_schemas = None
-            default_function_call = ""
+            # default_function_call = ""
 
         choice = prompter.chat_completion(
             session_id,
             chat_context,
             func_schemas,
-            function_call=default_function_call,
+            function_call="",
             config_name=self.config.llm_config_name,
         )
-
-        # 如果是一般的消息, 走消息处理.
-        msg = choice.as_chat_msg()
-        if msg is not None:
-            this.say(ctx, msg.content)
 
         # 如果返回值是 函数, 走函数处理.
         called = choice.as_func_called()
         if called is not None:
             # 需要考虑异步场景如何解决....
             return self.call_llm_func(ctx, this, called)
+
+        # 如果是一般的消息, 走消息处理.
+        msg = choice.as_chat_msg()
+        if msg is not None:
+            this.say(ctx, msg.content)
         return self.on_llm_text_resp(ctx, this)
 
     def _llm_basic_chat_context(self, ctx: Context, this: AgentThought) -> List[OpenAIChatMsg]:
@@ -759,7 +782,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         if called_name not in mapping:
             return self.on_llm_text_resp(ctx, this)
         fn: LLMFunc = mapping[called_name]
-        result = fn.call(ctx, this, called.arguments)
+        result = fn.call(ctx, this, called.content, called.arguments)
         # 方法会返回三种可能的信息 .
         # 如果是 None, 调用默认动作.
         if result is None:

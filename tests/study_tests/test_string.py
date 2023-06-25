@@ -19,3 +19,9 @@ def test_strip_yaml() -> None:
 """
     sections = text.split("```")
     assert len(sections) == 3
+
+
+def test_multi_lines() -> None:
+    a = "abc" \
+        "efg"
+    assert a == "abcefg"

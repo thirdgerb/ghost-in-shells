@@ -59,7 +59,6 @@ class SpheroBoltShell(BaiduSpeechShell):
                 break
             if self._sphero_runtime.error:
                 break
-
             time.sleep(1)
         if self._sphero_runtime.error is not None:
             self._quit(self._sphero_runtime.error)

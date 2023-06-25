@@ -69,6 +69,9 @@ class SpheroGhostCore:
     def ability_names(self) -> str:
         return "|".join(self._cached_commands.abilities)
 
+    def invalid_order(self) -> str:
+        return self.config.invalid_direction
+
     def parse_direction(
             self,
             ctx: Context,
@@ -118,7 +121,7 @@ class SpheroGhostCore:
             if content.startswith(self.config.invalid_command_mark):
                 return [], False
             commands = self._unpack_commands_in_direction(content)
-            result, ok = self._filter_commands_data(ctx, commands)
+            result, ok = self.filter_commands_data(ctx, commands)
             if not ok:
                 return [], False
 
@@ -127,7 +130,7 @@ class SpheroGhostCore:
             self._save_cached()
             return result, True
 
-    def _filter_commands_data(
+    def filter_commands_data(
             self,
             ctx: Context,
             commands: List[Dict],
@@ -153,7 +156,7 @@ class SpheroGhostCore:
             # ability 检查.
             ability = ability_check(cmd)
             if ability is not None:
-                commands = self._cached_commands.indexes.get(ability.name, None)
+                commands = self._cached_commands.indexes.get(ability.ability_name, None)
                 if commands is None:
                     return [], False
                 ability.commands = commands
@@ -182,7 +185,7 @@ class SpheroGhostCore:
         text = cls._unpack_yaml_in_text(text)
         command_data = yaml.safe_load(text)
         if isinstance(command_data, str):
-            return [Say(text=command_data).dict()]
+            return [Say(content=command_data).dict()]
         if not isinstance(command_data, list):
             raise RuntimeError(f"invalid ghost response: {text}")
         return command_data

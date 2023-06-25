@@ -8,9 +8,12 @@ from ghoshell.ghost import Context, Reaction, Intention, Think
 from ghoshell.ghost import OnReceived
 from ghoshell.ghost import Operator
 from ghoshell.ghost import Stage, Thought, ThinkMeta, URL
-from ghoshell.llms.thinks import AgentStage, AgentThought, AgentStageConfig
+from ghoshell.llms import OpenAIChatMsg
+from ghoshell.llms.thinks import AgentStage, AgentThought, AgentStageConfig, LLMFunc
 from ghoshell.messages import Text
+from ghoshell.prototypes.sphero.sphero_commands import defined_commands, Say, LambdaSay
 from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore
+from ghoshell.prototypes.sphero.sphero_llm_func import SpheroLLMFunc
 from ghoshell.prototypes.sphero.sphero_messages import SpheroEventMessage, SpheroCommandMessage
 
 
@@ -42,7 +45,6 @@ class SpheroRuntimeModeThink(Think, AgentStage):
             instruction=config.instruction,
             on_activate_text=config.on_activate_text,
             on_receive_prompt=config.on_receive_prompt,
-            default_func_call="fn_run_direction",
             llm_config_name=self._core.config.use_llm_config,
         )
         super().__init__(config.name, stage_config)
@@ -103,26 +105,57 @@ class SpheroRuntimeModeThink(Think, AgentStage):
         this.data.add_user_message(text.content)
         return self.on_receive_prompt(ctx, this)
 
-    def _on_receive_event(self, ctx: Context, this: SpheroRuntimeThought, event: SpheroEventMessage) -> Operator:
-        print("+++++++++", event)
-        return ctx.mind(this).awaits()
+    def _llm_basic_chat_context(self, ctx: Context, this: AgentThought) -> List[OpenAIChatMsg]:
+        chat_context = super()._llm_basic_chat_context(ctx, this)
+        chat_context.append(OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_SYSTEM,
+            content=f"当前拥有的技能: {self._core.ability_names()}"
+        ))
+        return chat_context
 
-    def on_llm_text_message(self, ctx: Context, this: AgentThought, message: str) -> Operator:
-        """
-        llm 返回了一个文字消息, 而不是函数调用.
-        """
-        this.say(ctx, message)
-        return ctx.mind(this).awaits()
+    def _on_receive_event(self, ctx: Context, this: SpheroRuntimeThought, event: SpheroEventMessage) -> Operator:
+        print("++++ receive", event.dict())
+        for log in event.runtime_logs:
+            index = log.find("|")
+            method = log[:index]
+            log_text = log[index + 1:]
+
+            # hack 一下
+            if method == Say.method or method == LambdaSay.method:
+                this.data.add_ai_message(log_text)
+            else:
+                this.data.add_system_message(f"你调用了函数 `{method}`, 结果如下: {log_text}")
+        #
+        # if event.stopped:
+        #     message = f"指令运行中断, 原因: {event.stopped}"
+        #     this.data.add_system_message(message)
+
+        return self.on_receive_prompt(ctx, this)
+
+    #
+    # def on_llm_text_message(self, ctx: Context, this: AgentThought, message: str) -> Operator:
+    #     """
+    #     llm 返回了一个文字消息, 而不是函数调用.
+    #     """
+    #     this.say(ctx, message)
+    #     return ctx.mind(this).awaits()
+
+    def _llm_funcs(self, ctx: Context) -> List[LLMFunc]:
+        funcs = super()._llm_funcs(ctx)
+        for cmd_method in defined_commands:
+            cmd = defined_commands[cmd_method]
+            funcs.append(SpheroLLMFunc(self._core, cmd))
+        return funcs
 
     def method_as_funcs(self) -> Dict[str, Type[BaseModel] | None]:
         return {
-            "fn_run_direction": SpheroDirection,
+            # "fn_run_direction": SpheroDirection,
             "fn_await": None,
         }
 
     def fn_await(self, ctx: Context, this: SpheroRuntimeThought, args: None):
         """
-        不做任何事情, 等待下一条消息的输入.
+        不做任何事情, 等待用户的下一条消息的输入.
         """
         return ctx.mind(this).awaits()
 
