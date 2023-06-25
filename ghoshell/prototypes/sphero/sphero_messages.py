@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Dict
 
 from ghoshell.messages import Message
-from ghoshell.prototypes.sphero.sphero_commands import SpheroCommand, defined_commands
+from ghoshell.prototypes.sphero.sphero_commands import SpheroCommand, defined_commands, Say
 
 
 class SpheroEventMessage(Message):
@@ -12,8 +12,6 @@ class SpheroEventMessage(Message):
     direction: str
     # 运行状态的自然语言描述.
     runtime_logs: List[str]
-    # 如果意外中断了, 则包含中断的原因.
-    stopped: str
 
 
 class SpheroCommandMessage(Message):
@@ -32,6 +30,9 @@ class SpheroCommandMessage(Message):
         result = cls()
         result.add(*command)
         return result
+
+    def say(self, content: str) -> None:
+        self.commands.append(Say(content=content).to_command_data())
 
     def add(self, *command: SpheroCommand) -> None:
         for cmd in command:

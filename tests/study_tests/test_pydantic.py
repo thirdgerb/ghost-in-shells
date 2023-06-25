@@ -133,3 +133,20 @@ def test_schema():
     schema = Foo.schema()
     assert len(schema["properties"]) == 1
     assert schema["properties"]["foo"]["description"] == "foo"
+
+
+def test_schema_with_includes() -> None:
+    class Foo(BaseModel):
+        foo: str = Field(description="foo")
+        _bar: str
+        zoo: ClassVar[str] = "value"
+
+    schema = Foo.schema()
+    assert len(schema["properties"]) == 1
+
+# def test_single_arg() -> None:
+#     class Foo(BaseModel):
+#         foo: str = Field(description="foo")
+#
+#     f = Foo("foo")
+#     assert f.foo == "foo"

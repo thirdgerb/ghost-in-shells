@@ -6,7 +6,6 @@ from ghoshell.ghost import Context, Thought, ThinkMeta, URL
 from ghoshell.ghost import Operator, Reaction, Intention
 from ghoshell.ghost_fmk.reactions.commands import ProcessCmdReaction
 from ghoshell.ghost_fmk.thinks import SingleStageThink
-from ghoshell.llms import OpenAIChatCompletion
 from ghoshell.messages import Text
 from ghoshell.prototypes.sphero.sphero_ghost_configs import *
 from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore
@@ -82,8 +81,11 @@ class SpheroLearningModeThink(SingleStageThink):
         self._config: SpheroLearningModeConfig = core.config.learn_mode
 
     def on_activate(self, ctx: "Context", this: LearningModeThought) -> Operator | None:
-        self._core.say(ctx, this, self._config.on_activate)
         this.add_message(self._config.on_activate, False)
+
+        msg = SpheroCommandMessage()
+        msg.say(self._config.on_activate)
+        ctx.send_at(this).output(msg)
         return ctx.mind(this).awaits()
 
     def on_received(self, ctx: "Context", this: LearningModeThought) -> Operator | None:
@@ -110,6 +112,7 @@ class SpheroLearningModeThink(SingleStageThink):
         return self._receive_parsed_output(ctx, parsed, this)
 
     def _receive_parsed_output(self, ctx: Context, parsed: LearningModeOutput, this: LearningModeThought) -> Operator:
+        out = SpheroCommandMessage()
         if self._config.debug:
             ctx.send_at(this).json(parsed.dict())
 
@@ -122,34 +125,36 @@ class SpheroLearningModeThink(SingleStageThink):
         # 发送消息.
         if parsed.reply:
             reply = parsed.reply
-            self._core.say(ctx, this, reply)
+            out.say(reply)
             this.add_message(reply, False)
 
         # 解决 title 为空的问题.
         if parsed.reaction == "save":
             if not this.data.title:
-                self._core.say(ctx, this, self._config.ask_for_title)
+                out.say(self._config.ask_for_title)
                 this.add_message(self._config.ask_for_title, False)
+                ctx.send_at(this).output(out)
                 return ctx.mind(this).awaits()
 
         match parsed.reaction:
             case "restart":
+                ctx.send_at(this).output(out)
                 return ctx.mind(this).restart()
             case "test":
-                return self._run_test(ctx, this)
+                return self._run_test(ctx, this, out)
             case "save":
                 this.add_system_message(f"保存所有指令为 `{parsed.title}`")
-                return self._save_case(ctx, this)
+                return self._save_case(ctx, this, out)
             case "finish":
+                ctx.send_at(this).output(out)
                 return ctx.mind(this).finish()
             case _:
+                ctx.send_at(this).output(out)
                 return ctx.mind(this).awaits()
 
-    def _save_case(self, ctx: Context, this: LearningModeThought) -> Operator:
-        message = SpheroCommandMessage()
-        prompter = ctx.container.force_fetch(OpenAIChatCompletion)
+    def _save_case(self, ctx: Context, this: LearningModeThought, message: SpheroCommandMessage) -> Operator:
         for direction in this.data.directions:
-            commands, ok = self._core.parse_direction(ctx, direction, prompter, False)
+            commands, ok = self._core.parse_direction(ctx, direction)
             if not ok:
                 return self._send_unknown_message(ctx, this)
             message.commands = commands
@@ -158,16 +163,17 @@ class SpheroLearningModeThink(SingleStageThink):
         return ctx.mind(this).awaits()
 
     def _send_unknown_message(self, ctx: Context, this: LearningModeThought) -> Operator:
+        message = SpheroCommandMessage()
         text = self._core.config.unknown_order
-        self._core.say(ctx, this, text)
+        message.say(text)
         this.add_message(text, False)
+
+        ctx.send_at(this).output(message)
         return ctx.mind(this).awaits()
 
-    def _run_test(self, ctx: Context, this: LearningModeThought) -> Operator:
-        message = SpheroCommandMessage()
-        prompter = ctx.container.force_fetch(OpenAIChatCompletion)
+    def _run_test(self, ctx: Context, this: LearningModeThought, message: SpheroCommandMessage) -> Operator:
         for direction in this.data.directions:
-            commands, ok = self._core.parse_direction(ctx, direction, prompter, False)
+            commands, ok = self._core.parse_direction(ctx, direction)
             if not ok:
                 return self._send_unknown_message(ctx, this)
             for cmd in commands:

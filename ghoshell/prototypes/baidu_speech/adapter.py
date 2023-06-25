@@ -2,16 +2,17 @@ import base64
 import json
 import os
 from typing import Dict, Type, ClassVar
-from urllib.error import URLError
 from urllib.parse import urlencode, quote_plus
-from urllib.request import Request
-from urllib.request import urlopen
 
+import requests
 import yaml
 
 from ghoshell.container import Provider, Container, Contract
 from ghoshell.prototypes.baidu_speech.config import BaiduSpeechConfig
 from ghoshell.shell import Shell, BoostrapException
+
+asr_session = requests.session()
+tts_session = requests.session()
 
 
 class BaiduSpeechAdapter:
@@ -36,24 +37,17 @@ class BaiduSpeechAdapter:
 
         post_data = urlencode(params)
         post_data = post_data.encode('utf-8')
-        req = Request(self._config.token_url, post_data)
+        resp = requests.get(self._config.token_url, post_data)
 
-        f = urlopen(req, timeout=5)
-        result_str = f.read()
-        result_str = result_str.decode()
-
-        result = json.loads(result_str)
+        result = resp.json()
         if 'access_token' in result.keys() and 'scope' in result.keys():
-            if self._config.tts.scope not in result['scope'].split(' '):
-                raise URLError('scope is not correct')
-            # print('SUCCESS WITH TOKEN: %s ; EXPIRES IN SECONDS: %s' % (result['access_token'], result['expires_in']))
             self.__token = result['access_token']
             return self.__token
         else:
             raise RuntimeError(
                 'MAYBE API_KEY or SECRET_KEY not correct: access_token or scope not found in token response')
 
-    def wave2text(self, wave_data: str) -> str:
+    def wave2text(self, wave_data: bytes) -> str:
         """
         语音内容转文字
         format: wav
@@ -77,10 +71,14 @@ class BaiduSpeechAdapter:
         }
         post_data = json.dumps(params, sort_keys=False)
         # print post_data
-        req = Request(self._config.asr.asr_url, post_data.encode('utf-8'))
-        req.add_header('Content-Type', 'application/json')
-        f = urlopen(req)
-        result_str = f.read()
+        resp = asr_session.post(
+            self._config.asr.asr_url,
+            post_data.encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+
+        result_str = resp.text
+
         result_data = json.loads(result_str)
         if result_data.get("err_no", -1) == 0:
             return "\n".join(result_data.get("result", ""))
@@ -105,12 +103,22 @@ class BaiduSpeechAdapter:
             'lan': 'zh',
             'ctp': 1,
         }
-        data = urlencode(params)
-        req = Request(self._config.tts.tts_url, data=data.encode('utf-8'))
-        f = urlopen(req)
-        result_str = f.read()
-        headers = dict((name.lower(), value) for name, value in f.headers.items())
+        payload = urlencode(params)
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': '*/*'
+        }
 
+        resp = tts_session.request(
+            "POST",
+            self._config.tts.tts_url,
+            headers=headers,
+            data=payload,
+        )
+
+        result_str = resp.content
+
+        headers = dict((name.lower(), value) for name, value in resp.headers.items())
         has_error = 'content-type' not in headers.keys() or headers['content-type'].find('audio/') < 0
         if not has_error:
             return result_str

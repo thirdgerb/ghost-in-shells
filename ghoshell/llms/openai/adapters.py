@@ -124,7 +124,7 @@ class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
             session_id: str,
             chat_context: List[OpenAIChatMsg],
             functions: List[OpenAIFuncSchema] | None = None,
-            function_call: str = "none",
+            function_call: str = "",
             config_name: str = "",  # 选择哪个预设的配置
     ) -> OpenAIChatChoice:
         config_name = config_name if config_name else "default"
@@ -148,12 +148,13 @@ class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
                 request["functions"] = [func.dict() for func in functions]
 
             # function_call
-            if function_call:
-                request["function_call"] = {"name": function_call}
-            elif functions:
-                request["function_call"] = "auto"
-            else:
-                request["function_call"] = "none"
+            if functions:
+                if function_call == "none":
+                    request["function_call"] = "none"
+                elif function_call:
+                    request["function_call"] = {"name": function_call}
+                else:
+                    request["function_call"] = "auto"
 
             resp = openai.ChatCompletion.create(**request)
             resp_dict = resp.to_dict_recursive()

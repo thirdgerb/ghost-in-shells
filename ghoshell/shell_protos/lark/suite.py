@@ -12,7 +12,7 @@ class LarkSuite:
 
     def send_message(self, receive_id: str, msg: Payload) -> None:
         replies: List[Messenger] = []
-        if msg.text:
+        if msg.content:
             replies.append(Messenger(
                 receive_id=receive_id,
             ))

@@ -23,63 +23,96 @@ Sensor.collision_detected_notify = (24, 18, 0xff), __collision_detected_notify_h
 
 from spherov2.sphero_edu import SpheroEduAPI, EventType
 from spherov2.types import Color
-from pydantic import BaseModel
 
 Speaker = Callable[[str], None]
 Console = Callable[[Any], None]
 OnCollision = Callable[[], None]
 
 
-class SpheroBoltStage(BaseModel, metaclass=ABCMeta):
-    """
-    Sphero 的某个运行状态.
-    """
-    # 命令实际开始运行时间.
-    start_at: float = 0
-    # 命令的实际运行帧数.
-    ran_frames_count: int = -1
-    # 命令的运行日志.
-    runtime_log: str = ""
+class SpheroRunnable(metaclass=ABCMeta):
+
+    @classmethod
+    @abstractmethod
+    def name(cls) -> str:
+        pass
 
     @abstractmethod
-    def plan_desc(self) -> str:
+    def runtime_plan(self) -> str:
         """
         对运行计划的自然语言描述
         """
         pass
 
-    def run_frame(self, kernel: SpheroKernel, at: float) -> bool:
-        self.ran_frames_count += 1  # 第一次运行时, ran_frames_count == 0
-        if self.ran_frames_count == 0:
-            self.start_at = at
-        is_running = self._run_frame(kernel, at)
-        if not is_running:
-            now = time.time()
-            self.on_stop(now)
-        return is_running
+    @abstractmethod
+    def on_stop(self, duration: float, interrupt: str) -> str:
+        pass
 
     @abstractmethod
-    def _run_frame(self, kernel: SpheroKernel, at: float) -> bool:
+    def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float) -> bool:
         """
         运行本命令一帧.
         """
         pass
 
-    def on_stop(self, stop_at: float) -> None:
+    def runtime_info(self, duration: float, interrupt: str) -> str:
+        """
+        对运行计划的自然语言描述
+        """
+        plan = self.runtime_plan()
+        stop = self.on_stop(duration, interrupt)
+        return f"\n* 目标: {plan}" \
+               f"\n* 结果: {stop}"
+
+
+class SpheroCmdStatus:
+    """
+    Sphero 的某个运行状态.
+    """
+
+    def __init__(self, runnable: SpheroRunnable, logging: bool = True):
+        self._runnable = runnable
+        # 命令实际开始运行时间.
+        self.start_at: float = 0
+        # 命令的实际运行帧数.
+        self.ran_frames_count: int = -1
+        # 命令的运行日志.
+        self.runtime_log: str = ""
+        self.loop_count: int = 0
+        self.logging: bool = logging
+        self.stopped: bool = False
+
+    def run_frame(self, kernel: SpheroKernel, at: float) -> bool:
+        if self.start_at == 0:
+            self.start_at = time.time()
+
+        self.ran_frames_count += 1
+        is_running = self._runnable.run_frame(kernel, self, at)
+        return is_running
+
+    def on_stop(self, stop_at: float, interrupt: str) -> None:
         """
         结束时记录运行日志.
         """
-        plan = self.plan_desc()
-        duration = stop_at - self.start_at
-        self.runtime_log = plan + f"实际执行 {duration} 秒."
+        if self.stopped:
+            return
+        self.stopped = True
+        if self.start_at == 0:
+            duration = 0
+        else:
+            duration = stop_at - self.start_at
+
+        duration = round(duration, 2)
+        log_str = self._runnable.runtime_info(duration, interrupt)
+        if self.logging:
+            self.runtime_log = self._runnable.name() + "|" + log_str
 
 
 class SpheroKernel:
     # 面朝角度.
     front_angle: int = 0
     # 待运行的栈. 右进左出.
-    _stage_stacks: List[SpheroBoltStage] = []
-    ran_stacks: List[SpheroBoltStage] = []
+    stage_stacks: List[SpheroCmdStatus] = []
+    ran_stacks: List[SpheroCmdStatus] = []
 
     def __init__(
             self,
@@ -107,29 +140,35 @@ class SpheroKernel:
         api.set_front_led(Color(0, 0, 0))
         self.stop_at_collision = False
 
-    def current_stage(self) -> SpheroBoltStage | None:
-        if len(self._stage_stacks) > 0:
-            return self._stage_stacks[0]
+    def stop_all(self):
+        self.api.stop_roll()
+        self.api.clear_matrix()
+        self.api.set_front_led(Color(0, 0, 0))
+        self.api.set_back_led(Color(0, 0, 0))
+
+    def current_stage(self) -> SpheroCmdStatus | None:
+        if len(self.stage_stacks) > 0:
+            return self.stage_stacks[0]
         return None
 
-    def shift_stage(self, at: float) -> bool:
+    def shift_stage(self, at: float, interrupt: str) -> bool:
         """
         完成掉一个状态位.
         """
-        if len(self._stage_stacks) > 0:
-            current = self._stage_stacks[0]
-            current.on_stop(at)
+        if len(self.stage_stacks) > 0:
+            current = self.stage_stacks[0]
+            current.on_stop(at, interrupt)
             self.ran_stacks.append(current)
-            self._stage_stacks = self._stage_stacks[1:]
-        return len(self._stage_stacks) > 0
+            self.stage_stacks = self.stage_stacks[1:]
+        return len(self.stage_stacks) > 0
 
-    def insert_stages(self, stages: List[SpheroBoltStage]):
+    def insert_stages(self, stages: List[SpheroCmdStatus]):
         """
         在现在的调用栈上插入.
         """
-        for stage in self._stage_stacks:
+        for stage in self.stage_stacks:
             stages.append(stage)
-        self._stage_stacks = stages
+        self.stage_stacks = stages
 
     def toward(self, heading: int) -> int:
         return round((self.front_angle + heading) % 360)
@@ -138,5 +177,5 @@ class SpheroKernel:
         self.api.stop_roll()
         self.api.clear_matrix()
         self.front_angle = 0
-        self._stage_stacks = []
+        self.stage_stacks = []
         self.ran_stacks = []

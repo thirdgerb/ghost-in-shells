@@ -47,11 +47,10 @@ class BaiduSpeechShell(ShellKernel):
         super().__init__(container, config_path, runtime_path)
         self._config: BaiduSpeechShellConfig = self._load_config(config_filename)
         self._session = PromptSession("\n<<< ")
-        self._listening: bool = False
-        self._speaking: bool = False
-        self._stopping_speak: bool = False
         self._shell_event: Message | None = None
-        self._ticking: bool = False
+
+        self._listening: bool = False
+        self._time_lock: float = 0
 
     def _load_config(self, config_filename: str) -> BaiduSpeechShellConfig:
         config_filename = self.config_path.rstrip("/") + "/" + config_filename.lstrip("/")
@@ -136,13 +135,15 @@ class BaiduSpeechShell(ShellKernel):
         self._welcome()
         self.tick("")
         asyncio.run(self._main())
-        asyncio.run(self._shell_event_loop())
 
     async def _main(self):
         with patch_stdout(raw=True):
             background_task = asyncio.create_task(self.handle_async_output())
+            input_loop = asyncio.create_task(self._input_loop())
+            shell_event_loop = asyncio.create_task(self._shell_event_loop())
+
             try:
-                await self._input_loop()
+                await asyncio.wait([background_task, input_loop, shell_event_loop])
             finally:
                 background_task.cancel()
             self._console.print("Quitting event loop. Bye.")
@@ -163,7 +164,7 @@ class BaiduSpeechShell(ShellKernel):
         while True:
             try:
                 user_input = await self._session.prompt_async(multiline=False)
-                self._stop_speak()
+                self._time_lock = time.time()
                 match user_input:
                     case "/exit":
                         self._close()
@@ -180,12 +181,9 @@ class BaiduSpeechShell(ShellKernel):
         exit(0)
 
     def tick(self, e: str | Message) -> None:
-        self._ticking = True
-        self._stop_speak()
         self._console.print("> waiting ghost...")
         super().tick(e)
         self._console.print("> ghost replied")
-        self._ticking = False
 
     def _welcome(self) -> None:
         """
@@ -197,7 +195,7 @@ class BaiduSpeechShell(ShellKernel):
         if self._listening:
             return
         self._listening = True
-        self._stop_speak()
+        self._time_lock = time.time()
         adapter = self.container.force_fetch(BaiduSpeechAdapter)
         r = sr.Recognizer()
         with sr.Microphone() as source:
@@ -214,18 +212,20 @@ class BaiduSpeechShell(ShellKernel):
         """
         说话.
         """
+        self._time_lock = time.time()
         if self._listening:
             self._console.print("> not speaking cause of listening")
             return
         adapter = self.container.force_fetch(BaiduSpeechAdapter)
         self._console.print("> text to speech...")
-        # speech_data = adapter.text2speech(text.content)
-        # self._speak(speech_data)
+        speech_data = adapter.text2speech(text.content)
+        self._speak(speech_data)
 
     def _speak(self, wave_data: bytes) -> None:
         if self._listening:
             self._console.print("> not speaking cause of listening")
             return
+        now = time.time()
         self._console.print("> speaking...")
         self._speaking = True
         stream = self.pyaudio.open(
@@ -238,25 +238,14 @@ class BaiduSpeechShell(ShellKernel):
         wave_obj = Wave_read(wave_stream)
         chunk = 1024
         # play stream
-        self._stopping_speak = False
-        while not self._stopping_speak:
+        while now > self._time_lock:
             frames = wave_obj.readframes(chunk)
             if not frames:
                 break
             stream.write(frames)
         stream.stop_stream()
         stream.close()
-        self._speaking = False
-        self._stopping_speak = False
         self._console.print("> finish speaking")
-
-    def _stop_speak(self) -> None:
-        if not self._speaking:
-            return
-        self._stopping_speak = True
-        while self._speaking:
-            time.sleep(0.1)
-        self._console.print("> speaking stopped")
 
     def _markdown_print(self, text: str) -> None:
         markdown = Markdown(f"""

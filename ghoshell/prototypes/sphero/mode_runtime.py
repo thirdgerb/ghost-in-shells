@@ -1,54 +1,84 @@
 from __future__ import annotations
 
-from typing import Optional, Dict, AnyStr, List
+from typing import Dict, List, Type, Optional, AnyStr
 
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost import Context, Thought, ThinkMeta, URL
-from ghoshell.ghost import Operator, Reaction, Intention
-from ghoshell.ghost_fmk.thinks import SingleStageThink
+from ghoshell.ghost import Context, Reaction, Intention, Think
+from ghoshell.ghost import OnReceived
+from ghoshell.ghost import Operator
+from ghoshell.ghost import Stage, Thought, ThinkMeta, URL
 from ghoshell.llms import OpenAIChatMsg
+from ghoshell.llms.thinks import AgentStage, AgentThought, AgentStageConfig, LLMFunc
 from ghoshell.messages import Text
+from ghoshell.prototypes.sphero.sphero_commands import defined_commands, Say, LambdaSay
 from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore
-from ghoshell.prototypes.sphero.sphero_messages import SpheroEventMessage
+from ghoshell.prototypes.sphero.sphero_llm_func import SpheroLLMFunc
+from ghoshell.prototypes.sphero.sphero_messages import SpheroEventMessage, SpheroCommandMessage
 
 
-class SpheroRuntimeThought(Thought):
+class SpheroDirection(BaseModel):
+    direction: str = Field(
+        description="用自然语言形式描述的命令"
+    )
+
+
+class SpheroRuntimeThought(AgentThought):
     priority = -1
 
-    class Runtime(BaseModel):
-        events: List[OpenAIChatMsg] = Field(default_factory=lambda: [])
-
-    data: Runtime = Runtime()
-
-    def prepare(self, args: Dict) -> None:
-        self.data = self.Runtime()
-
-    def set_variables(self, variables: Dict) -> None:
-        self.data = self.Runtime(**variables)
-
-    def vars(self) -> Dict | None:
-        return self.data.dict()
-
-    def _destroy(self) -> None:
-        del self.data
+    def say(self, ctx: Context, message: str, name: str | None = None):
+        _output = SpheroCommandMessage()
+        _output.say(message)
+        ctx.send_at(self).output(_output)
+        self.data.add_ai_message(message, name)
 
 
-class SpheroRuntimeModeThink(SingleStageThink):
-    """
-    runtime mode
-    """
+class SpheroRuntimeModeThink(Think, AgentStage):
 
     def __init__(self, core: SpheroGhostCore):
         self._core = core
-        self._config = core.config.runtime_mode
+        config = self._core.config.runtime_mode
+        self._mode_config = config
+        stage_config = AgentStageConfig(
+            name="",
+            desc=config.desc,
+            instruction=config.instruction,
+            on_activate_text=config.on_activate_text,
+            on_receive_prompt=config.on_receive_prompt,
+            llm_config_name=self._core.config.use_llm_config,
+        )
+        super().__init__(config.name, stage_config)
 
-    def on_activate(self, ctx: "Context", this: SpheroRuntimeThought) -> Operator | None:
-        self._core.say(ctx, this, self._config.on_activate)
-        self._add_message(this, self._config.on_activate, False)
-        return ctx.mind(this).awaits()
+    def url(self) -> URL:
+        return URL.new(resolver=self._mode_config.name)
 
-    def on_received(self, ctx: "Context", this: SpheroRuntimeThought) -> Operator | None:
+    def to_meta(self) -> ThinkMeta:
+        return ThinkMeta(
+            id=self._mode_config.name,
+            kind=self._core.config.driver_name,
+        )
+
+    def desc(self, ctx: Context, thought: Thought | None) -> AnyStr:
+        return self._mode_config.desc
+
+    def new_task_id(self, ctx: "Context", args: Dict) -> str:
+        return self.url().new_id()
+
+    def new_thought(self, ctx: "Context", args: Dict) -> Thought:
+        return SpheroRuntimeThought(args)
+
+    def result(self, ctx: Context, this: Thought) -> Optional[Dict]:
+        return None
+
+    def all_stages(self) -> List[str]:
+        return [""]
+
+    def fetch_stage(self, stage_name: str = "") -> Optional[Stage]:
+        if stage_name == "":
+            return self
+        return None
+
+    def on_received(self, ctx: "Context", this: SpheroRuntimeThought, e: OnReceived) -> Operator | None:
         """
         runtime 模式可能收到三种类型的消息.
         1. 命令被中断了.
@@ -69,42 +99,192 @@ class SpheroRuntimeModeThink(SingleStageThink):
         return ctx.mind(this).rewind()
 
     def _on_receive_text(self, ctx: Context, this: SpheroRuntimeThought, text: Text):
-        pass
+        """
+        处理用户的文字消息.
+        """
+        this.data.add_user_message(text.content)
+        return self.on_receive_prompt(ctx, this)
 
-    def _on_receive_event(self, ctx: Context, this: SpheroRuntimeThought, event: SpheroEventMessage):
-        pass
+    def _llm_basic_chat_context(self, ctx: Context, this: AgentThought) -> List[OpenAIChatMsg]:
+        chat_context = super()._llm_basic_chat_context(ctx, this)
+        chat_context.append(OpenAIChatMsg(
+            role=OpenAIChatMsg.ROLE_SYSTEM,
+            content=f"当前拥有的技能: {self._core.ability_names()}"
+        ))
+        return chat_context
 
-    @classmethod
-    def _add_message(cls, this: SpheroRuntimeThought, message: str, from_user: bool) -> None:
-        msg = OpenAIChatMsg(
-            role=OpenAIChatMsg.ROLE_USER if from_user else OpenAIChatMsg.ROLE_ASSISTANT,
-            content=message,
-        )
-        this.data.events.append(msg)
+    def _on_receive_event(self, ctx: Context, this: SpheroRuntimeThought, event: SpheroEventMessage) -> Operator:
+        print("++++ receive", event.dict())
+        for log in event.runtime_logs:
+            index = log.find("|")
+            method = log[:index]
+            log_text = log[index + 1:]
 
-    def url(self) -> URL:
-        return URL(resolver=self._config.name)
+            # hack 一下
+            if method == Say.method or method == LambdaSay.method:
+                this.data.add_ai_message(log_text)
+            else:
+                this.data.add_system_message(f"你调用了函数 `{method}`, 结果如下: {log_text}")
+        #
+        # if event.stopped:
+        #     message = f"指令运行中断, 原因: {event.stopped}"
+        #     this.data.add_system_message(message)
 
-    def to_meta(self) -> ThinkMeta:
-        return ThinkMeta(
-            id=self._config.name,
-            kind=self._core.config.driver_name,
-        )
+        return self.on_receive_prompt(ctx, this)
 
-    def desc(self, ctx: Context, thought: Thought) -> AnyStr:
-        return self._config.desc
+    #
+    # def on_llm_text_message(self, ctx: Context, this: AgentThought, message: str) -> Operator:
+    #     """
+    #     llm 返回了一个文字消息, 而不是函数调用.
+    #     """
+    #     this.say(ctx, message)
+    #     return ctx.mind(this).awaits()
 
-    def new_task_id(self, ctx: "Context", args: Dict) -> str:
-        return self.url().new_id()
+    def _llm_funcs(self, ctx: Context) -> List[LLMFunc]:
+        funcs = super()._llm_funcs(ctx)
+        for cmd_method in defined_commands:
+            cmd = defined_commands[cmd_method]
+            funcs.append(SpheroLLMFunc(self._core, cmd))
+        return funcs
 
-    def new_thought(self, ctx: "Context", args: Dict) -> Thought:
-        return SpheroRuntimeThought(args)
+    def method_as_funcs(self) -> Dict[str, Type[BaseModel] | None]:
+        return {
+            # "fn_run_direction": SpheroDirection,
+            "fn_await": None,
+        }
 
-    def result(self, ctx: Context, this: Thought) -> Optional[Dict]:
-        return None
+    def fn_await(self, ctx: Context, this: SpheroRuntimeThought, args: None):
+        """
+        不做任何事情, 等待用户的下一条消息的输入.
+        """
+        return ctx.mind(this).awaits()
+
+    def fn_run_direction(self, ctx: Context, this: SpheroRuntimeThought, args: SpheroDirection):
+        """
+        让 Sphero 运行一条自然语言描述的命令, 执行一个或多个动作.
+        """
+        commands, ok = self._core.parse_direction(ctx, args.direction)
+        if ok:
+            message = SpheroCommandMessage(direction=args.direction, runtime_mode=True)
+            message.commands = commands
+            ctx.send_at(this).output(message)
+        else:
+            this.data.add_system_message(f"direction is invalid: {args.direction}")
+        return ctx.mind(this).awaits()
 
     def intentions(self, ctx: Context) -> List[Intention] | None:
         return None
 
     def reactions(self) -> Dict[str, Reaction]:
         return {}
+
+# from __future__ import annotations
+#
+# from typing import Optional, Dict, AnyStr, List
+#
+# from pydantic import BaseModel, Field
+#
+# from ghoshell.ghost import Context, Thought, ThinkMeta, URL
+# from ghoshell.ghost import Operator, Reaction, Intention
+# from ghoshell.ghost_fmk.thinks import SingleStageThink
+# from ghoshell.llms import OpenAIChatMsg
+# from ghoshell.messages import Text
+# from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore
+# from ghoshell.prototypes.sphero.sphero_messages import SpheroEventMessage
+#
+#
+# class SpheroRuntimeThought(Thought):
+#     priority = -1
+#
+#     class Runtime(BaseModel):
+#         events: List[OpenAIChatMsg] = Field(default_factory=lambda: [])
+#
+#     data: Runtime = Runtime()
+#
+#     def prepare(self, args: Dict) -> None:
+#         self.data = self.Runtime()
+#
+#     def set_variables(self, variables: Dict) -> None:
+#         self.data = self.Runtime(**variables)
+#
+#     def vars(self) -> Dict | None:
+#         return self.data.dict()
+#
+#     def _destroy(self) -> None:
+#         del self.data
+#
+#
+# class SpheroRuntimeModeThink(SingleStageThink):
+#     """
+#     runtime mode
+#     """
+#
+#     def __init__(self, core: SpheroGhostCore):
+#         self._core = core
+#         self._config = core.config.runtime_mode
+#
+#     def on_activate(self, ctx: "Context", this: SpheroRuntimeThought) -> Operator | None:
+#         self._core.say(ctx, this, self._config.on_activate)
+#         self._add_message(this, self._config.on_activate, False)
+#         return ctx.mind(this).awaits()
+#
+#     def on_received(self, ctx: "Context", this: SpheroRuntimeThought) -> Operator | None:
+#         """
+#         runtime 模式可能收到三种类型的消息.
+#         1. 命令被中断了.
+#         2. 命令运行完成.
+#         """
+#         # 自然语言消息.
+#         text = ctx.read(Text)
+#         if text is not None:
+#             if text.is_empty():
+#                 return ctx.mind(this).rewind()
+#             return self._on_receive_text(ctx, this, text)
+#
+#         # 事件类消息
+#         event = ctx.read(SpheroEventMessage)
+#         if event is not None:
+#             return self._on_receive_event(ctx, this, event)
+#
+#         return ctx.mind(this).rewind()
+#
+#     def _on_receive_text(self, ctx: Context, this: SpheroRuntimeThought, text: Text):
+#         pass
+#
+#     def _on_receive_event(self, ctx: Context, this: SpheroRuntimeThought, event: SpheroEventMessage):
+#         pass
+#
+#     @classmethod
+#     def _add_message(cls, this: SpheroRuntimeThought, message: str, from_user: bool) -> None:
+#         msg = OpenAIChatMsg(
+#             role=OpenAIChatMsg.ROLE_USER if from_user else OpenAIChatMsg.ROLE_ASSISTANT,
+#             content=message,
+#         )
+#         this.data.events.append(msg)
+#
+#     def url(self) -> URL:
+#         return URL(resolver=self._config.name)
+#
+#     def to_meta(self) -> ThinkMeta:
+#         return ThinkMeta(
+#             id=self._config.name,
+#             kind=self._core.config.driver_name,
+#         )
+#
+#     def desc(self, ctx: Context, thought: Thought) -> AnyStr:
+#         return self._config.desc
+#
+#     def new_task_id(self, ctx: "Context", args: Dict) -> str:
+#         return self.url().new_id()
+#
+#     def new_thought(self, ctx: "Context", args: Dict) -> Thought:
+#         return SpheroRuntimeThought(args)
+#
+#     def result(self, ctx: Context, this: Thought) -> Optional[Dict]:
+#         return None
+#
+#     def intentions(self, ctx: Context) -> List[Intention] | None:
+#         return None
+#
+#     def reactions(self) -> Dict[str, Reaction]:
+#         return {}
