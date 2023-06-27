@@ -11,7 +11,7 @@ from ghoshell.ghost import Stage, Thought, ThinkMeta, URL
 from ghoshell.llms import OpenAIChatMsg
 from ghoshell.llms.thinks import AgentStage, AgentThought, AgentStageConfig, LLMFunc
 from ghoshell.messages import Text
-from ghoshell.prototypes.sphero.sphero_commands import defined_commands, Say, LambdaSay
+from ghoshell.prototypes.sphero.sphero_commands import defined_commands, Say, LambdaSpeak
 from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore
 from ghoshell.prototypes.sphero.sphero_llm_func import SpheroLLMFunc
 from ghoshell.prototypes.sphero.sphero_messages import SpheroEventMessage, SpheroCommandMessage
@@ -121,7 +121,7 @@ class SpheroRuntimeModeThink(Think, AgentStage):
             log_text = log[index + 1:]
 
             # hack 一下
-            if method == Say.method or method == LambdaSay.method:
+            if method == Say.method or method == LambdaSpeak.method:
                 this.data.add_ai_message(log_text)
             else:
                 has_callback = True

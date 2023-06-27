@@ -128,6 +128,11 @@ class SpheroKernel:
         self.stop_at_collision: bool = False
         self.api.register_event(EventType.on_collision, self._on_collision)
 
+    def on_ready(self):
+        self.api.set_front_led(Color(0, 50, 0))
+        time.sleep(1)
+        self.api.set_front_led(Color(0, 0, 0))
+
     def _on_collision(self, api: SpheroEduAPI) -> None:
         if self.stop_at_collision:
             return

@@ -24,7 +24,6 @@ class SpheroBoltRuntime:
             console: Console,
             frame: float = 1,
     ):
-        frame = 0.5
         self._speak = speak
         self._console = console
         self._dispatch = dispatcher
@@ -67,6 +66,8 @@ class SpheroBoltRuntime:
         with SpheroEduAPI(bolt) as api:
             # kernel 定义为一个简单状态机. 与命令无关.
             kernel = SpheroKernel(api, self._console, self._speak, self._on_collision)
+            kernel.on_ready()
+
             self._kernel = kernel
             self.ready = True
 

@@ -64,7 +64,7 @@ class SpheroLearningModeConfig(BaseModel):
     debug: bool = True
 
     instruction: str = """
-你是球形机器人 SpheroGPT. 
+你是球形机器人 Sphero. 
 
 你采用了一个 ghost in Shell 的技术架构. 
 其中 ghost 指的是基于大语言模型实现的思维中控, 负责决策, 并给 shell 下达指令. 
@@ -279,7 +279,7 @@ class SpheroGhostConfig(BaseModel):
     invalid_direction: str = "无法理解的命令"
 
     parse_command_instruction: str = """
-你是球形机器人 SpheroGPT, 拥有一个可以滚动的球形身体, 可以用语音与用户交互, 也可以用滚动的方式来绘制一些图形.
+你是球形机器人 Sphero, 拥有一个可以滚动的球形身体, 可以用语音与用户交互, 也可以用滚动的方式来绘制一些图形.
 
 你采用了一个 ghost in Shell 的技术架构. 
 其中 ghost 指的是基于大语言模型实现的思维中控, 负责决策, 并给 shell 下达指令. 
@@ -317,7 +317,7 @@ Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
 2. 对于无法解析或参数错误的命令, 需要用 Say 指令来告诉用户问题所在. 
 3. 你想说的任何话都只能用 say 方法来传达. 
 4. 由于操纵你的用户, 可能是可爱的孩子. 你说话的态度应该是积极的, 可爱的.
-5. 你应该仅仅输出 yaml 数据本身, 不需要用 ``` 等符号括起来, 也不需要任何别的对话内容!!!!
+5. 凡是用到了 lambda 函数, 函数体必须用引号括起来. 
 
 补充信息, 你当前的状态是: 
 {stage_desc}
