@@ -80,6 +80,13 @@ class SpheroGhostCore:
         """
         理解一个指令, 并将它解析为 SpheroCommandMessage
         """
+        try:
+            commands = yaml.safe_load(direction)
+            commands, ok = self.filter_commands_data(ctx, commands)
+            return commands, ok
+        except Exception:
+            pass
+
         prompter = ctx.container.force_fetch(OpenAIChatCompletion)
         if self.config.use_command_cache and direction in self._cached_commands.indexes:
             command_data = self._cached_commands.indexes[direction].copy()
@@ -140,7 +147,7 @@ class SpheroGhostCore:
 
             # loop 检查
             loop = loop_check(cmd)
-            if loop is not None:
+            if loop is not None and loop.direction:
                 # 递归解析.
                 commands, ok = self.parse_direction(
                     ctx,

@@ -298,7 +298,7 @@ Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
 
 ```
 - method: say
-  text: 你开始喽!
+  content: 我开始喽!
 - method: roll
   speed: 50
   heading: 0
