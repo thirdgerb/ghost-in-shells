@@ -171,11 +171,11 @@ class SpheroKernel:
         self.stage_stacks = stages
 
     def toward(self, heading: int) -> int:
+        # return heading
         return round((self.front_angle + heading) % 360)
 
     def reset(self) -> None:
         self.api.stop_roll()
         self.api.clear_matrix()
-        self.front_angle = 0
         self.stage_stacks = []
         self.ran_stacks = []

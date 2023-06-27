@@ -141,6 +141,7 @@ class Spin(SpheroCommand):
     def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float):
         if status.ran_frames_count == 0:
             kernel.api.set_front_led(Color(0, 200, 0))
+            # angle = kernel.toward(self.angle)
             kernel.api.spin(self.angle, self.duration)
             return True
         # 变更角度.
@@ -179,8 +180,10 @@ class LambdaSay(SpheroCommand):
         if status.ran_frames_count == 0:
             kernel.api.stop_roll()
             text = self._get_text()
-            kernel.api.set_main_led(Color(0, 0, 200))
+            kernel.api.set_front_led(Color(0, 50, 0))
+            kernel.api.set_main_led(Color(0, 0, 100))
             kernel.speak(text)
+        kernel.api.set_front_led(Color(0, 0, 0))
         kernel.api.clear_matrix()
         return False
 
@@ -213,8 +216,10 @@ class Say(SpheroCommand):
     def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float):
         if status.ran_frames_count == 0:
             kernel.api.stop_roll()
-            kernel.api.set_main_led(Color(0, 0, 200))
+            kernel.api.set_front_led(Color(0, 50, 0))
+            kernel.api.set_main_led(Color(0, 0, 100))
             kernel.speak(self.content)
+        kernel.api.set_front_led(Color(0, 0, 0))
         kernel.api.clear_matrix()
         return False
 
