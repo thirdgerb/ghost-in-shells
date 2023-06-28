@@ -51,7 +51,7 @@ class SpheroLearningModeConfig(BaseModel):
 
     name: str = "sphero/learning_mode"
 
-    on_activate: str = "我已经进入学习模式. 您可以用多轮对话来教导你应该怎么做, 当说 `测试` 时你才会执行它们. " \
+    on_activate: str = "我已经进入学习模式. 您可以用多轮对话来教导我应该怎么做, 当说 `测试` 时我才会执行它们. " \
                        "最后可以将这些指令保存为你的一个技能. 现在请您开始教我新技能吧!"
 
     desc: str = "todo"
@@ -294,7 +294,7 @@ Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
 目前可用的技能有: {abilities}
 
 现在你需要以 ghost 的身份, 理解输入的自然语言命令, 将之解析成为 Shell 能理解的 yaml 格式指令并输出.
-比如命令是 "以 50 的速度向前滚动 3秒, 然后用 60 的速度向右滚动 4 秒", 它的输出为: 
+比如命令是 "以 50 的速度向前滚动 3秒, 然后用 60 的速度向右滚动 4 秒, 然后向后滚动1秒, 原地旋转2圈, 最后画一个圆.", 它的输出为: 
 
 ```
 - method: say
@@ -309,6 +309,16 @@ Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
   speed: 60
   heading: 0
   duration: 4
+- method: roll
+  speed: 100
+  heading: 180
+  duration: 1
+- method: spin
+  angle: 720
+  duration: 1
+- method: round_roll
+  angle: 360
+  duration: 1
 ```
 
 注意: 
@@ -339,10 +349,6 @@ Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
 - 循环: 可以循环执行另一个自然语言命令. 比如 `重复画十次正方形`
 - 技能: 可以运行一个已经掌握的技能. 
 
-已经保存过的技能有(用 | 隔开): `{abilities}` 
-
----
-
 综上, 将一系列指令组合起来, 可以是(举个例子): 
 
 ```
@@ -352,6 +358,11 @@ Shell 指的是控制球形身体的模块, 执行 ghost 下发的指令.
 - 执行技能 abc
 - 然后说一声 哈喽
 ```
+
+---
+
+注意: 你现在已经保存过一些技能. 保存过的技能有 (用 | 隔开): `{abilities}` 
+
 """
 
     def format_parse_command_instruction(self, commands_instruction: str, abilities: str, stage_desc: str) -> str:

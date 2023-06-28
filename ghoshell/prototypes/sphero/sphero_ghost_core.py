@@ -50,8 +50,8 @@ class SpheroGhostCore:
         理解学习模式的输出.
         """
         yaml_str = cls._unpack_yaml_in_text(msg.as_chat_msg().content)
-        if yaml_str.startswith("yaml"):
-            yaml_str = yaml_str[4:]
+        if yaml_str.startswith("yaml\n"):
+            yaml_str = yaml_str[5:]
         data = yaml.safe_load(yaml_str)
         return LearningModeOutput(**data)
 
@@ -147,7 +147,7 @@ class SpheroGhostCore:
 
             # loop 检查
             loop = loop_check(cmd)
-            if loop is not None and loop.direction:
+            if loop is not None and loop.direction and not loop.commands:
                 # 递归解析.
                 commands, ok = self.parse_direction(
                     ctx,
@@ -162,7 +162,7 @@ class SpheroGhostCore:
 
             # ability 检查.
             ability = ability_check(cmd)
-            if ability is not None:
+            if ability is not None and not ability.commands:
                 commands = self._cached_commands.indexes.get(ability.ability_name, None)
                 if commands is None:
                     return [], False

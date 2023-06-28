@@ -82,6 +82,9 @@ class SpheroCmdStatus:
         self.stopped: bool = False
 
     def run_frame(self, kernel: SpheroKernel, at: float) -> bool:
+        if self.stopped:
+            return False
+
         if self.start_at == 0:
             self.start_at = time.time()
 

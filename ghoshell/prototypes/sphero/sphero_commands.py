@@ -37,9 +37,9 @@ class SpheroCommand(BaseModel, SpheroRunnable, metaclass=ABCMeta):
         return """
 各种指令可能会用到的标准参数有: 
 
-* speed: int 类型, 定义滚动的速度, 范围是 0 到 255, 0 表示停止. 默认值是 100
+* speed: int 类型, 定义滚动的速度, 范围是 0 到 255, 0 表示停止(不能为负). 默认值是 100
 * heading: int 类型, 定义滚动的方向, 范围是 -360 到 360, 对应圆形的角度. 正前方是 0, 正后方是 180, 向左是 270, 向右是 90. 
-* duration: float 类型, 定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续
+* duration: float 类型, 定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续运动. 
 * angle: int 类型. 是一个转动的角度, 会变更我的正面指向. 360 表示 360度, 是一个整圆.
  
 以下是现有的指令: 
@@ -101,10 +101,15 @@ class Roll(SpheroCommand):
             kernel.api.clear_matrix()
             return False
         if status.ran_frames_count == 0:
+            speed = self.speed
+            heading = self.heading
+            if speed < 0:
+                speed = -speed
+
             kernel.api.set_front_led(Color(0, 200, 0))
             kernel.api.set_back_led(Color(0, 0, 0))
-            heading = kernel.toward(self.heading)
-            kernel.api.set_speed(self.speed)
+            heading = kernel.toward(heading)
+            kernel.api.set_speed(speed)
             kernel.api.set_heading(heading)
             # kernel.api.roll(self.speed, heading, self.duration)
         return True
@@ -121,7 +126,7 @@ class Spin(SpheroCommand):
 
     @classmethod
     def desc(cls) -> str:
-        return "原地旋转, 改变面朝的角度"
+        return "原地旋转, 并且会改面朝的角度"
 
     @classmethod
     def yaml_desc(cls) -> str:
@@ -311,8 +316,8 @@ class RoundRoll(SpheroCommand):
     @classmethod
     def yaml_desc(cls) -> str:
         return """
-* round_roll: 走出一个圆形. 只能用来画圆.
-    * speed: int 类型, 范围是 0 ~ 255, 表示滚动的速度. 默认是 50.
+* round_roll: 画一个圆形. 只能用来画圆, 不能用来旋转. .
+    * speed: int 类型, 不能为空. 范围是 0 ~ 255, 表示滚动的速度. 默认是 50.
     * angle: int 类型, 负数表示逆时针旋转, 正数为顺时针旋转. 表示滚动时要经过的角度. 比如 360 表示会沿圆弧滚动回起点.
     * duration: float 类型, 单位是秒. 表示完成滚动的时间.
 """
@@ -330,8 +335,12 @@ class RoundRoll(SpheroCommand):
         passed = at - status.start_at
         angle = round(self.angle * passed / self.duration)
         heading = kernel.toward(angle)
+        speed = self.speed
+        if speed < 0:
+            speed = - speed
+            heading = - heading
         kernel.api.set_heading(heading)
-        kernel.api.set_speed(self.speed)
+        kernel.api.set_speed(speed)
         # 不改变朝向.
         return in_duration
 
