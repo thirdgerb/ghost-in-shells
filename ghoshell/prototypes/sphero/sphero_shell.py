@@ -50,7 +50,7 @@ class SpheroBoltShell(BaiduSpeechShell):
             self._speak_str,
             self.dispatch,
             self._console.print,
-            frame=0.01,
+            frame=0.005,
         )
         self._sphero_runtime.run()
         count = 0

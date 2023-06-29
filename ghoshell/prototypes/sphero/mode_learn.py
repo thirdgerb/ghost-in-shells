@@ -157,7 +157,8 @@ class SpheroLearningModeThink(SingleStageThink):
             commands, ok = self._core.parse_direction(ctx, direction)
             if not ok:
                 return self._send_unknown_message(ctx, this)
-            message.commands = commands
+            for cmd in commands:
+                message.commands.append(cmd)
 
         self._core.cache_command(this.data.title, message.commands, True)
         return ctx.mind(this).awaits()

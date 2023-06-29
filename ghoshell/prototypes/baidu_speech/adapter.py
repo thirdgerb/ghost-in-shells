@@ -11,8 +11,22 @@ from ghoshell.container import Provider, Container, Contract
 from ghoshell.prototypes.baidu_speech.config import BaiduSpeechConfig
 from ghoshell.shell import Shell, BoostrapException
 
-asr_session = requests.session()
-tts_session = requests.session()
+
+#
+# import requests.packages.urllib3.util.connection as urllib3_cn
+#
+#
+# def allowed_gai_family():
+#     """
+#      https://github.com/shazow/urllib3/blob/master/urllib3/util/connection.py
+#     """
+#     family = socket.AF_INET
+#     if urllib3_cn.HAS_IPV6:
+#         family = socket.AF_INET6  # force ipv6 only if it is available
+#     return family
+#
+#
+# urllib3_cn.allowed_gai_family = allowed_gai_family
 
 
 class BaiduSpeechAdapter:
@@ -71,7 +85,7 @@ class BaiduSpeechAdapter:
         }
         post_data = json.dumps(params, sort_keys=False)
         # print post_data
-        resp = asr_session.post(
+        resp = requests.post(
             self._config.asr.asr_url,
             post_data.encode('utf-8'),
             headers={'Content-Type': 'application/json'}
@@ -109,7 +123,7 @@ class BaiduSpeechAdapter:
             'Accept': '*/*'
         }
 
-        resp = tts_session.request(
+        resp = requests.request(
             "POST",
             self._config.tts.tts_url,
             headers=headers,

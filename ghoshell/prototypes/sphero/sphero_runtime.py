@@ -49,8 +49,7 @@ class SpheroBoltRuntime:
             self._thread.join()
 
     def _on_collision(self) -> None:
-        print("++++ finish at collision")
-        self.finish_cmd_stack(self._kernel, "碰撞事件", deliver_events=True, now=time.time())
+        self.finish_cmd_stack(self._kernel, "碰到东西", deliver_events=True, now=time.time())
         self.set_cmd_message(None)
 
     def _do_run(self):
@@ -67,6 +66,8 @@ class SpheroBoltRuntime:
         with SpheroEduAPI(bolt) as api:
             # kernel 定义为一个简单状态机. 与命令无关.
             kernel = SpheroKernel(api, self._console, self._speak, self._on_collision)
+            kernel.on_ready()
+
             self._kernel = kernel
             self.ready = True
 
@@ -84,9 +85,7 @@ class SpheroBoltRuntime:
                     stage.on_stop(now, "")
                     # 结束一个指令的话
                     more = kernel.shift_stage(now, "")
-                    print("++++ more", more, len(kernel.stage_stacks))
                     if not more:
-                        print("-------- finish at no more")
                         self.finish_cmd_stack(kernel, "", True, now)
                 self._sleep_frame()
         self.close()
@@ -143,7 +142,6 @@ class SpheroBoltRuntime:
         # 结束上一个指令.
         if self._cmds_message is not None:
             # 重置命令导致的中断.
-            print("+++++ finish at setting cmd")
             self.finish_cmd_stack(self._kernel, "receive new commands", False, time.time())
 
         self._kernel.reset()

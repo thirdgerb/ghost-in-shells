@@ -37,9 +37,9 @@ class SpheroCommand(BaseModel, SpheroRunnable, metaclass=ABCMeta):
         return """
 各种指令可能会用到的标准参数有: 
 
-* speed: int 类型, 定义滚动的速度, 范围是 0 到 255, 0 表示停止. 默认值是 100
+* speed: int 类型, 定义滚动的速度, 范围是 0 到 255, 0 表示停止(不能为负). 默认值是 100
 * heading: int 类型, 定义滚动的方向, 范围是 -360 到 360, 对应圆形的角度. 正前方是 0, 正后方是 180, 向左是 270, 向右是 90. 
-* duration: float 类型, 定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续
+* duration: float 类型, 定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续运动. 
 * angle: int 类型. 是一个转动的角度, 会变更我的正面指向. 360 表示 360度, 是一个整圆.
  
 以下是现有的指令: 
@@ -48,8 +48,8 @@ class SpheroCommand(BaseModel, SpheroRunnable, metaclass=ABCMeta):
 
     def on_stop(self, duration: float, interrupt: str) -> str:
         if interrupt:
-            return f"{duration} 秒后中断, 原因是 `{interrupt}`"
-        return f"{duration}秒后完成."
+            return f"stopped after {duration} seconds, cause of `{interrupt}`"
+        return f"finished after {duration} seconds."
 
     @classmethod
     def read(cls, data: Dict) -> SpheroCommand | None:
@@ -70,7 +70,7 @@ class Roll(SpheroCommand):
 
     method = "roll"
     heading: int = Field(default=0, description="滚动的朝向, 360表示360度. 默认是 0")
-    speed: int = Field(default=100, description="定义滚动的速度, 范围是 0 到 255, 0 表示停止.  默认值是 100")
+    speed: int = Field(default=100, description="定义滚动的速度, 范围是 0 到 255, 0 表示停止. 不可为负. 默认值是 100")
     duration: float = Field(default=1, description="定义滚动的时间, 单位是秒. 默认值是 1. 为负数表示一直持续")
 
     @classmethod
@@ -101,10 +101,16 @@ class Roll(SpheroCommand):
             kernel.api.clear_matrix()
             return False
         if status.ran_frames_count == 0:
+            speed = self.speed
+            heading = self.heading
+            if speed < 0 <= heading:
+                speed = -speed
+                heading = heading + 180
+
             kernel.api.set_front_led(Color(0, 200, 0))
             kernel.api.set_back_led(Color(0, 0, 0))
-            heading = kernel.toward(self.heading)
-            kernel.api.set_speed(self.speed)
+            heading = kernel.toward(heading)
+            kernel.api.set_speed(speed)
             kernel.api.set_heading(heading)
             # kernel.api.roll(self.speed, heading, self.duration)
         return True
@@ -121,7 +127,7 @@ class Spin(SpheroCommand):
 
     @classmethod
     def desc(cls) -> str:
-        return "原地旋转, 改变面朝的角度"
+        return "原地旋转, 并且会改面朝的角度"
 
     @classmethod
     def yaml_desc(cls) -> str:
@@ -141,48 +147,50 @@ class Spin(SpheroCommand):
     def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float):
         if status.ran_frames_count == 0:
             kernel.api.set_front_led(Color(0, 200, 0))
+            # angle = kernel.toward(self.angle)
             kernel.api.spin(self.angle, self.duration)
-            print("spin +++", at, status.start_at, self.duration)
             return True
-        print("spin +++", at, status.start_at, self.duration)
         # 变更角度.
         kernel.front_angle = kernel.toward(self.angle)
         kernel.api.set_front_led(Color(0, 0, 0))
         return False
 
 
-class LambdaSay(SpheroCommand):
-    method = "lambda_say"
-    func: str = Field(description="用 python lambda 函数返回要说的话. 比如 `lambda: '你好啊!'`")
+class LambdaSpeak(SpheroCommand):
+    method = "lambda_speak"
+    lambda_content: str = Field(description="值是一个 python lambda 函数, 返回要说的话. 与 say 方法相比, 可以运行一些计算逻辑, "
+                                            "比如计算运行距离: `lambda: '我滚动了{l}单位距离'.format(l=速度*时间)` ")
 
     @classmethod
     def desc(cls) -> str:
-        return """用声音模块说话, 可以运行一些计算逻辑, 比如计算运行距离: `lambda: "我滚动了{l}单位距离".format(l=100*3)` """
+        return """支持调用函数的说话能力. """
 
     @classmethod
     def yaml_desc(cls) -> str:
         return """
-    * say: 用我的声音模块说话. 参数如下
-        * func: 用 python lambda 函数返回要说的话. 比如 `lambda: "你好啊!"` 
+    * lambda_say: 支持调用函数的说话能力.  
+        * lambda_content: str 类型的 python lambda 函数. 参数为空, 返回值是 str. 可以在说话过程中计算, 比如计算运行距离: `lambda: "我滚动了{l}单位距离".format(l=速度*时间)` 
     """
 
     def runtime_info(self, duration: float, interrupt: str) -> str:
-        return self._get_text()
+        return self.get_text()
 
     def runtime_plan(self) -> str:
-        text = self._get_text()
+        text = self.get_text()
         return f"说 `{text}`"
 
-    def _get_text(self) -> str:
-        fn = eval(self.func)
+    def get_text(self) -> str:
+        fn = eval(self.lambda_content)
         return fn()
 
     def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float):
         if status.ran_frames_count == 0:
             kernel.api.stop_roll()
-            text = self._get_text()
-            kernel.api.set_main_led(Color(0, 0, 200))
+            text = self.get_text()
+            kernel.api.set_front_led(Color(0, 50, 0))
+            kernel.api.set_main_led(Color(0, 0, 100))
             kernel.speak(text)
+        kernel.api.set_front_led(Color(0, 0, 0))
         kernel.api.clear_matrix()
         return False
 
@@ -193,30 +201,32 @@ class Say(SpheroCommand):
     """
 
     method = "say"
-    content: str = Field(description="要说的话.")
+    content: str = Field(description="要对用户说的话.")
 
     @classmethod
     def desc(cls) -> str:
-        return "用我的声音模块说话.比如 say(text=\"something\") "
+        return "用我的声音模块说话. 说的话可以被用户听到."
 
     @classmethod
     def yaml_desc(cls) -> str:
         return """
 * say: 用我的声音模块说话. 参数如下: 
-    * text: 要说的话的内容. 
+    * content: 要说的话的内容. 
 """
 
     def runtime_info(self, duration: float, interrupt: str) -> str:
         return self.content
 
     def runtime_plan(self) -> str:
-        return f"说 `{self.content}`"
+        return f"说: {self.content}"
 
     def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float):
         if status.ran_frames_count == 0:
             kernel.api.stop_roll()
-            kernel.api.set_main_led(Color(0, 0, 200))
+            kernel.api.set_front_led(Color(0, 50, 0))
+            kernel.api.set_main_led(Color(0, 0, 100))
             kernel.speak(self.content)
+        kernel.api.set_front_led(Color(0, 0, 0))
         kernel.api.clear_matrix()
         return False
 
@@ -227,7 +237,7 @@ class Stop(SpheroCommand):
 
     @classmethod
     def desc(cls) -> str:
-        return "停止所有动作."
+        return "停止所有进行中的运动.符合命令`停下来`, `停止`"
 
     @classmethod
     def yaml_desc(cls) -> str:
@@ -292,46 +302,55 @@ class Loop(SpheroCommand):
         return True
 
 
-# class RoundRoll(SpheroCommand):
-#     """
-#     以圆弧的形式滚动.
-#     """
-#
-#     method = "round_roll"
-#
-#     speed: int
-#     angle: int
-#     duration: float
-#
-#     @classmethod
-#     def yaml_desc(cls) -> str:
-#         return """
-# * round_roll: 从当前位置出发, 会按照圆形的弧线进行滚动. 不适合用来走出直线.
-#     * speed: int 类型, 范围是 0 ~ 255, 表示滚动的速度. 默认是 50.
-#     * angle: int 类型, 负数表示逆时针旋转, 正数为顺时针旋转. 表示滚动时要经过的角度. 比如 360 表示会沿圆弧滚动回起点.
-#     * duration: float 类型, 单位是秒. 表示完成滚动的时间.
-# """
-#
-#     def plan_desc(self) -> str:
-#         return f"以{self.speed} 的速度, 在 {self.duration} 秒内完成 {self.angle} 度的圆弧"
-#
-#     def _run_frame(self, kernel: SpheroKernel, at: float) -> bool:
-#         in_duration = self._start_at + self.duration > at
-#         if not in_duration:
-#             kernel.api.stop_roll()
-#             kernel.api.set_front_led(Color(0, 0, 0))
-#             return False
-#
-#         if self._ran_frames_count == 0:
-#             kernel.api.set_front_led(Color(0, 200, 0))
-#
-#         passed = at - self._start_at
-#         angle = round(self.angle * passed / self.duration)
-#         heading = kernel.toward(angle)
-#         kernel.api.set_heading(heading)
-#         kernel.api.set_speed(self.speed)
-#         # 不改变朝向.
-#         return in_duration
+class RoundRoll(SpheroCommand):
+    """
+    以圆弧的形式滚动.
+    """
+
+    method = "round_roll"
+
+    speed: int = Field(default=50, description=" 表示滚动的速度, 范围是 0 ~ 255, 默认是 50")
+    angle: int = Field(default=360,
+                       description="表示圆弧的角度. 负数表示逆时针旋转, 正数为顺时针旋转. 比如 360 表示会沿圆弧滚动回起点.")
+    duration: float = Field(default=1, description="表示完成滚动的时间, 单位是秒")
+
+    @classmethod
+    def yaml_desc(cls) -> str:
+        return """
+* round_roll: 画一个圆形. 只能用来画圆, 不能用来旋转. .
+    * speed: int 类型, 不能为空. 范围是 0 ~ 255, 表示滚动的速度. 默认是 50.
+    * angle: int 类型, 负数表示逆时针旋转, 正数为顺时针旋转. 表示滚动时要经过的角度. 比如 360 表示会沿圆弧滚动回起点.
+    * duration: float 类型, 单位是秒. 表示完成滚动的时间.
+"""
+
+    def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float) -> bool:
+        in_duration = status.start_at + self.duration > at
+        if not in_duration:
+            kernel.api.stop_roll()
+            kernel.api.set_front_led(Color(0, 0, 0))
+            return False
+
+        if status.ran_frames_count == 0:
+            kernel.api.set_front_led(Color(0, 200, 0))
+
+        passed = at - status.start_at
+        angle = round(self.angle * passed / self.duration)
+        heading = kernel.toward(angle)
+        speed = self.speed
+        if speed < 0:
+            speed = - speed
+            heading = - heading
+        kernel.api.set_heading(heading)
+        kernel.api.set_speed(speed)
+        # 不改变朝向.
+        return in_duration
+
+    @classmethod
+    def desc(cls) -> str:
+        return "以圆弧的方式滚动, 只能用来画圆形. 无法用于别的场景."
+
+    def runtime_plan(self) -> str:
+        return f"以{self.speed} 的速度, 在 {self.duration} 秒内完成 {self.angle} 度的圆弧"
 
 
 class LambdaRoll(SpheroCommand):
@@ -341,11 +360,11 @@ class LambdaRoll(SpheroCommand):
 
     method = "lambda_roll"
 
-    speed: str = Field(
-        description="接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒). "
+    lambda_speed: str = Field(
+        description="非线性滚动方法. 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒). "
                     "返回值是 int 类型, 表示速度, 范围是 -255 ~ 255. 例如 `lambda t: 100`, 表示速度恒定为 100"
     )
-    heading: str = Field(
+    lambda_heading: str = Field(
         description="接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒)."
                     " 返回值是 int 类型, 表示角度. 例如 `lambda t: 10`, 表示滚动指向固定为 10."
 
@@ -361,14 +380,14 @@ class LambdaRoll(SpheroCommand):
     def yaml_desc(cls) -> str:
         return """
 * lambda_roll: 允许使用 python lambda 函数来定义滚动轨迹的方法. 可以使用 python 的 math 库. 对于直线轨迹不该用 lambda_roll, 还是 roll + spin 组合使用更合理.  
-    * speed: str 类型, 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒), 返回值是 int 类型, 表示速度, 范围是 -255 ~ 255. 例如 `lambda t: 100`, 表示速度恒定为 100
-    * heading: str 类型, 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒), 返回值是 int 类型, 表示角度. 例如 `lambda t: 10`, 表示滚动指向固定为 10.
+    * lambda_speed: str 类型, 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒), 返回值是 int 类型. 用来表示速度, 范围是 -255 ~ 255. 例如 "lambda t: 100`, 表示速度恒定为 100"
+    * lambda_heading: str 类型, 接受一个 lambda 函数, 以 float 类型的 t 为参数 (表示经过时间, 单位是秒), 返回值是 int 类型. 用来表示角度. 例如 "lambda t: 10", 表示滚动指向固定为 10.
     * duration: float 类型, 指令持续的时间, 单位是秒
 """
 
     def runtime_plan(self) -> str:
         return f"在 {self.duration} 秒内, 以时间 t 为变量," \
-               f"运行速度按函数 `{self.speed}`, 朝向按函数 `{self.heading}` 来滚动."
+               f"运行速度按函数 `{self.lambda_speed}`, 朝向按函数 `{self.lambda_heading}` 来滚动."
 
     def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float) -> bool:
         in_duration = self.duration < 0 or (status.start_at + self.duration > at)
@@ -381,10 +400,10 @@ class LambdaRoll(SpheroCommand):
             kernel.api.set_front_led(Color(0, 200, 0))
 
         t = at - status.start_at
-        speed_fn = eval(self.speed)
-        heading_fn = eval(self.heading)
-        speed = speed_fn(t)
-        heading = heading_fn(t)
+        speed_fn = eval(self.lambda_speed)
+        heading_fn = eval(self.lambda_heading)
+        speed = int(speed_fn(t))
+        heading = int(heading_fn(t))
         toward = kernel.toward(heading)
         kernel.api.set_heading(toward)
         kernel.api.set_speed(speed)
@@ -410,7 +429,7 @@ class Ability(SpheroCommand):
     def yaml_desc(cls) -> str:
         return """
 * ability_roll: 使用一个已有的技能. 所谓技能, 是系统已经掌握的一组指令. 
-    * name: str 类型, 表示技能的名字.
+    * ability_name: str 类型, 表示技能的名字.
 """
 
     def runtime_plan(self) -> str:
@@ -432,8 +451,8 @@ defined_commands: [Type[SpheroCommand]] = {cmd.method: cmd for cmd in [
     Stop,
     Say,
     Loop,
-    LambdaSay,
-    # RoundRoll,
+    LambdaSpeak,
+    RoundRoll,
     LambdaRoll,
     Ability,
 ]}

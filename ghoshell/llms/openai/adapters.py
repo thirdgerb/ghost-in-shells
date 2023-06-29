@@ -1,3 +1,4 @@
+import os
 from abc import ABCMeta, abstractmethod
 from typing import Dict, List
 
@@ -6,6 +7,10 @@ from pydantic import BaseModel, Field
 
 from ghoshell.llms.contracts import LLMTextCompletion
 from ghoshell.llms.openai_contracts import OpenAIChatCompletion, OpenAIChatChoice, OpenAIChatMsg, OpenAIFuncSchema
+
+proxy_env = os.getenv("OPENAI_PROXY", "")
+if proxy_env:
+    openai.proxy = {"https": proxy_env}
 
 
 class TextCompletionConfig(BaseModel):

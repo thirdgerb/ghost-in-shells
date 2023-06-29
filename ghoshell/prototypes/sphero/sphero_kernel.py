@@ -82,6 +82,9 @@ class SpheroCmdStatus:
         self.stopped: bool = False
 
     def run_frame(self, kernel: SpheroKernel, at: float) -> bool:
+        if self.stopped:
+            return False
+
         if self.start_at == 0:
             self.start_at = time.time()
 
@@ -128,6 +131,11 @@ class SpheroKernel:
         self.stop_at_collision: bool = False
         self.api.register_event(EventType.on_collision, self._on_collision)
 
+    def on_ready(self):
+        self.api.set_front_led(Color(0, 50, 0))
+        time.sleep(1)
+        self.api.set_front_led(Color(0, 0, 0))
+
     def _on_collision(self, api: SpheroEduAPI) -> None:
         if self.stop_at_collision:
             return
@@ -171,11 +179,11 @@ class SpheroKernel:
         self.stage_stacks = stages
 
     def toward(self, heading: int) -> int:
+        # return heading
         return round((self.front_angle + heading) % 360)
 
     def reset(self) -> None:
         self.api.stop_roll()
         self.api.clear_matrix()
-        self.front_angle = 0
         self.stage_stacks = []
         self.ran_stacks = []
