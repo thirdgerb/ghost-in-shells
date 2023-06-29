@@ -114,7 +114,6 @@ class SpheroRuntimeModeThink(Think, AgentStage):
         return chat_context
 
     def _on_receive_event(self, ctx: Context, this: SpheroRuntimeThought, event: SpheroEventMessage) -> Operator:
-        has_callback = False
         for log in event.runtime_logs:
             index = log.find("|")
             method = log[:index]
@@ -124,16 +123,12 @@ class SpheroRuntimeModeThink(Think, AgentStage):
             if method == Say.method or method == LambdaSpeak.method:
                 this.data.add_ai_message(log_text)
             else:
-                has_callback = True
-                this.data.add_system_message(f"你调用了函数 `{method}`, 结果如下: {log_text}")
+                this.data.add_system_message(f"我调用了函数 `{method}`, 运行结果如下: {log_text}")
         #
         # if event.stopped:
         #     message = f"指令运行中断, 原因: {event.stopped}"
         #     this.data.add_system_message(message)
-        if has_callback:
-            return self.on_receive_prompt(ctx, this)
-        else:
-            return ctx.mind(this).awaits()
+        return self.on_receive_prompt(ctx, this)
 
     #
     # def on_llm_text_message(self, ctx: Context, this: AgentThought, message: str) -> Operator:
@@ -153,18 +148,31 @@ class SpheroRuntimeModeThink(Think, AgentStage):
     def method_as_funcs(self) -> Dict[str, Type[BaseModel] | None]:
         return {
             # "fn_run_direction": SpheroDirection,
-            "fn_await": None,
+            "fn_await": Say,
+            "fn_restart": None,
         }
 
-    def fn_await(self, ctx: Context, this: SpheroRuntimeThought, args: None):
+    def fn_await(self, ctx: Context, this: SpheroRuntimeThought, args: Say):
         """
-        不做任何事情, 等待用户的下一条消息的输入.
+        说一句话, 不做任何事情, 等待用户的下一条消息的输入.
         """
+        if args and args.content:
+            args.content = args.content.replace("fn_await", "")
+            this.data.add_ai_message(args.content)
+            msg = SpheroCommandMessage()
+            msg.add(args)
+            ctx.send_at(this).output(msg)
         return ctx.mind(this).awaits()
+
+    def fn_restart(self, ctx: Context, this: SpheroRuntimeThought, args: None):
+        """
+        清空上下文, 重新开始对话. 当用户说 "重新开始", "从头开始" 之类指令时执行.
+        """
+        return ctx.mind(this).restart()
 
     def fn_run_direction(self, ctx: Context, this: SpheroRuntimeThought, args: SpheroDirection):
         """
-        让 Sphero 运行一条自然语言描述的命令, 执行一个或多个动作.
+        用自然语言描述一系列的指令, 执行完毕后等待用户输入. 可以用来实现复合动作. 但只能用自然语言描述命令.
         """
         commands, ok = self._core.parse_direction(ctx, args.direction)
         if ok:

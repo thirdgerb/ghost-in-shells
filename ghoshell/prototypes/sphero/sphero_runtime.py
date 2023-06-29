@@ -49,7 +49,7 @@ class SpheroBoltRuntime:
             self._thread.join()
 
     def _on_collision(self) -> None:
-        self.finish_cmd_stack(self._kernel, "碰撞事件", deliver_events=True, now=time.time())
+        self.finish_cmd_stack(self._kernel, "碰到东西", deliver_events=True, now=time.time())
         self.set_cmd_message(None)
 
     def _do_run(self):

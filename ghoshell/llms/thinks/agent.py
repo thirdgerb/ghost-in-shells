@@ -799,6 +799,10 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
 
         raise LogicException(f"invalid type `{type(result)}` of llm func {called_name} result")
 
+    def llm_func_not_found(self, ctx: Context, this: AgentThought, method: str) -> Operator:
+        this.data.add_system_message(f"function `{method}` not found")
+        return self.on_receive_prompt(ctx, this)
+
     def op_finish(self, ctx: Context, this: AgentThought, params: None) -> Operator | None:
         """
         系统指令: 当前任务的目的已完成, 结束当前任务.

@@ -48,8 +48,8 @@ class SpheroCommand(BaseModel, SpheroRunnable, metaclass=ABCMeta):
 
     def on_stop(self, duration: float, interrupt: str) -> str:
         if interrupt:
-            return f"{duration} 秒后中断, 原因是 `{interrupt}`"
-        return f"{duration}秒后完成."
+            return f"stopped after {duration} seconds, cause of `{interrupt}`"
+        return f"finished after {duration} seconds."
 
     @classmethod
     def read(cls, data: Dict) -> SpheroCommand | None:
@@ -103,8 +103,9 @@ class Roll(SpheroCommand):
         if status.ran_frames_count == 0:
             speed = self.speed
             heading = self.heading
-            if speed < 0:
+            if speed < 0 <= heading:
                 speed = -speed
+                heading = heading + 180
 
             kernel.api.set_front_led(Color(0, 200, 0))
             kernel.api.set_back_led(Color(0, 0, 0))
@@ -157,7 +158,7 @@ class Spin(SpheroCommand):
 
 class LambdaSpeak(SpheroCommand):
     method = "lambda_speak"
-    lambda_content: str = Field(description="用 python lambda 函数返回要说的话. 可以运行一些计算逻辑, "
+    lambda_content: str = Field(description="值是一个 python lambda 函数, 返回要说的话. 与 say 方法相比, 可以运行一些计算逻辑, "
                                             "比如计算运行距离: `lambda: '我滚动了{l}单位距离'.format(l=速度*时间)` ")
 
     @classmethod
@@ -172,20 +173,20 @@ class LambdaSpeak(SpheroCommand):
     """
 
     def runtime_info(self, duration: float, interrupt: str) -> str:
-        return self._get_text()
+        return self.get_text()
 
     def runtime_plan(self) -> str:
-        text = self._get_text()
+        text = self.get_text()
         return f"说 `{text}`"
 
-    def _get_text(self) -> str:
+    def get_text(self) -> str:
         fn = eval(self.lambda_content)
         return fn()
 
     def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float):
         if status.ran_frames_count == 0:
             kernel.api.stop_roll()
-            text = self._get_text()
+            text = self.get_text()
             kernel.api.set_front_led(Color(0, 50, 0))
             kernel.api.set_main_led(Color(0, 0, 100))
             kernel.speak(text)
@@ -200,11 +201,11 @@ class Say(SpheroCommand):
     """
 
     method = "say"
-    content: str = Field(description="要说的话.")
+    content: str = Field(description="要对用户说的话.")
 
     @classmethod
     def desc(cls) -> str:
-        return "用我的声音模块说话.比如 say(content=\"something\") "
+        return "用我的声音模块说话. 说的话可以被用户听到."
 
     @classmethod
     def yaml_desc(cls) -> str:
@@ -217,7 +218,7 @@ class Say(SpheroCommand):
         return self.content
 
     def runtime_plan(self) -> str:
-        return f"说 `{self.content}`"
+        return f"说: {self.content}"
 
     def run_frame(self, kernel: SpheroKernel, status: SpheroCmdStatus, at: float):
         if status.ran_frames_count == 0:
@@ -236,7 +237,7 @@ class Stop(SpheroCommand):
 
     @classmethod
     def desc(cls) -> str:
-        return "停止所有动作."
+        return "停止所有进行中的运动.符合命令`停下来`, `停止`"
 
     @classmethod
     def yaml_desc(cls) -> str:
