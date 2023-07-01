@@ -8,9 +8,9 @@
 这样一个 Ghost 可以同时存在于多个 Shells 里. 
 以对话机器人为例, 可以将 微信/飞书/discord 等不同通信方式的 IM 使用同一个 Ghost, 同构成一个机器人.
 
-核心的设计思路在 [ghoshell/ghost]() 目录下. 不过注释写得一塌糊涂.
+核心的设计思路在 [ghoshell/ghost](https://github.com/thirdgerb/ghost-in-shells/tree/main/ghoshell/ghost) 目录下. 不过注释写得一塌糊涂.
 
-这个项目的前身是 [https://github.com/thirdgerb/communechatbot]() :
+这个项目的前身是 [https://github.com/thirdgerb/chatbot](https://github.com/thirdgerb/chatbot) :
 * demo: https://communechatbot.com/
 * 实现思路: https://communechatbot.com/docs/#/
 
