@@ -41,7 +41,7 @@ class SpheroGhostCore:
         return "/".join([
             self.app_runtime_path.rstrip("/"),
             self.config.relative_runtime_path.strip("/"),
-            "/commands.yaml",
+            "commands.yaml",
         ])
 
     @classmethod
