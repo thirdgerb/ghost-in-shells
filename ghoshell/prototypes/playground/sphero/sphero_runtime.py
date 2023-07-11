@@ -5,8 +5,8 @@ from typing import Callable
 from spherov2 import scanner
 from spherov2.sphero_edu import SpheroEduAPI
 
-from ghoshell.prototypes.sphero.sphero_kernel import SpheroKernel, Speaker, Console, SpheroCmdStatus
-from ghoshell.prototypes.sphero.sphero_messages import SpheroCommandMessage, SpheroEventMessage, \
+from ghoshell.prototypes.playground.sphero.sphero_kernel import SpheroKernel, Speaker, Console, SpheroCmdStatus
+from ghoshell.prototypes.playground.sphero.sphero_messages import SpheroCommandMessage, SpheroEventMessage, \
     command_message_to_commands
 
 Dispatcher = Callable[[SpheroEventMessage], None]

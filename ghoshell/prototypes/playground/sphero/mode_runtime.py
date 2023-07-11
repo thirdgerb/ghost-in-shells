@@ -11,10 +11,10 @@ from ghoshell.ghost import Stage, Thought, ThinkMeta, URL
 from ghoshell.llms import OpenAIChatMsg
 from ghoshell.llms.thinks import AgentStage, AgentThought, AgentStageConfig, LLMFunc
 from ghoshell.messages import Text
-from ghoshell.prototypes.sphero.sphero_commands import defined_commands, Say, LambdaSpeak
-from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore
-from ghoshell.prototypes.sphero.sphero_llm_func import SpheroLLMFunc
-from ghoshell.prototypes.sphero.sphero_messages import SpheroEventMessage, SpheroCommandMessage
+from ghoshell.prototypes.playground.sphero.sphero_commands import defined_commands, Say, LambdaSpeak
+from ghoshell.prototypes.playground.sphero.sphero_ghost_core import SpheroGhostCore
+from ghoshell.prototypes.playground.sphero.sphero_llm_func import SpheroLLMFunc
+from ghoshell.prototypes.playground.sphero.sphero_messages import SpheroEventMessage, SpheroCommandMessage
 
 
 class SpheroDirection(BaseModel):

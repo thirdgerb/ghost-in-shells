@@ -7,6 +7,12 @@ from typing import List, Dict, ClassVar
 from pydantic import BaseModel, Field
 
 
+# 这里是用的 openai 提供的抽象
+# 没有定义成通用抽象, 因为 LLM 现在没有 openai 之外的 API 解决方案, 未来的接口也可能会向 openai 看齐.
+# 所以用 openai 的接口抽象当成暂时的标准.
+# 整个系统少了一个 API 层, 应该用 API 层去屏蔽掉对模型层的调用.
+
+
 class OpenAIFuncSchema:
     """
     openai 对 function 的定义策略.

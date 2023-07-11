@@ -2,9 +2,9 @@ import time
 
 from ghoshell.container import Container
 from ghoshell.messages import Output, Text
-from ghoshell.prototypes.baidu_speech import BaiduSpeechShell
-from ghoshell.prototypes.sphero.sphero_messages import SpheroCommandMessage
-from ghoshell.prototypes.sphero.sphero_runtime import SpheroBoltRuntime
+from ghoshell.prototypes.playground.baidu_speech import BaiduSpeechShell
+from ghoshell.prototypes.playground.sphero.sphero_messages import SpheroCommandMessage
+from ghoshell.prototypes.playground.sphero.sphero_runtime import SpheroBoltRuntime
 
 
 class SpheroBoltShell(BaiduSpeechShell):

@@ -7,7 +7,7 @@ from typing import ClassVar, List, Dict, Type
 from pydantic import Field, BaseModel
 from spherov2.types import Color
 
-from ghoshell.prototypes.sphero.sphero_kernel import SpheroKernel, SpheroRunnable, SpheroCmdStatus
+from ghoshell.prototypes.playground.sphero.sphero_kernel import SpheroKernel, SpheroRunnable, SpheroCmdStatus
 
 xx = math.sin(30)
 

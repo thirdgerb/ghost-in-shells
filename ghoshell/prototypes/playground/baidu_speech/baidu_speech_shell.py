@@ -18,7 +18,7 @@ from ghoshell.container import Container
 from ghoshell.ghost import URL
 from ghoshell.messages import Input, Output, Message
 from ghoshell.messages import Text, ErrMsg, Signal
-from ghoshell.prototypes.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
+from ghoshell.prototypes.playground.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
 from ghoshell.shell_fmk import ShellKernel
 
 

@@ -8,7 +8,7 @@ import requests
 import yaml
 
 from ghoshell.container import Provider, Container, Contract
-from ghoshell.prototypes.baidu_speech.config import BaiduSpeechConfig
+from ghoshell.prototypes.playground.baidu_speech.config import BaiduSpeechConfig
 from ghoshell.shell import Shell, BoostrapException
 
 

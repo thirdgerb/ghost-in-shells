@@ -5,16 +5,10 @@ import traceback
 class GhostException(Exception):
     """
     ghoshell 为 ghost 定义的 exception
-    参考 http statuscode, 区分了几档.
-    200~299: 正常区间
-    300~399: 与 shell / client 通信的状态码.
-    400~499: 表示客户端输入异常
-    500~599: 表示系统自身异常, 通常会导致系统重启, 重置状态.
-
-    todo: 注意, 现在还没研究过错误码, 都是乱写的.
+    work in progress
     """
 
-    CODE: int = 500
+    CODE: int = 100
 
     def __init__(self, message: str, at: str = "", e: Exception = None):
         self.message: str = message
@@ -30,60 +24,76 @@ class GhostException(Exception):
         return "\n".join(traceback.format_exception(*sys.exc_info(), limit=3))
 
 
-class StackoverflowException(GhostException):
+class ConversationException(GhostException):
     """
-    出现了死循环逻辑, 用爆栈错误来中断.
+    会话过程中发生的异常.
     """
-    CODE: int = 505
+
+    CODE: int = 400
+
+
+class ForbiddenException(ConversationException):
+    CODE: int = 403
 
 
 class UnhandledException(GhostException):
     """
     表示无法处理的消息.
     """
-    CODE: int = 204
+    CODE: int = 410
     pass
 
 
-class MindsetNotFoundException(GhostException):
+class BusyException(ConversationException):
     """
-    表示来到了没有思维存在的荒漠.
+    系统忙碌.
     """
-    CODE: int = 404
+    CODE: int = 420
 
 
-class LogicException(GhostException):
+class ErrMessageException(ConversationException):
     """
-    设计错误.
+    用来传递信息的 err
     """
-
-    CODE: int = 600
+    CODE: int = 430
 
 
 class RuntimeException(GhostException):
     """
-    致命错误, 系统应该重置所有的思维.
+    无法响应的系统错误.
+    由于会导致对话无法继续进行, 所以是致命错误, 系统应该重置所有的上下文.
     """
-    CODE: int = 505
+    CODE: int = 500
 
 
-class BusyException(GhostException):
+class MindsetNotFoundException(RuntimeException):
     """
-    系统忙碌.
+    表示来到了没有思维存在的荒漠.
+    通常是注册出了问题.
     """
-    CODE: int = 409
+    CODE: int = 510
 
 
-class ErrMessageException(GhostException):
+class OperatorException(RuntimeException):
     """
-    用来传递信息的 err
+    Runtime 的算子发生了错误.
     """
-    CODE: int = 403
+    CODE: int = 520
 
 
-class OperatorException(GhostException):
-    CODE: int = 522
+class StackoverflowException(GhostException):
+    """
+    出现了死循环逻辑, 用爆栈错误来中断.
+    """
+    CODE: int = 530
 
 
-class BootstrapException(GhostException):
+class LogicException(GhostException):
+    """
+    工程上的设计错误, 系统不应该启动.
+    """
     CODE: int = 600
+
+
+class BootstrapException(LogicException):
+    CODE: int = 610

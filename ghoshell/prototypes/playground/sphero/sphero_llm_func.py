@@ -6,9 +6,9 @@ from ghoshell.ghost import Context, Thought, Operator
 from ghoshell.llms import OpenAIFuncSchema
 from ghoshell.llms.thinks import AgentThought
 from ghoshell.llms.thinks import LLMFunc
-from ghoshell.prototypes.sphero.sphero_commands import SpheroCommand, Say
-from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore
-from ghoshell.prototypes.sphero.sphero_messages import SpheroCommandMessage
+from ghoshell.prototypes.playground.sphero.sphero_commands import SpheroCommand, Say
+from ghoshell.prototypes.playground.sphero.sphero_ghost_core import SpheroGhostCore
+from ghoshell.prototypes.playground.sphero.sphero_messages import SpheroCommandMessage
 
 
 class SpheroLLMFunc(LLMFunc):

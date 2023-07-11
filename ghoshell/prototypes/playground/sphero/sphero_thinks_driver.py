@@ -4,11 +4,11 @@ import yaml
 
 from ghoshell.ghost import Ghost, ThinkDriver, ThinkMeta, Think, MindsetNotFoundException
 from ghoshell.ghost_fmk import Bootstrapper
-from ghoshell.prototypes.sphero.mode_learn import SpheroLearningModeThink
-from ghoshell.prototypes.sphero.mode_runtime import SpheroRuntimeModeThink
-from ghoshell.prototypes.sphero.mode_simple import SpheroSimpleCommandModeThink
-from ghoshell.prototypes.sphero.sphero_ghost_configs import SpheroGhostConfig
-from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore, SpheroCommandsCache
+from ghoshell.prototypes.playground.sphero.mode_learn import SpheroLearningModeThink
+from ghoshell.prototypes.playground.sphero.mode_runtime import SpheroRuntimeModeThink
+from ghoshell.prototypes.playground.sphero.mode_simple import SpheroSimpleCommandModeThink
+from ghoshell.prototypes.playground.sphero.sphero_ghost_configs import SpheroGhostConfig
+from ghoshell.prototypes.playground.sphero.sphero_ghost_core import SpheroGhostCore, SpheroCommandsCache
 
 
 class SpheroGhostBootstrapper(Bootstrapper):

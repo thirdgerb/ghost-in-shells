@@ -6,8 +6,9 @@ from pydantic import BaseModel, Field
 
 from ghoshell.ghost import Context, CtxTool
 from ghoshell.llms import OpenAIChatCompletion, OpenAIChatMsg, OpenAIChatChoice
-from ghoshell.prototypes.sphero.sphero_commands import Say, commands_yaml_instruction, loop_check, ability_check
-from ghoshell.prototypes.sphero.sphero_ghost_configs import SpheroGhostConfig, LearningModeOutput
+from ghoshell.prototypes.playground.sphero.sphero_commands import Say, commands_yaml_instruction, loop_check, \
+    ability_check
+from ghoshell.prototypes.playground.sphero.sphero_ghost_configs import SpheroGhostConfig, LearningModeOutput
 
 
 class SpheroCommandsCache(BaseModel):

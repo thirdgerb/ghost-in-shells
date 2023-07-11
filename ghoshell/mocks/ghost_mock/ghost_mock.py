@@ -13,9 +13,10 @@ from ghoshell.llms.thinks import ConversationalThinksBootstrapper, FileAgentMind
 from ghoshell.mocks.cache import MockCacheProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
 # from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
-from ghoshell.prototypes.llm_test_ghost import GameUndercoverBootstrapper
-from ghoshell.prototypes.llm_test_ghost import LLMConversationalThinkBootstrapper, PromptUnitTestsBootstrapper
-from ghoshell.prototypes.sphero import SpheroGhostBootstrapper
+from ghoshell.prototypes.playground.llm_test_ghost import GameUndercoverBootstrapper
+from ghoshell.prototypes.playground.llm_test_ghost import LLMConversationalThinkBootstrapper, \
+    PromptUnitTestsBootstrapper
+from ghoshell.prototypes.playground.sphero import SpheroGhostBootstrapper
 
 
 class OperatorMock(OperationKernel):

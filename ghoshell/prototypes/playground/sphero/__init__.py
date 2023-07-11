@@ -1,5 +1,5 @@
-from ghoshell.prototypes.sphero.sphero_shell import SpheroBoltShell
-from ghoshell.prototypes.sphero.sphero_thinks_driver import SpheroGhostBootstrapper
+from ghoshell.prototypes.playground.sphero.sphero_shell import SpheroBoltShell
+from ghoshell.prototypes.playground.sphero.sphero_thinks_driver import SpheroGhostBootstrapper
 
 __all__ = [
     # "SpheroEventMessage",

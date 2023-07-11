@@ -20,7 +20,8 @@ class ConversationalConfig(BaseModel):
     # think 的自我描述, 后面用于做能力的提示.
     desc: str = ""
 
-    llm_name: str = ""
+    # 使用的 llm 的配置名. 详见 OpenAIChatCompletion 接口
+    llm_config: str = ""
 
     # ai 扮演的角色.
     assistant_name: str = "AI"
@@ -158,7 +159,7 @@ class DefaultConversationalStage(BasicStage):
         chat = llm.chat_completion(
             ctx.input.trace.session_id,
             chats,
-            config_name=self.config.llm_name,
+            config_name=self.config.llm_config,
         )
 
         this.data.context.append(chat.as_chat_msg())

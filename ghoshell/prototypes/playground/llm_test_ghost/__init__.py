@@ -1,7 +1,7 @@
-from ghoshell.prototypes.llm_test_ghost.bootstrapper import *
-from ghoshell.prototypes.llm_test_ghost.conversational import ConversationalThinkConfig
-from ghoshell.prototypes.llm_test_ghost.prompt_unittest import *
-from ghoshell.prototypes.llm_test_ghost.undercover import *
+from ghoshell.prototypes.playground.llm_test_ghost.bootstrapper import *
+from ghoshell.prototypes.playground.llm_test_ghost.conversational import ConversationalThinkConfig
+from ghoshell.prototypes.playground.llm_test_ghost.prompt_unittest import *
+from ghoshell.prototypes.playground.llm_test_ghost.undercover import *
 
 #
 # 探索过程中开发的 think

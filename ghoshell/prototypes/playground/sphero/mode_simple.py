@@ -6,9 +6,8 @@ from ghoshell.ghost import Context, Thought, ThinkMeta, URL, DictThought
 from ghoshell.ghost import Operator, Reaction, Intention
 from ghoshell.ghost_fmk.thinks import SingleStageThink
 from ghoshell.messages import Text
-from ghoshell.prototypes.sphero.sphero_ghost_configs import *
-from ghoshell.prototypes.sphero.sphero_ghost_core import SpheroGhostCore
-from ghoshell.prototypes.sphero.sphero_messages import SpheroCommandMessage
+from ghoshell.prototypes.playground.sphero.sphero_ghost_core import SpheroGhostCore
+from ghoshell.prototypes.playground.sphero.sphero_messages import SpheroCommandMessage
 
 
 # --- simple mode--- #

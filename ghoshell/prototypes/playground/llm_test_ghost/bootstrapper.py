@@ -4,9 +4,9 @@ import yaml
 
 from ghoshell.ghost import Ghost
 from ghoshell.ghost_fmk import Bootstrapper
-from ghoshell.prototypes.llm_test_ghost.conversational import ConversationalThinkConfig, ConversationalThink
-from ghoshell.prototypes.llm_test_ghost.prompt_unittest import PromptUnitTestThinkDriver
-from ghoshell.prototypes.llm_test_ghost.undercover import UndercoverGameDriver
+from ghoshell.prototypes.playground.llm_test_ghost.conversational import ConversationalThinkConfig, ConversationalThink
+from ghoshell.prototypes.playground.llm_test_ghost.prompt_unittest import PromptUnitTestThinkDriver
+from ghoshell.prototypes.playground.llm_test_ghost.undercover import UndercoverGameDriver
 
 
 class LLMConversationalThinkBootstrapper(Bootstrapper):
