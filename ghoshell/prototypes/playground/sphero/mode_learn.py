@@ -62,7 +62,7 @@ class LearningModeThought(Thought):
         self.data = self.Data(**variables)
 
     def vars(self) -> Dict | None:
-        return self.data.dict()
+        return self.data.model_dump()
 
     def _destroy(self) -> None:
         return
@@ -117,7 +117,7 @@ class SpheroLearningModeThink(SingleStageThink):
     def _receive_parsed_output(self, ctx: Context, parsed: LearningModeOutput, this: LearningModeThought) -> Operator:
         out = SpheroCommandMessage()
         if self._config.debug:
-            ctx.send_at(this).json(parsed.dict())
+            ctx.send_at(this).json(parsed.model_dump())
 
         # 完成赋值.
         if parsed.title:

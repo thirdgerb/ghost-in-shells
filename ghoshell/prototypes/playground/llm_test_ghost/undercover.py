@@ -151,7 +151,7 @@ class UndercoverGameThought(Thought):
         self.game_info = _UndercoverGameInfo(**variables)
 
     def vars(self) -> Dict | None:
-        _vars = self.game_info.dict()
+        _vars = self.game_info.model_dump()
         return _vars
 
     def _destroy(self) -> None:
@@ -549,7 +549,7 @@ reason: 原因
 
     @classmethod
     def save_review_result(cls, filename: str, game_info: _UndercoverGameInfo) -> None:
-        config = game_info.dict()
+        config = game_info.model_dump()
         with open(filename, 'w') as f:
             yaml.dump(config, f, allow_unicode=True)
 
@@ -601,7 +601,7 @@ class UndercoverGameDemoThink(Think):
         """
         生成一个会话唯一的 id
         """
-        return self.url().new_id(extra=ctx.input.trace.dict(include={"session_id"}))
+        return self.url().new_id(extra=ctx.input.trace.model_dump(include={"session_id"}))
 
     def new_thought(self, ctx: "Context", args: Dict) -> Thought:
         return UndercoverGameThought(args)

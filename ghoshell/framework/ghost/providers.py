@@ -86,7 +86,7 @@ class ContextLoggerProvider(Provider):
         if ctx.container.parent is None:
             raise BootstrapException("context container must be sub container of ghost")
         logger = logging.getLogger(self.logger_name)
-        adapter = LoggerAdapter(logger, extra={"trace": ctx.input.trace.dict()})
+        adapter = LoggerAdapter(logger, extra={"trace": ctx.input.trace.model_dump()})
         return adapter
 
 

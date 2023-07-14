@@ -219,7 +219,7 @@ class SpheroRuntimeModeThink(Think, AgentStage):
 #         self.data = self.Runtime(**variables)
 #
 #     def vars(self) -> Dict | None:
-#         return self.data.dict()
+#         return self.data.model_dump()
 #
 #     def _destroy(self) -> None:
 #         del self.data

@@ -73,7 +73,7 @@ class ThoughtCmdReaction(CommandReaction):
         todo: 实现 authentication
         """
         thought = CtxTool.fetch_current_thought(ctx)
-        ctx.send_at(this).json(thought.dict())
+        ctx.send_at(this).json(thought.model_dump())
         return ctx.mind(this).rewind()
 
 
@@ -135,7 +135,7 @@ class ProcessCmdReaction(CommandReaction):
             ctx.send_at(None).json(process.brief())
             return ctx.mind(None).rewind()
         else:
-            ctx.send_at(None).json(process.dict())
+            ctx.send_at(None).json(process.model_dump())
             return ctx.mind(None).rewind()
 
 
@@ -157,7 +157,7 @@ class TaskCmdReaction(CommandReaction):
         process = ctx.runtime.current_process()
         task = RuntimeTool.fetch_task(ctx, process.current)
         task = ctx.runtime.instance_task(task)
-        ctx.send_at(None).json(task.dict())
+        ctx.send_at(None).json(task.model_dump())
         return ctx.mind(None).rewind()
 
 

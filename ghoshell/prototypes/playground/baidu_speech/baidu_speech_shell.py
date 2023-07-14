@@ -126,7 +126,7 @@ class BaiduSpeechShell(ShellKernel):
         )
         return Input(
             mid=uuid.uuid4().hex,
-            url=self._config.root_url.dict(),
+            url=self._config.root_url.model_dump(),
             payload=msg.as_payload_dict(),
             trace=trace,
         )

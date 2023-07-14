@@ -61,7 +61,7 @@ class SendingImpl(Sender):
                 subject_id=inpt.trace.subject_id,
             )
         else:
-            trace_data = trace.dict()
+            trace_data = trace.model_dump()
 
         # 实例化.
         mid = self.ctx.session.new_message_id()
@@ -70,7 +70,7 @@ class SendingImpl(Sender):
             payload=dict(
                 tid=tid,
                 body={
-                    message.KIND: message.dict(),
+                    message.KIND: message.model_dump(),
                 }
             ),
             trace=trace_data,

@@ -21,7 +21,7 @@ class Argument(BaseModel):
     desc: str = ""
     short: str = ""
     default: Any = None
-    const: str = None
+    const: str | None = None
     nargs: int | str | None = None
     choices: List[Any] | None = None
 
@@ -42,7 +42,7 @@ class Command(BaseModel):
     epilog: str = ""
 
     def to_intention(self) -> CommandIntention:
-        return CommandIntention(kind=CommandIntentionKind, config=self.dict())
+        return CommandIntention(kind=CommandIntentionKind, config=self.model_dump())
 
 
 class CommandOutput(BaseModel):
@@ -95,7 +95,7 @@ class _ArgumentParserWrapper(ArgumentParser):
 
 
 class HelpCommand(CommandIntention):
-    config = Command(
+    config: Command = Command(
         name="help",
         desc="show all the available commands",
     )
@@ -114,7 +114,7 @@ class HelpCommand(CommandIntention):
         command_intentions = grouped_intentions.get(CommandIntentionKind, [])
         commands: List[Command] = [self.config]
         for intention in command_intentions:
-            cmd = CommandIntention(**intention.dict())
+            cmd = CommandIntention(**intention.model_dump())
             commands.append(cmd.config)
         # 进行解析.
         format_line = handler.format_help_commands(commands)
@@ -160,7 +160,7 @@ show current commands. use -h option on command to see details:
                 command_lines.append(meta)
             else:
                 # 二次包装.
-                line = CommandIntention(**meta.dict())
+                line = CommandIntention(**meta.model_dump())
                 command_lines.append(line)
         return self.match_raw_text(text.content, *command_lines)
 
@@ -239,7 +239,7 @@ show current commands. use -h option on command to see details:
     @classmethod
     def parse_argument_kwargs(cls, arg: Argument) -> Dict:
         result = {}
-        origin = arg.dict()
+        origin = arg.model_dump()
         mapping = {
             "dest": "name",
             "description": "help",

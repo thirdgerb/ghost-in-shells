@@ -28,7 +28,7 @@ class RuntimeImpl(Runtime):
         self._config = config
 
         # init root
-        self._root_url: URL = URL(**config.root_url.dict())
+        self._root_url: URL = URL(**config.root_url.model_dump())
 
         # 缓存数据的初始化.
         self._cached_tasks: Dict[str, Dict[str, Task]] = {}
@@ -324,7 +324,7 @@ class CacheRuntimeDriver(RuntimeDriver):
         for tid in data:
             key = self._get_task_key(session_id, tid)
             tasked = data[tid]
-            task_data = tasked.dict()
+            task_data = tasked.model_dump()
             val = json.dumps(task_data)
             self._cache.set(key, val, tasked.overdue)
 

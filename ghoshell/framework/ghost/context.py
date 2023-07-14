@@ -34,7 +34,7 @@ class ContextImpl(Context):
         # 初始化 input
         self._origin_input = inpt
         # 防止交叉污染.
-        self._input = Input(**inpt.dict())
+        self._input = Input(**inpt.model_dump())
 
         # 初始化其它参数.
         self._failed: bool = False

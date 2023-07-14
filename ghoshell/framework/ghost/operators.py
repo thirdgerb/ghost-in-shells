@@ -244,7 +244,7 @@ class IntendingOperator(AbsOperator):
 
         thought = RuntimeTool.fetch_thought_by_task(ctx, task)
         # 这里就反映出 python 弱约束 + 强类型的痛苦了.
-        result = self.matched.dict(include={"params"})
+        result = self.matched.model_dump(include={"params"})
         op = reaction.react(ctx, thought, result.get("params", None))
         RuntimeTool.merge_thought_to_task(thought, task)
         RuntimeTool.store_task(ctx, task)
@@ -345,7 +345,7 @@ class ActivateOperator(AbsOperator):
 
                 event = OnActivating(task.tid, self.to.stage, self.fr)
                 return RuntimeTool.fire_event(ctx, event)
-            case TaskStatus.FINISHED, TaskStatus.DEAD:
+            case [TaskStatus.FINISHED, TaskStatus.DEAD]:
                 # 重启任务.
                 task.restart()
                 RuntimeTool.store_task(ctx, task)
@@ -353,7 +353,7 @@ class ActivateOperator(AbsOperator):
                 return RuntimeTool.fire_event(ctx, event)
 
             # preempting
-            case TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING:
+            case [TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING]:
                 event = OnPreempted(task.tid, task.url.stage, self.fr)
                 return RuntimeTool.fire_event(ctx, event)
             case _:
@@ -450,10 +450,10 @@ class AwaitOperator(AbsOperator):
             if reaction is None:
                 continue
             intentions = reaction.intentions(ctx)
-            url_dict = task.url.dict()
+            url_dict = task.url.model_dump()
             attention = Attention(
                 to=url_dict,
-                intentions=[intention.dict() for intention in intentions],
+                intentions=[intention.model_dump() for intention in intentions],
                 reaction=reaction_name,
                 level=reaction.level(),
             )

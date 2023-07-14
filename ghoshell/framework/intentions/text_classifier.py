@@ -11,6 +11,8 @@ class TextClassifier(Intention):
     """
     kind = "text_classifier"
 
+    # TODO[pydantic]: The `Config` class inherits from another class, please create the `model_config` manually.
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
     class Config(BaseModel):
         description: str = ""
         examples: List[str] = []

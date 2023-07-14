@@ -47,10 +47,10 @@ class ConversationalThinkConfig(BaseModel):
     # 对话到达了最大的轮次后, 是结束会话还是遗忘.
     conclusion_on_max_turns: bool = False
     # 默认的 debug 模式
-    debug = False
+    debug: bool = False
 
     # 对话内容是否需要用符号括起来, 防止 hack
-    dialog_quote_mark = True
+    dialog_quote_mark: bool = True
 
     # 默认的 prompt 模板. 会用 instruction 的值去填充.
     on_receive_template: str = RECEIVE_TEMPLATE
@@ -107,7 +107,7 @@ class ConversationalThought(Thought):
     def vars(self) -> Dict | None:
         if self.data is None:
             return None
-        return self.data.dict()
+        return self.data.model_dump()
 
     def _destroy(self) -> None:
         del self.data
@@ -290,7 +290,7 @@ class ConversationalThink(Think, ThinkDriver):
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:
         # 每次都是同一意图. 
-        return self.url().new_id(extra=ctx.input.trace.dict(include={"session_id"}))
+        return self.url().new_id(extra=ctx.input.trace.model_dump(include={"session_id"}))
 
     def new_thought(self, ctx: "Context", args: Dict) -> Thought:
         thought = ConversationalThought(args)

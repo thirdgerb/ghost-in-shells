@@ -179,4 +179,4 @@ class ContextValue(BaseModel, metaclass=ABCMeta):
         return cls(**value)
 
     def set(self, ctx: Context) -> None:
-        ctx.set(self.key, self.dict())
+        ctx.set(self.key, self.model_dump())

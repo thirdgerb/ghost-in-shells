@@ -15,6 +15,7 @@ class FileLoggerBootstrapper(GhostBootstrapper):
 
     def bootstrap(self, ghost: Ghost):
         # set logger
+        logging.captureWarnings(True)
         logger = getLogger(self.logger_name)
         container = ghost.container
         container.set(logging.Logger, logger)

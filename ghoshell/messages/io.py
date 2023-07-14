@@ -48,7 +48,7 @@ class Input(BaseModel):
 
     # 传入 shell 侧携带的上下文信息, shell 侧定义的协议
     # 如果 ghost 希望理解 shell 的话, 可以主动处理这部分上下文
-    shell_env: Dict = None
+    shell_env: Dict | None = None
 
     # ghost 约定的上下文协议. 可以传入额外的信息
     # ghost_env: Dict = None
@@ -98,7 +98,7 @@ class Output(BaseModel):
     @classmethod
     def new(cls, mid: str, _input: Input, trace: Trace | None = None, tid: str | None = None) -> Output:
         if trace is None:
-            trace = _input.trace.dict()
+            trace = _input.trace.model_dump()
         payload = {}
         if tid:
             payload["tid"] = tid

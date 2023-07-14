@@ -58,7 +58,7 @@ class SpheroCommand(BaseModel, SpheroRunnable, metaclass=ABCMeta):
         return None
 
     def to_command_data(self) -> Dict:
-        data = self.dict()
+        data = self.model_dump()
         data["method"] = self.method
         return data
 

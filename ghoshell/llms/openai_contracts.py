@@ -48,7 +48,7 @@ class OpenAIChatMsg(BaseModel):
     function_call: Dict | None = None
 
     def to_message(self) -> Dict:
-        data = self.dict(include={"role", "content", "name", "function_call"})
+        data = self.model_dump(include={"role", "content", "name", "function_call"})
         result = {}
         for key in data:
             value = data[key]

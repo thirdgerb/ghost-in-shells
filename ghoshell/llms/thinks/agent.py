@@ -103,7 +103,7 @@ class AgentThinkConfig(BaseModel):
         return ThinkMeta(
             id=self.name,
             kind=AGENT_THINK_DRIVER_NAME,
-            config=self.dict(),
+            config=self.model_dump(),
         )
 
 
@@ -178,7 +178,7 @@ class AgentThought(Thought):
         self.data = wrapper(**variables)
 
     def vars(self) -> Dict | None:
-        data = self.data.dict()
+        data = self.data.model_dump()
         return data
 
 
@@ -427,7 +427,7 @@ class AgentThink(Think, Stage):
         return ThinkMeta(
             id=self.config.name,
             kind=AGENT_THINK_DRIVER_NAME,
-            config=self.config.dict(),
+            config=self.config.model_dump(),
         )
 
     def desc(self, ctx: Context, thought: Thought | None) -> AnyStr:

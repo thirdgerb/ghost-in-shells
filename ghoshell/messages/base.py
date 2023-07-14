@@ -45,7 +45,7 @@ class Message(BaseModel, metaclass=ABCMeta):
     def as_payload_dict(self, tid: str = "") -> Dict:
         return dict(
             tid=tid,
-            body={self.KIND: self.dict()}
+            body={self.KIND: self.model_dump()}
         )
 
     def join(self, payload: Payload) -> bool:
@@ -54,7 +54,7 @@ class Message(BaseModel, metaclass=ABCMeta):
     def join_body(self, body: Dict) -> bool:
         if self.KIND in body:
             return False
-        body[self.KIND] = self.dict()
+        body[self.KIND] = self.model_dump()
         return True
 
 

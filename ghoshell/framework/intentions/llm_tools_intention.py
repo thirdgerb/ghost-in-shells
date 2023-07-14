@@ -40,7 +40,7 @@ class LLMToolIntention(Intention):
 
 
 class LLMToolsFocusConfig(BaseModel):
-    instruction = """
+    instruction: str = """
 我是一个自然语言理解中间件 (NLU), 在思考用户说得话是否正好对应我的某种工具.
 这些工具也是基于大语言模型实现的. 
 
@@ -63,9 +63,9 @@ class LLMToolsFocusConfig(BaseModel):
 我的思考如下: 
 """
 
-    tool_temp = "* {name}: {desc}"
+    tool_temp: str = "* {name}: {desc}"
 
-    invalid_mark = "no"
+    invalid_mark: str = "no"
 
 
 class LLMToolsFocusDriver(FocusDriver):
@@ -79,7 +79,7 @@ class LLMToolsFocusDriver(FocusDriver):
         return LLM_TOOL_INTENTION_KIND
 
     def match(self, ctx: Context, *metas: Intention) -> Optional[LLMToolIntention]:
-        wrapped = [LLMToolIntention(**meta.dict()) for meta in metas]
+        wrapped = [LLMToolIntention(**meta.model_dump()) for meta in metas]
         text = Text.read(ctx.input.payload)
         if text is None:
             return None
@@ -135,7 +135,7 @@ class LLMToolsFocusDriver(FocusDriver):
 
     def register_global_intentions(self, *intentions: Intention) -> None:
         for i in intentions:
-            wrapped = LLMToolIntention(**i.dict())
+            wrapped = LLMToolIntention(**i.model_dump())
             self.global_tools.append(wrapped)
 
     def wildcard_match(self, ctx: Context) -> Optional[Intention]:

@@ -80,7 +80,7 @@ class ConversationalThought(Thought):
     def vars(self) -> Dict | None:
         if self.data is None:
             return None
-        return self.data.dict()
+        return self.data.model_dump()
 
     def _destroy(self) -> None:
         del self.data
@@ -245,7 +245,7 @@ class ConversationalThink(Think, ThinkDriver):
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:
         # 每次都是同一意图.
-        return self.url().new_id(extra=ctx.input.trace.dict(include={"session_id"}))
+        return self.url().new_id(extra=ctx.input.trace.model_dump(include={"session_id"}))
 
     def new_thought(self, ctx: "Context", args: Dict) -> Thought:
         thought = ConversationalThought(args)

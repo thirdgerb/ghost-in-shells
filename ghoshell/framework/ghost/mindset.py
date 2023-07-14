@@ -148,4 +148,4 @@ class LocalFileThinkMetaStorage(ThinkMetaStorage):
         self._cached_metas[meta.id] = meta
         filename = self._make_filename(meta.id)
         with open(filename, 'w') as f:
-            yaml.safe_dump(meta.dict(), f, allow_unicode=True)
+            yaml.safe_dump(meta.model_dump(), f, allow_unicode=True)

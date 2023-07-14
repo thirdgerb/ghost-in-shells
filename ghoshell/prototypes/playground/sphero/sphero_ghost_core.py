@@ -183,7 +183,7 @@ class SpheroGhostCore:
     def _save_cached(self):
         filename = self._cached_commands_file()
         with open(filename, 'w') as f:
-            yaml.safe_dump(self._cached_commands.dict(), f, allow_unicode=True)
+            yaml.safe_dump(self._cached_commands.model_dump(), f, allow_unicode=True)
 
     @classmethod
     def _unpack_commands_in_direction(cls, text: str) -> List[Dict]:
@@ -193,7 +193,7 @@ class SpheroGhostCore:
         text = cls._unpack_yaml_in_text(text)
         command_data = yaml.safe_load(text)
         if isinstance(command_data, str):
-            return [Say(content=command_data).dict()]
+            return [Say(content=command_data).model_dump()]
         if not isinstance(command_data, list):
             raise RuntimeError(f"invalid ghost response: {text}")
         return command_data

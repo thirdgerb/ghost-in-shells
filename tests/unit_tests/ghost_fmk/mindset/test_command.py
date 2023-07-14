@@ -6,8 +6,8 @@ def test_command_intention():
     intention = Command(name="foo").to_intention()
     assert intention is not None
 
-    parsed = Intention(**intention.dict())
-    cmd = CommandIntention(**parsed.dict())
+    parsed = Intention(**intention.model_dump())
+    cmd = CommandIntention(**parsed.model_dump())
     assert cmd.config.name == "foo"
 
 #
