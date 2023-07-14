@@ -2,8 +2,8 @@
 #
 # from ghoshell.ghost import Input
 # from ghoshell.shell import IShell
-# from ghoshell.shell_fmk import EventMiddleware
-# from ghoshell.shell_fmk.shell import EventPipe, EventPipeline
+# from ghoshell.framework.shell import EventMiddleware
+# from ghoshell.framework.shell.shell import EventPipe, EventPipeline
 
 
 # class ParseLarkEventToInputPipe(EventMiddleware):

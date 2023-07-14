@@ -1,8 +1,8 @@
 from typing import Iterator, Optional, Dict, Type
 
 from ghoshell.container import Provider, Container, Contract
+from ghoshell.framework.contracts import ThinkMetaStorage
 from ghoshell.ghost.mindset import ThinkMeta
-from ghoshell.ghost_fmk import ThinkMetaStorage
 
 
 class ThinkMetaDriverMock(ThinkMetaStorage):

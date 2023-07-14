@@ -2,13 +2,13 @@ import os
 
 import yaml
 
+from ghoshell.framework.ghost import GhostBootstrapper
 from ghoshell.ghost import Ghost
-from ghoshell.ghost_fmk import Bootstrapper
 from ghoshell.llms.thinks.agent import FileAgentMindset, FileAgentFuncStorage, AgentFuncStorage
 from ghoshell.llms.thinks.conversational import ConversationalConfig, ConversationalThink
 
 
-class ConversationalThinksBootstrapper(Bootstrapper):
+class ConversationalThinksBootstrapper(GhostBootstrapper):
     """
     支持注册多个
     """
@@ -29,7 +29,7 @@ class ConversationalThinksBootstrapper(Bootstrapper):
                 mindset.register_think(think)
 
 
-class FileAgentFuncStorageBootstrapper(Bootstrapper):
+class FileAgentFuncStorageBootstrapper(GhostBootstrapper):
     """
     基于本地文件提供全局可用的 agent func.
     """
@@ -42,7 +42,7 @@ class FileAgentFuncStorageBootstrapper(Bootstrapper):
         ghost.container.set(AgentFuncStorage, storage)
 
 
-class FileAgentMindsetBootstrapper(Bootstrapper):
+class FileAgentMindsetBootstrapper(GhostBootstrapper):
     """
     基于本地文件实现 agent 的配置.
     """

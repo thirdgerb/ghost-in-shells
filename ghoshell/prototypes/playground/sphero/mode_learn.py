@@ -4,10 +4,10 @@ from typing import Optional, Dict, AnyStr, List
 
 from pydantic import BaseModel, Field
 
+from ghoshell.framework.reactions.commands import ProcessCmdReaction
+from ghoshell.framework.thinks import SingleStageThink
 from ghoshell.ghost import Context, Thought, ThinkMeta, URL
 from ghoshell.ghost import Operator, Reaction, Intention
-from ghoshell.ghost_fmk.reactions.commands import ProcessCmdReaction
-from ghoshell.ghost_fmk.thinks import SingleStageThink
 from ghoshell.llms import OpenAIChatMsg
 from ghoshell.messages import Text
 from ghoshell.prototypes.playground.sphero.sphero_ghost_configs import SpheroLearningModeConfig, LearningModeOutput

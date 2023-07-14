@@ -5,8 +5,8 @@ from typing import Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 
+from ghoshell.framework.stages import BasicStage
 from ghoshell.ghost import *
-from ghoshell.ghost_fmk.stages import BasicStage
 from ghoshell.llms.utils import fetch_ctx_prompter
 from ghoshell.messages import *
 

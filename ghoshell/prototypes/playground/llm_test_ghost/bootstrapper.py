@@ -2,14 +2,14 @@ import os
 
 import yaml
 
+from ghoshell.framework.ghost import GhostBootstrapper
 from ghoshell.ghost import Ghost
-from ghoshell.ghost_fmk import Bootstrapper
 from ghoshell.prototypes.playground.llm_test_ghost.conversational import ConversationalThinkConfig, ConversationalThink
 from ghoshell.prototypes.playground.llm_test_ghost.prompt_unittest import PromptUnitTestThinkDriver
 from ghoshell.prototypes.playground.llm_test_ghost.undercover import UndercoverGameDriver
 
 
-class LLMConversationalThinkBootstrapper(Bootstrapper):
+class LLMConversationalThinkBootstrapper(GhostBootstrapper):
     """
     实现一个最简单的 LLMs 单任务多轮对话的注册机.
     直接注册实例.
@@ -36,7 +36,7 @@ class LLMConversationalThinkBootstrapper(Bootstrapper):
                 mindset.register_think(think)
 
 
-class PromptUnitTestsBootstrapper(Bootstrapper):
+class PromptUnitTestsBootstrapper(GhostBootstrapper):
 
     def __init__(self, relative_config_path: str = "/llms/unittests", think_prefix: str = "unittests"):
         self.relative_config_path = relative_config_path
@@ -51,7 +51,7 @@ class PromptUnitTestsBootstrapper(Bootstrapper):
             mindset.register_meta(meta)
 
 
-class GameUndercoverBootstrapper(Bootstrapper):
+class GameUndercoverBootstrapper(GhostBootstrapper):
 
     def __init__(self, relative_review_dir: str = "/games/undercover", think_name: str = None):
         self.relative_review_path = relative_review_dir

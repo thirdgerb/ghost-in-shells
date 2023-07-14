@@ -4,7 +4,7 @@
 #
 # from ghoshell.shell.prototypes.lark.config import LarkShellConfig
 #
-# from ghoshell.shell_fmk.shell import Bootstrapper
+# from ghoshell.framework.shell.shell import Bootstrapper
 #
 # if TYPE_CHECKING:
 #     from ghoshell.shell.prototypes.lark.shell import LarkShell

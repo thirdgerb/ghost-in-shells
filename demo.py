@@ -6,12 +6,12 @@ import yaml
 from rich.prompt import Prompt
 
 from ghoshell.container import Container
+from ghoshell.framework.ghost import GhostConfig
+from ghoshell.framework.shell import SyncGhostMessenger, MessageQueue
 from ghoshell.ghost import Ghost
-from ghoshell.ghost_fmk import GhostConfig
 from ghoshell.mocks import MockGhost, MockMessageQueueProvider
 from ghoshell.prototypes import ConsoleShell, BaiduSpeechShell, SpheroBoltShell
 from ghoshell.shell import Messenger
-from ghoshell.shell_fmk import SyncGhostMessenger, MessageQueue
 
 pwd = os.getcwd()
 root_path = pwd + "/demo"

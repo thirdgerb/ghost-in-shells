@@ -15,11 +15,11 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from ghoshell.container import Container
+from ghoshell.framework.shell import ShellKernel
 from ghoshell.ghost import URL
 from ghoshell.messages import Input, Output, Message
 from ghoshell.messages import Text, ErrMsg, Signal
 from ghoshell.prototypes.playground.baidu_speech.adapter import BaiduSpeechAdapter, BaiduSpeechProvider
-from ghoshell.shell_fmk import ShellKernel
 
 
 class BaiduSpeechShellConfig(BaseModel):
@@ -138,7 +138,7 @@ class BaiduSpeechShell(ShellKernel):
 
     async def _main(self):
         with patch_stdout(raw=True):
-            background_task = asyncio.create_task(self.handle_async_output())
+            background_task = asyncio.create_task(self.listen_async_output())
             input_loop = asyncio.create_task(self._input_loop())
             shell_event_loop = asyncio.create_task(self._shell_event_loop())
 

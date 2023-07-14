@@ -6,8 +6,8 @@ from typing import Optional, List, Dict, Any, ClassVar, Tuple
 import yaml
 from pydantic import BaseModel, Field
 
+from ghoshell.framework.reactions import CommandReaction, Command, CommandOutput
 from ghoshell.ghost import *
-from ghoshell.ghost_fmk.reactions import CommandReaction, Command, CommandOutput
 from ghoshell.llms.utils import fetch_ctx_prompter
 from ghoshell.messages import *
 

@@ -32,5 +32,5 @@ chat_completions:
     model: "gpt-4-0613"
     temperature: 0.7
     max_tokens: 3000
-    timeout: 30
-    request_timeout: 25
+    timeout: 80
+    request_timeout: 70

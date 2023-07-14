@@ -9,10 +9,10 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from ghoshell.container import Container
+from ghoshell.framework.shell import ShellKernel
+from ghoshell.framework.shell import ShellOutputPipe
 from ghoshell.ghost import Ghost
 from ghoshell.messages import *
-from ghoshell.shell_fmk import OutputMiddleware
-from ghoshell.shell_fmk import ShellKernel
 
 
 class ConsoleShell(ShellKernel):
@@ -29,7 +29,7 @@ class ConsoleShell(ShellKernel):
     ]
 
     # 输出处理
-    output_middlewares: ClassVar[List[OutputMiddleware]] = [
+    output_middlewares: ClassVar[List[ShellOutputPipe]] = [
     ]
 
     def __init__(self, container: Container, config_path: str, runtime_path: str):
@@ -64,7 +64,7 @@ log:
 
     async def _main(self):
         with patch_stdout(raw=True):
-            background_task = asyncio.create_task(self.handle_async_output())
+            background_task = asyncio.create_task(self.listen_async_output())
             try:
                 await self._prompt_loop()
             finally:

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Optional, Dict, AnyStr
 
+from ghoshell.framework.thinks import SingleStageThink
 from ghoshell.ghost import Context, Thought, ThinkMeta, URL, DictThought
 from ghoshell.ghost import Operator, Reaction, Intention
-from ghoshell.ghost_fmk.thinks import SingleStageThink
 from ghoshell.messages import Text
 from ghoshell.prototypes.playground.sphero.sphero_ghost_core import SpheroGhostCore
 from ghoshell.prototypes.playground.sphero.sphero_messages import SpheroCommandMessage

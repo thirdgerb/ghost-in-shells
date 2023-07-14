@@ -7,10 +7,10 @@ import yaml
 from pydantic import BaseModel, Field
 
 from ghoshell.container import Container
+from ghoshell.framework.stages import BasicStage
 from ghoshell.ghost import LogicException
 from ghoshell.ghost import Think, Event, OnReceived, CtxTool, Stage, ThinkMeta, Reaction, Intention, ThinkDriver, Focus
 from ghoshell.ghost import Thought, Operator, Context, URL, Mindset
-from ghoshell.ghost_fmk.stages import BasicStage
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion, OpenAIFuncSchema, OpenAIFuncCalled
 from ghoshell.messages import Text
 from ghoshell.utils import import_module_value

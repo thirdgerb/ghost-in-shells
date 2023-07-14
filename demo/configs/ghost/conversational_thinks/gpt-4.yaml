@@ -2,12 +2,12 @@
 name: chat/gpt-4
 llm_config: gpt-4-0613
 reactions:
-  cancel: ghoshell.ghost_fmk.reactions.cancel_cmd
-  restart: ghoshell.ghost_fmk.reactions.restart_cmd
-  quit: ghoshell.ghost_fmk.reactions.quit_cmd
-  task: ghoshell.ghost_fmk.reactions.task_cmd
-  process: ghoshell.ghost_fmk.reactions.process_cmd
-  instance_count: ghoshell.ghost_fmk.reactions.instance_count_cmd
-  thought: ghoshell.ghost_fmk.reactions.thought_cmd
-  redirect: ghoshell.ghost_fmk.reactions.redirect_cmd
+  cancel: ghoshell.framework.reactions.cancel_cmd
+  restart: ghoshell.framework.reactions.restart_cmd
+  quit: ghoshell.framework.reactions.quit_cmd
+  task: ghoshell.framework.reactions.task_cmd
+  process: ghoshell.framework.reactions.process_cmd
+  instance_count: ghoshell.framework.reactions.instance_count_cmd
+  thought: ghoshell.framework.reactions.thought_cmd
+  redirect: ghoshell.framework.reactions.redirect_cmd
 
