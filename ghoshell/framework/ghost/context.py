@@ -145,7 +145,7 @@ class ContextImpl(Context):
     def fail(self):
         self._failed = True
         # 清空数据.
-        self._input = self._origin_input.copy()
+        self._input = self._origin_input.model_copy()
         self._async_inputs_buffer = []
         self._outputs_buffer = []
 

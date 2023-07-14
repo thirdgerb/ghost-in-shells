@@ -1,12 +1,12 @@
 # ghoshell.llms.thinks.conversational.ConversationalConfig
 name: chat/baseline
 reactions:
-  cancel: ghoshell.framework.reactions.cancel_cmd
-  restart: ghoshell.framework.reactions.restart_cmd
-  quit: ghoshell.framework.reactions.quit_cmd
-  task: ghoshell.framework.reactions.task_cmd
-  process: ghoshell.framework.reactions.process_cmd
-  instance_count: ghoshell.framework.reactions.instance_count_cmd
-  thought: ghoshell.framework.reactions.thought_cmd
-  redirect: ghoshell.framework.reactions.redirect_cmd
+  cancel: ghoshell.framework.reactions:cancel_cmd
+  restart: ghoshell.framework.reactions:restart_cmd
+  quit: ghoshell.framework.reactions:quit_cmd
+  task: ghoshell.framework.reactions:task_cmd
+  process: ghoshell.framework.reactions:process_cmd
+  instance_count: ghoshell.framework.reactions:instance_count_cmd
+  thought: ghoshell.framework.reactions:thought_cmd
+  redirect: ghoshell.framework.reactions:redirect_cmd
 

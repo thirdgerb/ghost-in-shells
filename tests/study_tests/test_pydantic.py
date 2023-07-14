@@ -51,7 +51,7 @@ def test_children_copy() -> None:
     # 可以通过字典给子实体赋值.
     p = Parent(child={"foo": "foo", "bar": 123})
 
-    copied = p.copy()
+    copied = p.model_copy()
     copied.child.foo = "bar"
     assert copied.child.foo == "bar"
     # copy 不是深拷贝

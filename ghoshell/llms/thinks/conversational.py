@@ -1,4 +1,5 @@
-import importlib
+from __future__ import annotations
+
 from typing import List
 from typing import Optional, Dict, Any
 
@@ -8,6 +9,7 @@ from ghoshell.framework.stages import BasicStage
 from ghoshell.ghost import *
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion
 from ghoshell.messages import *
+from ghoshell.utils import import_module_value
 
 
 class ConversationalConfig(BaseModel):
@@ -209,11 +211,8 @@ class ConversationalThink(Think, ThinkDriver):
         default_reactions: Dict[str, Reaction] = {}
         for name in self.config.reactions:
             fullpath = self.config.reactions[name]
-            sections = fullpath.split(".")
-            value_name = sections[len(sections) - 1]
-            module = ".".join(sections[:len(sections) - 1])
-            imported = importlib.import_module(module)
-            default_reactions[name] = getattr(imported, value_name)
+            imported = import_module_value(fullpath)
+            default_reactions[name] = imported
 
         self.stages = {
             "": DefaultConversationalStage(

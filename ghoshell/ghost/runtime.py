@@ -384,7 +384,7 @@ class Process(BaseModel):
             current=self.current,
             parent_id=self.parent_id,
             round=self.round + 1,
-            tasks=[task.copy() for task in self.tasks],
+            tasks=[task.model_copy() for task in self.tasks],
         )
 
     @property
@@ -563,7 +563,7 @@ class Process(BaseModel):
         """
         将进程重置到根任务上.
         """
-        root = self.get_task(self.root).copy()
+        root = self.get_task(self.root).model_copy()
         root.restart()
         self.current = self.root
         self.tasks = [root]

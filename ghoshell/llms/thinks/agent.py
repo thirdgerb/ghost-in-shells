@@ -687,7 +687,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
 
         # 输入上下文.
         for m in this.data.dialog:
-            chat_context.append(m.copy())
+            chat_context.append(m.model_copy())
 
         # 加入最后的提示.
         if prompt:
