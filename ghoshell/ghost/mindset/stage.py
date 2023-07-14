@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import abstractmethod, ABCMeta
 from typing import List
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.mindset.events import *
+from ghoshell.ghost.mindset.events import Event
 from ghoshell.ghost.mindset.focus import Intention
 from ghoshell.ghost.mindset.operator import Operator
 from ghoshell.ghost.mindset.thought import Thought
-from ghoshell.ghost.url import URL
+from ghoshell.url import URL
 
 
 class Stage(metaclass=ABCMeta):

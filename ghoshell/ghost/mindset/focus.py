@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.mindset.operator import Operator
-from ghoshell.ghost.url import URL
+from ghoshell.url import URL
 
 
 class Intention(BaseModel):
@@ -78,7 +78,7 @@ class Focus(metaclass=ABCMeta):
     """
     工程化的注意力机制
     在运行中接受到各种事件, 比如 api/command/设备事件等等
-    通过 intentions 机制可以快速定位事件的处理者(task resolver => Thinking)
+    通过 intentions 机制可以快速定位事件的处理者(task think => Thinking)
     """
 
     @abstractmethod

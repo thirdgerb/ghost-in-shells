@@ -233,7 +233,7 @@ class DefaultConversationalStage(BasicStage):
         return self._send_and_await(ctx, this, self.config.instructions.on_preempted)
 
     def url(self) -> URL:
-        return URL(resolver=self.config.think, stage=self.stage_name)
+        return URL(think=self.config.think, stage=self.stage_name)
 
     def intentions(self, ctx: Context) -> List[Intention] | None:
         # todo: 下一步要实现 "能力" 的匹配.
@@ -269,7 +269,7 @@ class ConversationalThink(Think, ThinkDriver):
         )
 
     def url(self) -> URL:
-        return URL(resolver=self.config.think)
+        return URL(think=self.config.think)
 
     def driver_name(self) -> str:
         return f"{ConversationalThink.__name__}/{self.config.think}"
@@ -278,7 +278,7 @@ class ConversationalThink(Think, ThinkDriver):
         return self
 
     def to_meta(self) -> ThinkMeta:
-        resolver = self.url().resolver
+        resolver = self.url().think
         return ThinkMeta(
             id=resolver,
             kind=f"{self.driver_name()}",

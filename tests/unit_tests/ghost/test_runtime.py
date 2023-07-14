@@ -2,13 +2,13 @@ from ghoshell.ghost import Task, URL, Process, RuntimeException, TaskStatus
 
 
 def test_task_init():
-    task = Task(tid="a", url=URL(resolver="hello"))
+    task = Task(tid="a", url=URL(think="hello"))
     assert task is not None
 
 
 def test_process_init():
     p = Process.new_process("sid", "pid")
-    a = Task(tid="a", url=URL(resolver="a"))
+    a = Task(tid="a", url=URL(think="a"))
     p.store_task(a)
     assert p.root == "a"
     assert p.current == "a"
@@ -16,10 +16,10 @@ def test_process_init():
 
 def test_process_store_await_tasks():
     p = Process.new_process("sid", "pid")
-    a = Task(tid="a", url=URL(resolver="a"))
+    a = Task(tid="a", url=URL(think="a"))
     p.store_task(a)
 
-    b = Task(tid="b", url=URL(resolver="b"))
+    b = Task(tid="b", url=URL(think="b"))
     assert p.root == "a"
     e = None
     try:
@@ -36,8 +36,8 @@ def test_process_store_await_tasks():
 
 def test_process_store_canceled_task():
     p = Process.new_process("sid", "pid")
-    a = Task(tid="a", url=URL(resolver="a"))
-    b = Task(tid="b", url=URL(resolver="b"))
+    a = Task(tid="a", url=URL(think="a"))
+    b = Task(tid="b", url=URL(think="b"))
     p.store_task(a)
     p.store_task(b)
     assert p.running == ["b", "a"]
@@ -53,7 +53,7 @@ def test_process_store_canceled_task():
 
 def test_process_store_same_task():
     p = Process.new_process("sid", "pid")
-    a = Task(tid="a", url=URL(resolver="a"))
+    a = Task(tid="a", url=URL(think="a"))
     p.store_task(a, a, a, a, a)
     p.reset_indexes()
     assert len(p.tasks) == 1

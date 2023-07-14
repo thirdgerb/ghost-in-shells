@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Optional, List, ClassVar, Type, Dict
 
 from ghoshell.ghost import Attention, Intention
-from ghoshell.ghost import Context, URL
+from ghoshell.ghost import Context
 from ghoshell.ghost import CtxTool
 from ghoshell.ghost import OnReceived, OnActivating, OnPreempted, OnCallback
 from ghoshell.ghost import OnWithdrawing, OnCanceling, OnFailing, OnQuiting
@@ -10,6 +10,7 @@ from ghoshell.ghost import Operator
 from ghoshell.ghost import RuntimeTool
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
 from ghoshell.messages import Tasked, Signal
+from ghoshell.url import URL
 
 
 class AbsOperator(Operator, metaclass=ABCMeta):
@@ -124,7 +125,7 @@ class ReceiveInputOperator(AbsOperator):
                 # 任务消息就是根节点.
                 root = RuntimeTool.new_task(
                     ctx,
-                    URL.new(resolver=tasked.resolver, stage="", args=tasked.args),
+                    URL.new(think=tasked.think, stage="", args=tasked.args),
                 )
             else:
                 # 否则 root 用默认方式生成.
@@ -235,7 +236,7 @@ class IntendingOperator(AbsOperator):
 
     def _intend_to_stage(self, ctx: "Context", task: Task) -> Optional["Operator"]:
         fr = self.matched.target
-        stage_resolver = CtxTool.force_fetch_stage(ctx, fr.resolver, fr.stage)
+        stage_resolver = CtxTool.force_fetch_stage(ctx, fr.think, fr.stage)
         reaction_name = self.matched.reaction
         reactions = stage_resolver.reactions()
         if reaction_name is None or reaction_name not in reactions:
@@ -282,7 +283,7 @@ class TaskedMessageOperator(AbsOperator):
 
     def _run_operation(self, ctx: "Context") -> Optional["Operator"]:
         tasked = self.tasked
-        url = URL(think=tasked.resolver, stage=tasked.stage, args=tasked.args.copy())
+        url = URL(think=tasked.think, stage=tasked.stage, args=tasked.args.copy())
         task = RuntimeTool.fetch_task_by_url(ctx, url, True)
         # 保存任务的状态
         task.merge_tasked(tasked)
@@ -330,7 +331,7 @@ class ActivateOperator(AbsOperator):
             task = RuntimeTool.fetch_task_by_url(ctx, self.to, True)
         match task.status:
             case TaskStatus.NEW:
-                # think = CtxTool.force_fetch_think(ctx, self.to.resolver)
+                # think = CtxTool.force_fetch_think(ctx, self.to.think)
                 # if think.is_async():
                 #     # 设置 task 为 yielding, 保留了一个指针.
                 #     task.status = TaskStatus.YIELDING
@@ -433,7 +434,7 @@ class AwaitOperator(AbsOperator):
 
         task = RuntimeTool.fetch_task(ctx, tid)
         # 获取 intentions
-        stage = CtxTool.force_fetch_stage(ctx, task.url.resolver, task.url.stage)
+        stage = CtxTool.force_fetch_stage(ctx, task.url.think, task.url.stage)
 
         reactions = stage.reactions()
         reaction_names = set(reactions.keys())

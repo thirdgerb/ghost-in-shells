@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from typing import Dict
 
-from ghoshell.ghost.url import URL
+from ghoshell.url import URL
 
 
 # 事件体系是 Runtime 和 Think 之间的纽带.

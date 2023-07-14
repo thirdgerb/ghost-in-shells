@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "ghoshell"
+version = "0.0.1"
+description = "WIP: bot engine"
+authors = ["thirdgerb <thirdgerb@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/thirdgerb/ghost-in-shells"
+repository = "https://github.com/thirdgerb/ghost-in-shells.git"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+openai = "^0.27.8"
+pydantic = "2.0"
+PyYAML = "^6.0"
+requests = "^2.31.0"
+rich = "13.4"
+prompt-toolkit = "3"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.0"
+
+
+[tool.poetry.group.sphero.dependencies]
+spherov2 = "^0.12"
+speechrecognition = "^3.10.0"
+pyaudio = "^0.2.13"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

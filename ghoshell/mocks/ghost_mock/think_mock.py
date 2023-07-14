@@ -10,11 +10,11 @@ class HelloWorldThink(Think, ThinkDriver):
     name: ClassVar[str] = "helloworld"
 
     def url(self) -> URL:
-        return URL(resolver=self.name)
+        return URL(think=self.name)
 
     def to_meta(self) -> ThinkMeta:
         return ThinkMeta(
-            id=self.url().resolver,
+            id=self.url().think,
             kind=self.driver_name(),
         )
 
@@ -48,7 +48,7 @@ class HelloWorldThink(Think, ThinkDriver):
 class HelloWorldStage(BasicStage):
 
     def url(self) -> URL:
-        return URL(resolver=HelloWorldThink.name, stage="")
+        return URL(think=HelloWorldThink.name, stage="")
 
     def intentions(self, ctx: Context) -> List[Intention] | None:
         return None
@@ -75,7 +75,7 @@ class HelloWorldStage(BasicStage):
 
     def on_activating(self, ctx: "Context", this: Thought, _) -> Operator | None:
         ctx.send_at(this).text(HelloWorldStage.__name__ + ":hello world!")
-        return ctx.mind(this).awaits(to=URL(resolver="conversational"))
+        return ctx.mind(this).awaits(to=URL(think="conversational"))
 
     def on_quiting(self, ctx: "Context", this: Thought, _) -> Operator | None:
         ctx.send_at(this).text(HelloWorldStage.__name__ + ":I'm quiting")

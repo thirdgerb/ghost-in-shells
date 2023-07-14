@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from ghoshell.ghost import URL
+from ghoshell.url import URL
 
 
 class GhostConfig(BaseModel):

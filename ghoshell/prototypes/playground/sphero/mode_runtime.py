@@ -50,7 +50,7 @@ class SpheroRuntimeModeThink(Think, AgentStage):
         super().__init__(config.name, stage_config)
 
     def url(self) -> URL:
-        return URL.new(resolver=self._mode_config.name)
+        return URL.new(think=self._mode_config.name)
 
     def to_meta(self) -> ThinkMeta:
         return ThinkMeta(
@@ -274,7 +274,7 @@ class SpheroRuntimeModeThink(Think, AgentStage):
 #         this.data.events.append(msg)
 #
 #     def url(self) -> URL:
-#         return URL(resolver=self._config.name)
+#         return URL(think=self._config.name)
 #
 #     def to_meta(self) -> ThinkMeta:
 #         return ThinkMeta(

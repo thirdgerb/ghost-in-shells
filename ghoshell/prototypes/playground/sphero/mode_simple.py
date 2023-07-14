@@ -24,7 +24,7 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
         self._config = core.config.simple_mode
 
     def url(self) -> URL:
-        return URL.new_resolver(self._config.name)
+        return URL.new_think(self._config.name)
 
     def to_meta(self) -> ThinkMeta:
         return ThinkMeta(

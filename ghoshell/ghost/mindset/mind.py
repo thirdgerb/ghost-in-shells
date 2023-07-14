@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from typing import List
 
 from ghoshell.ghost.mindset.operator import Operator
-from ghoshell.ghost.url import URL
+from ghoshell.url import URL
 
 
 class Mind(metaclass=ABCMeta):

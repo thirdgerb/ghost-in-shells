@@ -212,7 +212,7 @@ class LLMFunc(metaclass=ABCMeta):
         if isinstance(arguments, Dict):
             return args_type(**arguments)
         if isinstance(arguments, str):
-            properties = args_type.schema().get("properties")
+            properties = args_type.model_json_schema().get("properties")
             if len(properties) == 1:
                 params = {}
                 for key in properties:
@@ -235,7 +235,7 @@ class AdapterAsFunc(LLMFunc):
         return self.alias
 
     def schema(self, ctx: Context, this: AgentThought) -> OpenAIFuncSchema:
-        schema = self.func.schema(ctx, this)
+        schema = self.func.model_json_schema(ctx, this)
         schema.name = self.name()
         if self.desc:
             schema.desc = self.desc
@@ -269,7 +269,7 @@ class MethodAsFunc(LLMFunc):
         return OpenAIFuncSchema(
             name=self._name,
             desc=self._desc,
-            parameters_schema=self._params_type.schema() if self._params_type is not None else None
+            parameters_schema=self._params_type.model_json_schema() if self._params_type is not None else None
         )
 
     def call(self, ctx: Context, this: AgentThought, content: str, arguments: Dict | str | None) -> Operator | None:
@@ -307,7 +307,7 @@ class RedirectFunc(LLMFunc):
         return OpenAIFuncSchema(
             name=self._name,
             desc=think.desc(ctx, None),
-            parameters_schema=args_type.schema() if args_type else None,
+            parameters_schema=args_type.model_json_schema() if args_type else None,
         )
 
     def call(self, ctx: Context, this: AgentThought, content: str, arguments: Dict) -> Operator | str | None:
@@ -319,7 +319,7 @@ class RedirectFunc(LLMFunc):
         if content:
             this.say(ctx, content)
 
-        url = URL.new(resolver=self._think, args=arguments.copy())
+        url = URL.new(think=self._think, args=arguments.copy())
         return ctx.mind(this).redirect(url)
 
 
@@ -421,7 +421,7 @@ class AgentThink(Think, Stage):
                 stages.add(name)
 
     def url(self) -> URL:
-        return URL.new(resolver=self.config.name)
+        return URL.new(think=self.config.name)
 
     def to_meta(self) -> ThinkMeta:
         return ThinkMeta(
@@ -513,7 +513,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
 
     def url(self) -> URL:
         return URL(
-            resolver=self.think_name,
+            think=self.think_name,
             stage=self.think_name,
         )
 
@@ -657,7 +657,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         获得所有方法的 openai function schemas
         """
         funcs = self.llm_funcs(ctx)
-        return [fn.schema(ctx, this) for fn in funcs]
+        return [fn.model_json_schema(ctx, this) for fn in funcs]
 
     def call_llm_with_funcs(self, ctx: Context, this: AgentThought, prompt: str | None) -> Operator:
         times = 0
@@ -732,7 +732,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         return chat_context
 
     def _context_think_instruction(self, ctx: Context, this: AgentThought, chat_context: List[OpenAIChatMsg]) -> None:
-        think_instruction = this.data.think_instruction.format(name=this.url.resolver)
+        think_instruction = this.data.think_instruction.format(name=this.url.think)
         if think_instruction:
             chat_context.append(OpenAIChatMsg(
                 role=OpenAIChatMsg.ROLE_SYSTEM,
@@ -741,13 +741,13 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
 
     def _context_think_args(self, ctx: Context, this: AgentThought, chat_context: List[OpenAIChatMsg]) -> None:
         # 处理有参数的情况.
-        think = CtxTool.force_fetch_think(ctx, this.url.resolver)
+        think = CtxTool.force_fetch_think(ctx, this.url.think)
         args_type = think.args_type()
         if args_type is not None:
             chat_context.append(
                 OpenAIChatMsg(
                     role=OpenAIChatMsg.ROLE_SYSTEM,
-                    content="args schema: " + json.dumps(args_type.schema(), ensure_ascii=False)
+                    content="args schema: " + json.dumps(args_type.model_json_schema(), ensure_ascii=False)
                 )
             )
             chat_context.append(

@@ -6,11 +6,11 @@ from ghoshell.messages import Input, Output
 
 if TYPE_CHECKING:
     from ghoshell.ghost.context import Context
-    from ghoshell.ghost.mindset.operator import OperationKernel
+    from ghoshell.ghost.mindset import OperationKernel
     from ghoshell.ghost.mindset import Mindset
-    from ghoshell.ghost.mindset.focus import Focus
-    from ghoshell.ghost.url import URL
-    from ghoshell.ghost.mindset.focus import Focus
+    from ghoshell.ghost.mindset import Focus
+    from ghoshell.url import URL
+    from ghoshell.ghost.mindset import Focus
     from ghoshell.ghost.memory import Memory
 
 

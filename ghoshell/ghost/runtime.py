@@ -5,9 +5,9 @@ from typing import List, Dict, Optional, Set
 from pydantic import BaseModel, Field
 
 from ghoshell.ghost.exceptions import RuntimeException
-from ghoshell.ghost.mindset.focus import Attention
-from ghoshell.ghost.url import URL
+from ghoshell.ghost.mindset import Attention
 from ghoshell.messages import Tasked
+from ghoshell.url import URL
 
 TASK_STATUS = int
 TASK_LEVEL = int
@@ -125,7 +125,7 @@ class Task(BaseModel):
     # 这会导致运行时的相互覆盖问题, 需要做更复杂的锁来解决隔离.
     tid: str
 
-    # task 自我描述的 resolver, 相当于一个指针.
+    # task 自我描述的 think, 相当于一个指针.
     url: URL
 
     # vars: 任务运行中的变量. 保存的时候非指针的信息需要清除掉.
@@ -171,7 +171,7 @@ class Task(BaseModel):
         返回出可传输, 可保存的 task 数据.
         """
         return Tasked(
-            resolver=self.url.resolver,
+            think=self.url.think,
             stage=self.url.stage,
             status=self.status,
             args=self.url.args.copy(),

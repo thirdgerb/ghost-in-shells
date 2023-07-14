@@ -22,7 +22,7 @@ class OpenAIFuncSchema:
         self.name = name
         self.desc = desc
         if parameters_schema is None:
-            parameters_schema = BaseModel.schema()
+            parameters_schema = BaseModel.model_json_schema()
         if "title" in parameters_schema:
             del parameters_schema["title"]
         self.parameters_schema = parameters_schema

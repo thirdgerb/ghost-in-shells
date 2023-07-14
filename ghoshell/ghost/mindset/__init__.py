@@ -4,7 +4,7 @@ from ghoshell.ghost.mindset.mind import Mind
 from ghoshell.ghost.mindset.mindset import Mindset
 from ghoshell.ghost.mindset.operator import Operator, OperationKernel
 from ghoshell.ghost.mindset.stage import Stage, Reaction
-from ghoshell.ghost.mindset.think import Think, ThinkDriver, ThinkMeta
+from ghoshell.ghost.mindset.think import Think, ThinkMeta, ThinkDriver
 from ghoshell.ghost.mindset.thought import Thought, DictThought
 
 __all__ = [

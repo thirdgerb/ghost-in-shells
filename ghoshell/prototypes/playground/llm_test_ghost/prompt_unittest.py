@@ -199,7 +199,7 @@ class PromptUnitTestThink(Think, Stage):
         self.config = loader.load()
 
     def url(self) -> URL:
-        return URL.new_resolver(self.think_name)
+        return URL.new_think(self.think_name)
 
     def to_meta(self) -> ThinkMeta:
         return ThinkMeta(
@@ -327,7 +327,7 @@ class PromptUnitTestCaseStage(Stage):
         self.config = case
 
     def url(self) -> URL:
-        return URL(resolver=self.think_name, stage=self.stage_name)
+        return URL(think=self.think_name, stage=self.stage_name)
 
     def intentions(self, ctx: Context) -> List[Intention] | None:
         return None
