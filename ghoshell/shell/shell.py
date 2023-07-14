@@ -39,18 +39,17 @@ class Shell(metaclass=ABCMeta):
         """
         pass
 
-    #
-    # @abstractmethod
-    # def context(self, _input: Input) -> ShellContext:
-    #     """
-    #     根据 Input 生成 Context.
-    #     """
-    #     pass
-
     @abstractmethod
     def on_event(self, event: Any) -> Optional[Input]:
         """
         收到一个事件时, 可以初始化一个 shell 的 context
+        """
+        pass
+
+    @abstractmethod
+    def tick(self, e: Any) -> None:
+        """
+        处理单个 shell 事件. 同步逻辑.
         """
         pass
 
@@ -70,14 +69,7 @@ class Shell(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def tick(self, e: Any) -> None:
-        """
-        处理单个 shell 事件. 同步逻辑.
-        """
-        pass
-
-    @abstractmethod
-    async def handle_async_output(self) -> None:
+    async def listen_async_output(self) -> None:
         """
         处理异步消息的逻辑. 可以放到 loop 里实现.
         """

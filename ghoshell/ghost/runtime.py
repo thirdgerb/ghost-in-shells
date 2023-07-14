@@ -582,7 +582,7 @@ class Process(BaseModel):
         self.reset_indexes()
 
     def to_saving_dict(self) -> Dict:
-        return self.dict(include={"pid", "sid", "root", "current", "round", "parent_id", "tasks"})
+        return self.model_dump(include={"pid", "sid", "root", "current", "round", "parent_id", "tasks"})
 
     def _clear_cached_indexes(self) -> None:
         self.tid_indexes = None
@@ -622,14 +622,14 @@ class Process(BaseModel):
         self.tid_indexes = tid_indexes
 
     def brief(self) -> Dict:
-        brief = self.dict(exclude={"__tid_indexes", "__status_list_indexes"})
+        brief = self.model_dump(exclude={"__tid_indexes", "__status_list_indexes"})
         return brief
 
     def deep_copy(self) -> "Process":
         self.reset_indexes()
         # 偷懒
         # todo: 实现一个干净一些的.
-        return Process(**self.dict())
+        return Process(**self.model_dump())
 
 
 class Runtime(metaclass=ABCMeta):

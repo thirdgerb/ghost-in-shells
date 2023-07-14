@@ -1,4 +1,4 @@
-# deprecated
+# deprecated !!! 使用 conversational_thinks
 # 测试时用 openai text completion 实现的多轮对话.
 # 后来改用 chat completion
 think: "conversational"

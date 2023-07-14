@@ -2,8 +2,8 @@ import asyncio
 from typing import Dict, Type
 
 from ghoshell.container import Provider, Container, Contract
+from ghoshell.framework.shell.messengers import MessageQueue
 from ghoshell.messages import Output, Input
-from ghoshell.shell_fmk.messengers import MessageQueue
 
 
 class MockMessageQueue(MessageQueue):

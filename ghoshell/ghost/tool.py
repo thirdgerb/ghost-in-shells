@@ -397,7 +397,7 @@ class RuntimeTool:
         tid = cls.new_task_id(ctx, url)
         task = Task(
             tid=tid,
-            url=url.dict(),
+            url=url.model_dump(),
         )
         thought = cls.new_thought(ctx, url)
         cls.merge_thought_to_task(thought, task)

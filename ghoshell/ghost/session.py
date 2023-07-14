@@ -13,11 +13,17 @@ class Session(metaclass=ABCMeta):
     @property
     @abstractmethod
     def clone_id(self) -> str:
+        """
+        session 所处的 clone
+        """
         pass
 
     @property
     @abstractmethod
     def session_id(self) -> str:
+        """
+        session 自身的 ID.
+        """
         pass
 
     @abstractmethod

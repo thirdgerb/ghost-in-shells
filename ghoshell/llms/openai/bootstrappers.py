@@ -3,8 +3,8 @@ from typing import Dict
 
 import yaml
 
+from ghoshell.framework.ghost import GhostBootstrapper
 from ghoshell.ghost import Ghost
-from ghoshell.ghost_fmk import Bootstrapper
 from ghoshell.llms.openai.adapters import OpenAIConfig, OpenAIAdapter, OpenAIRecordStorage
 
 
@@ -21,7 +21,7 @@ class MockRecordStorage(OpenAIRecordStorage):
         self.logger.info(yaml.dump(data, allow_unicode=True))
 
 
-class OpenAIBootstrapper(Bootstrapper):
+class OpenAIBootstrapper(GhostBootstrapper):
 
     def __init__(self, relative_config_file: str = "llms/openai_config.yaml", logger_name: str = "llm"):
         self.relative_config_file = relative_config_file

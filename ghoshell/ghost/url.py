@@ -39,7 +39,7 @@ class UniformResolverLocator(BaseModel):
         )
 
     def to_dict(self, stage: str | None = None, args: Dict | None = None) -> Dict:
-        result = self.dict()
+        result = self.model_dump()
         if stage is not None:
             result["stage"] = stage
         if args is not None:

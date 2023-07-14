@@ -23,7 +23,7 @@ class TextCompletionConfig(BaseModel):
     request_timeout: float = 5
 
     def text_completion_kwargs(self) -> Dict:
-        return self.dict()
+        return self.model_dump()
 
 
 class ChatCompletionConfig(BaseModel):
@@ -34,7 +34,7 @@ class ChatCompletionConfig(BaseModel):
     request_timeout: float = 10
 
     def chat_completion_kwargs(self) -> Dict:
-        return self.dict()
+        return self.model_dump()
 
 
 class OpenAIConfig(BaseModel):
@@ -150,7 +150,7 @@ class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
 
             # functions
             if functions:
-                request["functions"] = [func.dict() for func in functions]
+                request["functions"] = [func.model_dump() for func in functions]
 
             # function_call
             if functions:

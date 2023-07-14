@@ -70,7 +70,7 @@ class Thought(metaclass=ABCMeta):
 
     def dict(self):
         return dict(
-            url=self.url.dict() if self.url else None,
+            url=self.url.model_dump() if self.url else None,
             tid=self.tid,
             level=self.level,
             status=self.status,

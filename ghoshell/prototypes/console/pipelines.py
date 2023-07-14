@@ -1,12 +1,12 @@
 import uuid
 
+from ghoshell.framework.shell import ShellInputPipe, InputPipe, InputPipeline
 from ghoshell.messages import Input, Output, Text
 from ghoshell.shell import Shell
-from ghoshell.shell_fmk import InputMiddleware, InputPipe, InputPipeline
 
 
 #
-class InputTestMiddleware(InputMiddleware):
+class InputTestMiddleware(ShellInputPipe):
 
     def new(self, shell: Shell) -> InputPipe:
         def pipe(_input: Input, after: InputPipeline):

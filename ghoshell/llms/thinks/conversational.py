@@ -4,8 +4,8 @@ from typing import Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 
+from ghoshell.framework.stages import BasicStage
 from ghoshell.ghost import *
-from ghoshell.ghost_fmk.stages import BasicStage
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion
 from ghoshell.messages import *
 
@@ -20,7 +20,8 @@ class ConversationalConfig(BaseModel):
     # think 的自我描述, 后面用于做能力的提示.
     desc: str = ""
 
-    llm_name: str = ""
+    # 使用的 llm 的配置名. 详见 OpenAIChatCompletion 接口
+    llm_config: str = ""
 
     # ai 扮演的角色.
     assistant_name: str = "AI"
@@ -79,7 +80,7 @@ class ConversationalThought(Thought):
     def vars(self) -> Dict | None:
         if self.data is None:
             return None
-        return self.data.dict()
+        return self.data.model_dump()
 
     def _destroy(self) -> None:
         del self.data
@@ -158,7 +159,7 @@ class DefaultConversationalStage(BasicStage):
         chat = llm.chat_completion(
             ctx.input.trace.session_id,
             chats,
-            config_name=self.config.llm_name,
+            config_name=self.config.llm_config,
         )
 
         this.data.context.append(chat.as_chat_msg())
@@ -244,7 +245,7 @@ class ConversationalThink(Think, ThinkDriver):
 
     def new_task_id(self, ctx: "Context", args: Dict) -> str:
         # 每次都是同一意图.
-        return self.url().new_id(extra=ctx.input.trace.dict(include={"session_id"}))
+        return self.url().new_id(extra=ctx.input.trace.model_dump(include={"session_id"}))
 
     def new_thought(self, ctx: "Context", args: Dict) -> Thought:
         thought = ConversationalThought(args)

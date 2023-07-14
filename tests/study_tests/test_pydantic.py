@@ -17,7 +17,7 @@ def test_typing_dict() -> None:
 
         bar: Bar
 
-    zoo = Zoo(**foo.dict())
+    zoo = Zoo(**foo.model_dump())
     assert zoo.bar.a == "b"
 
     zoo = Zoo.parse_obj(foo)
@@ -60,7 +60,7 @@ def test_children_copy() -> None:
     # copy 不是深拷贝
     assert p.child.foo == "bar"
 
-    copied = Parent(**p.dict())
+    copied = Parent(**p.model_dump())
     copied.child.foo = "foo"
     assert copied.child.foo == "foo"
     assert p.child.foo == "bar"
@@ -74,14 +74,14 @@ def test_class_var_constant() -> None:
     t = Tester(foo="foo")
     assert t.foo == "foo"
     assert t.BAR == "bar"
-    assert t.dict().get("BAR") is None
+    assert t.model_dump().get("BAR") is None
 
     class Child(Tester):
         BAR = "zoo"
 
     c = Child(foo="foo")
     assert c.BAR == "zoo"
-    assert c.dict().get("BAR") is None
+    assert c.model_dump().get("BAR") is None
 
 
 def test_default_value_is_copy() -> None:

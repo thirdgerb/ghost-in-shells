@@ -1,13 +1,13 @@
+from ghoshell.framework.intentions.command_intention import Command, CommandIntention
 from ghoshell.ghost import Intention
-from ghoshell.ghost_fmk.intentions.command_intention import Command, CommandIntention
 
 
 def test_command_intention():
     intention = Command(name="foo").to_intention()
     assert intention is not None
 
-    parsed = Intention(**intention.dict())
-    cmd = CommandIntention(**parsed.dict())
+    parsed = Intention(**intention.model_dump())
+    cmd = CommandIntention(**parsed.model_dump())
     assert cmd.config.name == "foo"
 
 #
