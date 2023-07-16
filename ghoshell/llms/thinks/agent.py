@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 from abc import abstractmethod, ABCMeta
@@ -657,7 +659,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         获得所有方法的 openai function schemas
         """
         funcs = self.llm_funcs(ctx)
-        return [fn.model_json_schema(ctx, this) for fn in funcs]
+        return [fn.schema(ctx, this) for fn in funcs]
 
     def call_llm_with_funcs(self, ctx: Context, this: AgentThought, prompt: str | None) -> Operator:
         times = 0

@@ -22,9 +22,19 @@ class OpenAIFuncSchema:
         self.name = name
         self.desc = desc
         if parameters_schema is None:
-            parameters_schema = BaseModel.model_json_schema()
+            parameters_schema = {"type": "object", "properties": {}}
+        properties = parameters_schema.get("properties", {})
+        params_properties = {}
+        for key in properties:
+            _property = properties[key]
+            if "title" in _property:
+                del _property["title"]
+            params_properties[key] = _property
+        parameters_schema["properties"] = params_properties
+
         if "title" in parameters_schema:
             del parameters_schema["title"]
+
         self.parameters_schema = parameters_schema
 
     def dict(self) -> Dict:

@@ -51,6 +51,7 @@ class ConversationalConfig(BaseModel):
     on_conclusion: str = ""
     on_none_text: str = "can only response text message."
     on_empty_text: str = "you speak nothing."
+    on_beyond_max_turns: str = "超过最大对话轮次, 重置任务."
 
 
 class ConversationalThought(Thought):
@@ -100,7 +101,7 @@ class DefaultConversationalStage(BasicStage):
         self.stage_name = stage_name
         self._reactions = reactions
 
-    def desc(self, ctx: "Context") -> str:
+    def desc(self, ctx: "Context", this: None) -> str:
         return self.config.desc
 
     def on_received(self, ctx: "Context", this: ConversationalThought, e: OnReceived) -> Operator | None:
@@ -121,10 +122,13 @@ class DefaultConversationalStage(BasicStage):
         resp = self._prompt(ctx, this)
 
         # 删除超额的内容.
-        self._check_max_turns(this)
 
         # 发送消息.
         ctx.send_at(this).text(resp)
+
+        if self._beyond_max_turns(this):
+            ctx.send_at(this).text(self.config.on_beyond_max_turns)
+            return ctx.mind(this).restart()
         return ctx.mind(this).awaits()
 
     @classmethod
@@ -138,14 +142,12 @@ class DefaultConversationalStage(BasicStage):
         )
         return
 
-    def _check_max_turns(self, this: ConversationalThought) -> None:
+    def _beyond_max_turns(self, this: ConversationalThought) -> bool:
         """
         如果超过了最大会话长度, 就删除掉历史记录.
         todo: 让 llm 自己对前文进行总结.
         """
-        if len(this.data.context) > self.config.max_turns:
-            # 删除两轮对话. 当然最好的做法应该是让 bot 自己总结.
-            this.data.context = this.data.context[2:]
+        return len(this.data.context) > self.config.max_turns
 
     def _prompt(self, ctx: Context, this: ConversationalThought) -> str:
         chats = [
