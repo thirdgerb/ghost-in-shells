@@ -10,7 +10,7 @@ from ghoshell.framework.ghost.providers import LocalThinkMetaStorageProvider
 from ghoshell.llms import LLMTextCompletion, OpenAIChatCompletion
 from ghoshell.llms.openai import OpenAIBootstrapper
 from ghoshell.llms.thinks import ConversationalThinksBootstrapper, FileAgentMindsetBootstrapper
-from ghoshell.mocks.cache import MockCacheProvider
+from ghoshell.mocks import MockCacheProvider, MockAPIRepositoryProvider, MockMessageQueueProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
 # from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
 from ghoshell.prototypes.playground.llm_test_ghost import GameUndercoverBootstrapper
@@ -44,28 +44,30 @@ class OperatorMock(OperationKernel):
 
 class MockGhost(GhostKernel):
     # 启动流程. 想用这种方式解耦掉系统文件读取等逻辑.
-    bootstrapper: List[GhostBootstrapper] = [
-        FileLoggerBootstrapper(),
-        RegisterThinkDemosBootstrapper(),
-        CommandFocusDriverBootstrapper(),
-        OpenAIBootstrapper(),
 
-        # 使用 llm chat completion 实现的思维
-        ConversationalThinksBootstrapper(),
-        # 使用 llm chat completion + function call 实现的思维.
-        FileAgentMindsetBootstrapper(),
+    def get_bootstrapper(self) -> List[GhostBootstrapper]:
+        return [
+            FileLoggerBootstrapper(),
+            RegisterThinkDemosBootstrapper(),
+            CommandFocusDriverBootstrapper(),
+            OpenAIBootstrapper(),
 
-        LLMConversationalThinkBootstrapper(),
-        LLMToolsFocusDriverBootstrapper(),
-        # sphero 的逻辑驱动.
-        SpheroGhostBootstrapper(),
+            # 使用 llm chat completion 实现的思维
+            ConversationalThinksBootstrapper(),
+            # 使用 llm chat completion + function call 实现的思维.
+            FileAgentMindsetBootstrapper(),
 
-        # 将 configs/llms/unitests 下的文件当成单元测试思维.
-        PromptUnitTestsBootstrapper(),
+            LLMConversationalThinkBootstrapper(),
+            LLMToolsFocusDriverBootstrapper(),
+            # sphero 的逻辑驱动.
+            SpheroGhostBootstrapper(),
 
-        # 测试加入 undercover 游戏. deprecated
-        GameUndercoverBootstrapper(think_name="game/undercover"),
-    ]
+            # 将 configs/llms/unitests 下的文件当成单元测试思维.
+            PromptUnitTestsBootstrapper(),
+
+            # 测试加入 undercover 游戏. deprecated
+            GameUndercoverBootstrapper(think_name="game/undercover"),
+        ]
 
     def get_depending_contracts(self) -> List:
         contracts = super().get_depending_contracts()
@@ -78,6 +80,8 @@ class MockGhost(GhostKernel):
         return [
             MockCacheProvider(),
             LocalThinkMetaStorageProvider(),
+            MockAPIRepositoryProvider(),
+            MockMessageQueueProvider(),
             # LangChainTestLLMAdapterProvider(),
         ]
 

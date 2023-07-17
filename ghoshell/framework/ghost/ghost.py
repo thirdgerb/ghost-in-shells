@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 import traceback
 import uuid
@@ -5,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Callable, List
 
 from ghoshell.container import Container, Provider
-from ghoshell.contracts import Cache
+from ghoshell.contracts import Cache, APIRepository
 from ghoshell.framework.contracts.think_meta_storage import ThinkMetaStorage
 from ghoshell.framework.ghost import providers
 from ghoshell.framework.ghost.clone import CloneImpl
@@ -31,9 +33,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     Ghost 框架实现的内核
     """
 
-    # 启动流程. 想用这种方式解耦掉系统文件读取等逻辑.
-    bootstrapper: List[GhostBootstrapper] = []
-
     def __init__(
             self,
             container: Container,
@@ -56,7 +55,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     def boostrap(self) -> "Ghost":
         self._init_container()
         # bootstrapper
-        for boot in self.bootstrapper:
+        for boot in self.get_bootstrapper():
             boot.bootstrap(self)
 
         for depending in self.get_depending_contracts():
@@ -76,7 +75,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
 
     # ---- 配置类函数 ---- #
 
-    def get_bootstrappers(self) -> List[GhostBootstrapper]:
+    def get_bootstrapper(self) -> List[GhostBootstrapper]:
         return []
 
     def get_context_middleware(self) -> List[CtxMiddleware]:
@@ -94,6 +93,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         return [
             Cache,
             ThinkMetaStorage,
+            APIRepository,
         ]
 
     def get_contracts_providers(self) -> List[Provider]:

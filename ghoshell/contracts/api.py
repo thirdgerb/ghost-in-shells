@@ -1,37 +1,62 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Type, Dict, Iterator
+from typing import Type, Dict, Iterator, ClassVar
 
 from pydantic import BaseModel
 
 
-class API(metaclass=ABCMeta):
+class APIArgs(BaseModel, metaclass=ABCMeta):
+    """
+    API 的参数类定义.
+    """
+    api_caller: ClassVar[str] = ""
+
+
+class APIResp(BaseModel, metaclass=ABCMeta):
+    """
+    API 的返回值定义.
+    """
+    api_caller: ClassVar[str] = ""
+
+
+class APIError(RuntimeError):
+    """
+    API 接口调用异常.
+    """
+
+    def __init__(self, code: int, message: str, suggestion: str = ""):
+        self.code = code
+        self.message = message
+        self.suggestion = suggestion
+        super().__init__()
+
+
+class APICaller(metaclass=ABCMeta):
     """
     一个标准的 API 的封装.
     """
 
-    def __init__(self, name: str, desc: str):
-        self.name = name
-        self.desc = desc
-
     @classmethod
     @abstractmethod
-    def arguments_type(cls) -> Type[BaseModel]:
+    def args_type(cls) -> Type[APIArgs]:
         pass
 
     @classmethod
     @abstractmethod
-    def response_type(cls) -> Type[BaseModel]:
+    def resp_type(cls) -> Type[APIResp]:
         pass
 
     @abstractmethod
-    def do_call(self, arguments: BaseModel) -> BaseModel | None:
+    def call(self, arguments: APIArgs) -> APIResp | None:
+        """
+        :raise APIError
+        """
         pass
 
-    def call(self, arguments: Dict) -> Dict | None:
-        args = self.arguments_type()(**arguments)
-        resp = self.do_call(args)
+    def vague_call(self, arguments: Dict) -> Dict | None:
+        args = self.args_type()(**arguments)
+        resp = self.call(args)
         if resp is not None:
             return resp.model_dump()
         return None
@@ -43,33 +68,26 @@ class APIRepository(metaclass=ABCMeta):
     还需要和测试用例结合到一起.
     """
 
+    def vague_call(self, api_caller: str, args: Dict) -> Dict | None:
+        api = self.get_api(api_caller)
+        if api is None:
+            raise ImportError(f"api caller {api_caller} not found")
+        return api.vague_call(args)
+
+    def call(self, args: APIArgs) -> APIResp | None:
+        api = self.get_api(args.api_caller)
+        if api is None:
+            raise ImportError(f"api caller {args.api_caller} not found")
+        return api.call(args)
+
     @abstractmethod
-    def get_api(self, namespace: str) -> API | None:
+    def get_api(self, namespace: str) -> APICaller | None:
         pass
 
     @abstractmethod
-    def register_api(self, api: API) -> None:
+    def register_api(self, api: APICaller) -> None:
         pass
 
     @abstractmethod
-    def foreach_api(self) -> Iterator[API]:
+    def foreach_api(self) -> Iterator[APICaller]:
         pass
-
-
-class APIRepositoryImpl(APIRepository):
-    """
-    API 仓库的极简实现.
-    """
-
-    def __init__(self):
-        self._api_map = {}
-
-    def get_api(self, namespace: str) -> API | None:
-        return self._api_map.get(namespace, None)
-
-    def register_api(self, api: API) -> None:
-        self._api_map[api.name] = api
-
-    def foreach_api(self) -> Iterator[API]:
-        for name in self._api_map:
-            yield self._api_map[name]

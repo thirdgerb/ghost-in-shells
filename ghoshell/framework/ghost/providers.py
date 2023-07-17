@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from logging import Logger, LoggerAdapter
 from typing import Dict, Type
@@ -100,3 +102,15 @@ class FocusProvider(Provider):
 
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         return FocusImpl()
+
+
+class SimpleAPIProvider(Provider):
+
+    def singleton(self) -> bool:
+        return True
+
+    def contract(self) -> Type[Contract]:
+        pass
+
+    def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
+        pass

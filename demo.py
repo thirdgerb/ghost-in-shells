@@ -9,7 +9,7 @@ from ghoshell.container import Container
 from ghoshell.framework.ghost import GhostConfig
 from ghoshell.framework.shell import SyncGhostMessenger, MessageQueue
 from ghoshell.ghost import Ghost
-from ghoshell.mocks import MockGhost, MockMessageQueueProvider
+from ghoshell.mocks.ghost_mock import MockGhost
 from ghoshell.prototypes import ConsoleShell, BaiduSpeechShell, SpheroBoltShell
 from ghoshell.shell import Messenger
 
@@ -29,7 +29,6 @@ def demo_ghost() -> Ghost:
     bootstrap demo ghost from local files in ./demo
     """
     container = root_container
-    container.register(MockMessageQueueProvider())
     config_path = "/".join([root_path, "configs", "ghost"])
     runtime_path = "/".join([root_path, "runtime"])
 
@@ -86,6 +85,7 @@ default_shell = "console"
 def main() -> None:
     ghost = demo_ghost()
     ghost.boostrap()
+
     message_queue = ghost.container.force_fetch(MessageQueue)
     messenger = SyncGhostMessenger(ghost, queue=message_queue)
     root_container.set(Messenger, messenger)
