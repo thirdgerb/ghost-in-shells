@@ -18,7 +18,7 @@ class ConversationalConfig(BaseModel):
     """
 
     # think 的名字.
-    name: str
+    name: str = ""
     # think 的自我描述, 后面用于做能力的提示.
     desc: str = ""
 
@@ -210,6 +210,8 @@ class ConversationalThink(Think, ThinkDriver):
             # think 的名字.
             config: ConversationalConfig,
     ):
+        if not config.name:
+            raise ValueError("conversational think name should not be empty")
         self.config = config
         default_reactions: Dict[str, Reaction] = {}
         for name in self.config.reactions:

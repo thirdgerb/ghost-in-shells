@@ -1,6 +1,7 @@
 # ghoshell.llms.thinks.conversational.ConversationalConfig
-name: tool/json_model
+name: lark/tool_json_model
 desc: 用来将一个 json 格式描述的数据, 转化成 pydantic.BaseModel 类.
+on_activating: 请输入一个 json 数据样例, 我会生成它的 pydantic.BaseModel 类.
 instruction: |
   你正在执行一个编程任务, 需要把 json 描述的数据结构翻译成 pydantic.BaseModel 类. 
   文档里会用带有注释的 json 来描述这个数据结构, 所以会包含数据结构, 字段名和注释说明. 

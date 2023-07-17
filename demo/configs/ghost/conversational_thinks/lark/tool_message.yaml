@@ -1,7 +1,6 @@
 # ghoshell.llms.thinks.conversational.ConversationalConfig
-name: tool/lark_msg
 desc: 用来将 lark 的 普通 message 编写成 python BaseModel 的工具.
-on_activating: 请输入飞书消息的样例.
+on_activating: 请输入飞书消息的样例, 我会将它生成 BaseModel 类
 instruction: |
   你正在执行一个编程任务, 需要把文档里描述的数据结构定义成 pydantic 的 BaseModel 类. 
   

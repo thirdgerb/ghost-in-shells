@@ -1,6 +1,7 @@
 # ghoshell.llms.thinks.conversational.ConversationalConfig
-name: tool/lark_events
+name: lark/tool_events
 desc: 用来将 lark 的 event 编写成 python BaseModel 的工具.
+on_activating: 请输入一个 lark event 的描述, 和 event body 的样例. 我会返回封装好的 EventBody 子类.
 instruction: |
   # instruction
   
