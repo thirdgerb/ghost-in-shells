@@ -22,6 +22,8 @@ class ConversationalConfig(BaseModel):
     # think 的自我描述, 后面用于做能力的提示.
     desc: str = ""
 
+    on_activating: str = "你好!"
+
     # 使用的 llm 的配置名. 详见 OpenAIChatCompletion 接口
     llm_config: str = ""
 
@@ -42,7 +44,6 @@ class ConversationalConfig(BaseModel):
 
     # 全局的对话说明.
     instruction: str = "你可以回复任何内容, 但请使用中文来回复."
-    on_activating: str = "你好!"
     # 发生 prompt 事件时的回复.
     on_preempted: str = "preempting"
     # 发生 cancel 事件时的回复.

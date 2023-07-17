@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import uuid
 from typing import List, Optional, ClassVar
@@ -80,6 +82,7 @@ log:
         while True:
             try:
                 event = await session.prompt_async(multiline=False, key_bindings=bindings)
+                self._app.print(Markdown("\n----\n"))
                 self.tick(event)
             except (EOFError, KeyboardInterrupt):
                 self._app.print(f"quit!!")
@@ -124,7 +127,7 @@ log:
             if text.markdown:
                 self._app.print(self._markdown_output(text.content))
             else:
-                self._app.print(text.content)
+                self._app.print("\n\n" + text.content)
 
         err = ErrMsg.read(_output.payload)
         if err is not None:

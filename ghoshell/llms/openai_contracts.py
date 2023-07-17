@@ -46,6 +46,10 @@ class OpenAIFuncSchema:
 
 
 class OpenAIChatMsg(BaseModel):
+    """
+    OpenAI 接口的消息.
+    """
+
     ROLE_SYSTEM: ClassVar[str] = "system"
     ROLE_USER: ClassVar[str] = "user"
     ROLE_ASSISTANT: ClassVar[str] = "assistant"

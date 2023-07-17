@@ -2,8 +2,6 @@
 #
 # from larksuiteoapi import Config
 #
-# from ghoshell.ghost import Payload
-#
 #
 # class LarkSuite:
 #

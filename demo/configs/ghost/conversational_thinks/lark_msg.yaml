@@ -1,0 +1,40 @@
+# ghoshell.llms.thinks.conversational.ConversationalConfig
+name: chat/lark_msg
+desc: 用来将 lark 的 普通 message 编写成 python BaseModel 的工具.
+on_activating: 请输入飞书消息的样例.
+instruction: |
+  你正在执行一个编程任务, 需要把文档里描述的数据结构定义成 pydantic 的 BaseModel 类. 
+  
+  文档里会用一个 json 样例来描述这个数据结构. 你需要正确使用 pydantic 的语法, 结合 pydantic.Field 定义字段的描述信息, 
+  正确地使用 pydantic.Field 的 enum, description 等参数. 
+  生成的类需要继承自 `LarkMsg` 类, 这个类已经实现了对 BaseModel 的继承, 同时提供一个 `msg_type` 字段描述消息类型.   
+  
+  例如:
+  ---
+  文件 file
+  {
+      "file_key": "75235e0c-4f92-430a-a99b-8446610223cg",
+      "file_name": "test.txt" // 文件名
+  }
+  -- 
+  
+  生成的代码是
+  ```python
+  class FileMsg(LarkMsg):
+    """
+    文件类型的消息
+    """
+    msg_type: ClassVar[str] = "file"
+  
+    file_key: str = Field(description="")
+    file_name: str = Field(description="文件名")
+  ```
+  
+  注意:
+  1. you shall only return python code without any other information 
+  2. modules are already imported
+  3. msg_type is required
+llm_config: turbo-0613
+max_turns: 1
+reactions: {}
+
