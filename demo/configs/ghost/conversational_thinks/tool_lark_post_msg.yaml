@@ -1,0 +1,42 @@
+# ghoshell.llms.thinks.conversational.ConversationalConfig
+name: tool/lark_post_msg
+desc: 用来将 lark 的 post message 编写成 python BaseModel 的工具.
+instruction: |
+  你正在执行一个编程任务, 需要把文档里描述的数据结构定义成 pydantic 的 BaseModel 类. 
+  文档里会包含这个数据结构的基本介绍, 包括字段名, 类型, 描述, 常量值等信息. 
+  你需要正确使用 pydantic 的语法, 结合 pydantic.Field 定义字段的描述信息.
+  生成的类需要继承自 PostInfo 类, 这个类已经继承了 pydantic.BaseModel. 
+  
+  例如:
+  ---
+  at
+  字段	类型	描述
+  user_id	string	被at用户的open_id
+  user_name	string	用户姓名
+  style	[]string	文本内容的加粗、下划线、删除线和斜体样式，可选值分别为bold、underline、lineThrough与italic，没有样式则为空列表
+  -- 
+  
+  生成的代码是
+  ```python
+  class AtInfo(PostInfo):
+      """
+      at 类型的消息
+      """
+      tag: ClassVar[str] = "at"
+      user_id: str = Field(description="被at用户的open_id")
+      user_name: str = Field(description="用户姓名")
+      style: List[str] = Field(
+          description="文本内容的加粗、下划线、删除线和斜体样式，可选值分别为bold、underline、lineThrough与italic，没有样式则为空列表",
+          enum={"bold", "underline", "lineThrough", "italic"}
+      )
+  ```
+  
+  注意:
+  1. you should return python code only, without any other information
+  2. class var tag is required
+  3. described enums shall be defined in Field.enum
+  4. no need to import any package or module, they were imported.
+llm_config: turbo-0613
+max_turns: 1
+reactions: {}
+  

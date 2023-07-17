@@ -92,6 +92,15 @@ class UserOrder(BaseModel):
     is_primary_dept: bool
 
 
+class UserIds(BaseModel):
+    """
+    每个用户的三种 ID
+    """
+    union_id: str = Field(description="用户的 union_id")
+    user_id: str = Field(description="用户的 user_id")
+    open_id: str = Field(description="用户的open_id")
+
+
 class UserInfo(BaseModel):
     # "union_id": "on_94a1ee5551019f18cd73d9f111898cf2",
     # "user_id": "3e3cf96b",
