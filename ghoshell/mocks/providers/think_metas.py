@@ -29,7 +29,7 @@ class ThinkMetaDriverMock(ThinkMetaStorage):
         self.__metas_order.append(think_name)
 
 
-class ThinkMetaDriverMockProvider(Provider):
+class MockThinkMetaDriverProvider(Provider):
 
     def singleton(self) -> bool:
         return True

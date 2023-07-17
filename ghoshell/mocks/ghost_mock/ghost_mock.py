@@ -1,45 +1,19 @@
-from logging import Logger
 from typing import List
 
 from ghoshell.container import Provider
 from ghoshell.framework.bootstrapper import FileLoggerBootstrapper, \
     CommandFocusDriverBootstrapper, LLMToolsFocusDriverBootstrapper
 from ghoshell.framework.ghost import GhostKernel
-from ghoshell.framework.ghost.operators import ReceiveInputOperator
 from ghoshell.framework.ghost.providers import LocalThinkMetaStorageProvider
 from ghoshell.llms import LLMTextCompletion, OpenAIChatCompletion
 from ghoshell.llms.openai import OpenAIBootstrapper
 from ghoshell.llms.thinks import ConversationalThinksBootstrapper, FileAgentMindsetBootstrapper
-from ghoshell.mocks import MockCacheProvider, MockAPIRepositoryProvider, MockMessageQueueProvider
 from ghoshell.mocks.ghost_mock.bootstrappers import *
-# from ghoshell.mocks.think_metas import ThinkMetaDriverMockProvider
+from ghoshell.mocks.providers import *
 from ghoshell.prototypes.playground.llm_test_ghost import GameUndercoverBootstrapper
 from ghoshell.prototypes.playground.llm_test_ghost import LLMConversationalThinkBootstrapper, \
     PromptUnitTestsBootstrapper
 from ghoshell.prototypes.playground.sphero import SpheroGhostBootstrapper
-
-
-class OperatorMock(OperationKernel):
-
-    def __init__(self, max_operators=10):
-        self.max_operators = max_operators
-
-    def record(self, ctx: Context, op: Operator) -> None:
-        logger = ctx.container.force_fetch(Logger)
-        logger.debug(f"run operator: {op}")
-        return
-
-    def save_records(self) -> None:
-        return
-
-    def is_stackoverflow(self, op: Operator, length: int) -> bool:
-        return length > self.max_operators
-
-    def init_operator(self) -> "Operator":
-        return ReceiveInputOperator()
-
-    def destroy(self) -> None:
-        pass
 
 
 class MockGhost(GhostKernel):
@@ -79,11 +53,9 @@ class MockGhost(GhostKernel):
     def get_contracts_providers(self) -> List[Provider]:
         return [
             MockCacheProvider(),
-            LocalThinkMetaStorageProvider(),
             MockAPIRepositoryProvider(),
             MockMessageQueueProvider(),
-            # LangChainTestLLMAdapterProvider(),
+            MockOperationKernelProvider(),
+            # MockThinkMetaDriverProvider()
+            LocalThinkMetaStorageProvider(),
         ]
-
-    def new_operation_kernel(self) -> "OperationKernel":
-        return OperatorMock()

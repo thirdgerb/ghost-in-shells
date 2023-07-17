@@ -146,9 +146,8 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             ctx_container.register(provider)
         return ctx
 
-    @abstractmethod
     def new_operation_kernel(self) -> "OperationKernel":
-        pass
+        return self.container.force_fetch(OperationKernel)
 
     def respond(self, inpt: Input) -> List[Output] | None:
         """
