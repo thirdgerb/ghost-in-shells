@@ -48,14 +48,14 @@ class APICaller(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def call(self, arguments: APIArgs) -> APIResp | None:
+    def call(self, args: APIArgs) -> APIResp | None:
         """
         :raise APIError
         """
         pass
 
-    def vague_call(self, arguments: Dict) -> Dict | None:
-        args = self.args_type()(**arguments)
+    def vague_call(self, args: Dict) -> Dict | None:
+        args = self.args_type()(**args)
         resp = self.call(args)
         if resp is not None:
             return resp.model_dump()
