@@ -175,7 +175,7 @@ class PromptUnitTestThinkDriver(ThinkDriver):
     def from_meta(self, meta: ThinkMeta) -> "Think":
         think_name = meta.id
         if not think_name.startswith(self.think_prefix):
-            raise MindsetNotFoundException(f"think {think_name} not found in prompt unittest thinks")
+            raise MindsetNotFoundError(f"think {think_name} not found in prompt unittest thinks")
         sub_dir = think_name[len(self.think_prefix):]
         dirname = self.root_dir.rstrip("/") + "/" + sub_dir
         storage = PromptUnitTestLoader(

@@ -2,7 +2,7 @@ import json
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Any
 
-from ghoshell.ghost.exceptions import ErrMessageException
+from ghoshell.ghost.exceptions import ErrMessageError
 from ghoshell.messages import *
 
 
@@ -44,7 +44,7 @@ class Sender(metaclass=ABCMeta):
         string = json.dumps(value, indent=indent, ensure_ascii=False)
         return self.text(f"```json\n{string}\n```", markdown=True)
 
-    def err(self, errmsg: str, code: int = ErrMessageException.CODE, at: str = "") -> "Sender":
+    def err(self, errmsg: str, code: int = ErrMessageError.CODE, at: str = "") -> "Sender":
         """
         输出错误消息的语法糖.
         """

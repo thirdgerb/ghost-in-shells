@@ -1,8 +1,4 @@
-import sys
-import traceback
-
-
-class GhostException(Exception):
+class GhostError(RuntimeError):
     """
     ghoshell 为 ghost 定义的 exception
     work in progress
@@ -10,33 +6,21 @@ class GhostException(Exception):
 
     CODE: int = 100
 
-    def __init__(self, message: str, at: str = "", e: Exception = None):
+    def __init__(self, message: str, at: str = ""):
         self.message: str = message
         self.at = at
-        self.stack_info = ""
-        if e is not None:
-            stack_info = "\n".join(traceback.format_exception(e))
-            self.stack_info = stack_info
-        super().__init__(message)
-
-    @classmethod
-    def get_stack_info(cls) -> str:
-        return "\n".join(traceback.format_exception(*sys.exc_info(), limit=3))
+        super().__init__()
 
 
-class ConversationException(GhostException):
-    """
-    会话过程中发生的异常.
-    """
-
+class ContextError(GhostError):
     CODE: int = 400
 
 
-class ForbiddenException(ConversationException):
+class ForbiddenException(ContextError):
     CODE: int = 403
 
 
-class UnhandledException(GhostException):
+class UnexpectedError(ContextError):
     """
     表示无法处理的消息.
     """
@@ -44,21 +28,21 @@ class UnhandledException(GhostException):
     pass
 
 
-class BusyException(ConversationException):
+class BusyException(ContextError):
     """
     系统忙碌.
     """
     CODE: int = 420
 
 
-class ErrMessageException(ConversationException):
+class ErrMessageError(ContextError):
     """
     用来传递信息的 err
     """
     CODE: int = 430
 
 
-class RuntimeException(GhostException):
+class CloneError(GhostError):
     """
     无法响应的系统错误.
     由于会导致对话无法继续进行, 所以是致命错误, 系统应该重置所有的上下文.
@@ -66,7 +50,7 @@ class RuntimeException(GhostException):
     CODE: int = 500
 
 
-class MindsetNotFoundException(RuntimeException):
+class MindsetNotFoundError(CloneError):
     """
     表示来到了没有思维存在的荒漠.
     通常是注册出了问题.
@@ -74,26 +58,26 @@ class MindsetNotFoundException(RuntimeException):
     CODE: int = 510
 
 
-class OperatorException(RuntimeException):
+class OperatorError(CloneError):
     """
     Runtime 的算子发生了错误.
     """
     CODE: int = 520
 
 
-class StackoverflowException(GhostException):
+class StackoverflowError(CloneError):
     """
     出现了死循环逻辑, 用爆栈错误来中断.
     """
     CODE: int = 530
 
 
-class LogicException(GhostException):
+class LogicError(GhostError):
     """
     工程上的设计错误, 系统不应该启动.
     """
     CODE: int = 600
 
 
-class BootstrapException(LogicException):
+class BootstrapError(LogicError):
     CODE: int = 610

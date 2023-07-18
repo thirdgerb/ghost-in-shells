@@ -6,7 +6,7 @@ from typing import Optional, Dict, List, Tuple
 from pydantic import ValidationError
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.exceptions import MindsetNotFoundException, RuntimeException
+from ghoshell.ghost.exceptions import MindsetNotFoundError, CloneError
 from ghoshell.ghost.mindset import Intention, Attention
 from ghoshell.ghost.mindset import Think, Thought, Stage, Event
 from ghoshell.ghost.mindset.operator import Operator
@@ -60,7 +60,7 @@ class CtxTool:
         """
         stage_instance = cls.fetch_stage(ctx, think, stage)
         if stage_instance is None:
-            raise MindsetNotFoundException(f"force fetch think '{think}' with stage '{stage}' failed, not found")
+            raise MindsetNotFoundError(f"force fetch think '{think}' with stage '{stage}' failed, not found")
         return stage_instance
 
     @classmethod
@@ -281,9 +281,14 @@ class RuntimeTool:
     @classmethod
     def fetch_thought_by_task(cls, ctx: Context, task: Task) -> Thought:
         # 初始化 thought. 这个 thought 里应该包含正确的 tid.
+        # instance_task 理论上只应该执行一次.
         task = ctx.runtime.instance_task(task)
         thought = cls.new_thought(ctx, task.url)
-        thought = cls.merge_task_to_thought(task, thought)
+        try:
+            thought = cls.merge_task_to_thought(task, thought)
+        except Exception as e:
+            # 忽视掉任何错误, 当作遗忘了记忆.
+            ctx.error(e)
         return thought
 
     @classmethod
@@ -315,7 +320,7 @@ class RuntimeTool:
     def force_fetch_task(cls, ctx: Context, tid: str) -> Task:
         task = cls.fetch_task(ctx, tid)
         if task is None:
-            raise RuntimeException(f"force fetch task with id {tid} failed")
+            raise CloneError(f"force fetch task with id {tid} failed")
         return task
 
     @classmethod
@@ -324,7 +329,7 @@ class RuntimeTool:
         process = runtime.current_process()
         task = runtime.fetch_task(process.root)
         if task is None:
-            raise RuntimeException("fetch root task failed")
+            raise CloneError("fetch root task failed")
         return task
 
     @classmethod
@@ -333,7 +338,7 @@ class RuntimeTool:
         process = runtime.current_process()
         task = runtime.fetch_task(process.current)
         if task is None:
-            raise RuntimeException("fetch awaiting task failed")
+            raise CloneError("fetch awaiting task failed")
         return task
 
     @classmethod
@@ -348,7 +353,7 @@ class RuntimeTool:
             try:
                 args_type(**url.args)
             except ValidationError as e:
-                raise RuntimeException(str(e))
+                raise CloneError(str(e))
         thought = think.new_thought(ctx, url.args)
         return thought
 

@@ -5,27 +5,12 @@ from logging import Logger, LoggerAdapter
 from typing import Dict, Type
 
 from ghoshell.container import Provider, Container, Contract
-from ghoshell.contracts import Cache
-from ghoshell.framework.contracts import RuntimeDriver
 from ghoshell.framework.contracts.think_meta_storage import ThinkMetaStorage
 from ghoshell.framework.ghost.focus import FocusImpl
 from ghoshell.framework.ghost.memory import Memory, MemoryImpl
 from ghoshell.framework.ghost.mindset import MindsetImpl, LocalFileThinkMetaStorage
-from ghoshell.framework.ghost.runtime import CacheRuntimeDriver
-from ghoshell.ghost import Context, BootstrapException
+from ghoshell.ghost import Context, BootstrapError
 from ghoshell.ghost import Mindset, Focus, Ghost
-
-
-class CacheRuntimeDriverProvider(Provider):
-    def singleton(self) -> bool:
-        return True
-
-    def contract(self) -> Type[Contract]:
-        return RuntimeDriver
-
-    def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
-        cache = con.force_fetch(Cache)
-        return CacheRuntimeDriver(cache)
 
 
 class LocalThinkMetaStorageProvider(Provider):
@@ -86,7 +71,7 @@ class ContextLoggerProvider(Provider):
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         ctx = con.force_fetch(Context)
         if ctx.container.parent is None:
-            raise BootstrapException("context container must be sub container of ghost")
+            raise BootstrapError("context container must be sub container of ghost")
         logger = logging.getLogger(self.logger_name)
         adapter = LoggerAdapter(logger, extra={"trace": ctx.input.trace.model_dump()})
         return adapter

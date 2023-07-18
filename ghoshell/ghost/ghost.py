@@ -26,6 +26,8 @@ class Ghost(metaclass=ABCMeta):
     但 Clone 自己会拥有独立的主体, 所以 Clone 理论上也会形成和 Ghost 的区别.
 
     Ghost 和 Clone 两个抽象的划分是为了解决个性化问题.
+
+    Ghost 所有的方法都不做 async, 否则系统复杂度太高, 性能未见得好.
     """
 
     # 一个常量, 当 ghost 与 ghost 通讯时, 发送者的 ghost 也就成了 shell. 因此需要有一个常量来标记.

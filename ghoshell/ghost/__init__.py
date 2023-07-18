@@ -36,8 +36,8 @@ __all__ = [
     "Runtime", "Process", "Task",
     "TaskLevel", "TaskStatus",
     # exceptions
-    "StackoverflowException", "UnhandledException", "RuntimeException", "MindsetNotFoundException",
-    "ErrMessageException", "BootstrapException", "LogicException",
+    "StackoverflowError", "UnexpectedError", "CloneError", "MindsetNotFoundError", "GhostError", "ContextError",
+    "ErrMessageError", "BootstrapError", "LogicError",
     # events
     "Event",
     "OnActivating",

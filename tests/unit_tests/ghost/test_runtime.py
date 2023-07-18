@@ -1,4 +1,4 @@
-from ghoshell.ghost import Task, URL, Process, RuntimeException, TaskStatus
+from ghoshell.ghost import Task, URL, Process, TaskStatus
 
 
 def test_task_init():
@@ -24,7 +24,7 @@ def test_process_store_await_tasks():
     e = None
     try:
         p.set_current("b")
-    except RuntimeException as err:
+    except RuntimeError as err:
         e = err
     assert e is not None
 

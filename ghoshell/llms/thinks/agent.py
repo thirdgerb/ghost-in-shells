@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from ghoshell.container import Container
 from ghoshell.framework.stages import BasicStage
-from ghoshell.ghost import LogicException
+from ghoshell.ghost import LogicError
 from ghoshell.ghost import Think, Event, OnReceived, CtxTool, Stage, ThinkMeta, Reaction, Intention, ThinkDriver, Focus
 from ghoshell.ghost import Thought, Operator, Context, URL, Mindset
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion, OpenAIFuncSchema, OpenAIFuncCalled
@@ -413,13 +413,13 @@ class AgentThink(Think, Stage):
         if self.config.default_stage:
             name = self.config.default_stage.name
             if name in stages:
-                raise LogicException(f"duplicated stage name {name}")
+                raise LogicError(f"duplicated stage name {name}")
             stages.add(name)
         if self.config.stages:
             for config in self.config.stages:
                 name = config.name
                 if name in stages:
-                    raise LogicException(f"duplicated stage name {name}")
+                    raise LogicError(f"duplicated stage name {name}")
                 stages.add(name)
 
     def url(self) -> URL:
@@ -604,7 +604,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
                     done.add(name)
                     funcs.append(func)
                 else:
-                    raise LogicException(
+                    raise LogicError(
                         f"global func {name} not registered, required by {self.think_name}:{self.config.name} "
                     )
 
@@ -799,7 +799,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         if isinstance(result, Operator):
             return result
 
-        raise LogicException(f"invalid type `{type(result)}` of llm func {called_name} result")
+        raise LogicError(f"invalid type `{type(result)}` of llm func {called_name} result")
 
     def llm_func_not_found(self, ctx: Context, this: AgentThought, method: str) -> Operator:
         this.data.add_system_message(f"function `{method}` not found")

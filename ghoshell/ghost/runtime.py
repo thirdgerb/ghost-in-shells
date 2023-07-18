@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import uuid
 from abc import ABCMeta, abstractmethod
 from typing import List, Dict, Optional, Set
 
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost.exceptions import RuntimeException
+from ghoshell.ghost.exceptions import CloneError
 from ghoshell.ghost.mindset import Attention
 from ghoshell.messages import Tasked
 from ghoshell.url import URL
@@ -164,6 +166,7 @@ class Task(BaseModel):
 
     attentions: List[Attention] | None = None
 
+    # task 是否已经完成实例化. 完成实例化则不需要读取.
     instanced: bool = False
 
     def to_tasked(self) -> Tasked:
@@ -556,7 +559,7 @@ class Process(BaseModel):
         """
         task = self.get_task(tid)
         if task is None:
-            raise RuntimeException(f"await at task [{tid}] is not stored")
+            raise CloneError(f"await at task [{tid}] is not stored")
         self.current = tid
 
     def reset(self) -> None:
@@ -685,11 +688,11 @@ class Runtime(metaclass=ABCMeta):
         """
         process = self.get_process(self.current_process_id)
         if process is None:
-            raise RuntimeException(f"current process {self.current_process_id} not found, runtime initialize failed")
+            raise CloneError(f"current process {self.current_process_id} not found, runtime initialize failed")
         return process
 
     @abstractmethod
-    def remove_process(self, process: Process) -> None:
+    def remove_process(self, process_id: str) -> None:
         """
         提供一个算法, 用来将 process 里的数据进行精简
         这个方法通常在 finish 方法中被调用.
