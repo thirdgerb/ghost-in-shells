@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Iterator, Optional, Dict, Type
 
 from ghoshell.container import Provider, Container, Contract
