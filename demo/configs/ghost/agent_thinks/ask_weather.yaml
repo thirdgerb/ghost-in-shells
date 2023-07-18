@@ -8,10 +8,10 @@ instruction: |
   当这些参数齐备时, 可以调用 do_ask_weather 方法获取结果, 并告知用户.
   然后要询问用户是否还需要了解更多天气, 当用户需求满足时, 则退出当前会话.
   注意: 不需要告知用户你调用了什么函数.
-args_type: ghoshell.mocks.agent_mock.ask_weather.AskWeatherArgs
+args_type: ghoshell.mocks.agent_mock.ask_weather:AskWeatherArgs
 llm_config_name: turbo-16k-0613
 default_stage:
   name: ask_weather
   on_activate_prompt: 请决定下一步怎么行动.
   llm_funcs:
-    - ghoshell.mocks.agent_mock.ask_weather.do_ask_weather
+    - ghoshell.mocks.agent_mock.ask_weather:do_ask_weather

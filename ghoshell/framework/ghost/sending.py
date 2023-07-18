@@ -28,7 +28,7 @@ class SendingImpl(Sender):
     def _deliver_sync_output(self) -> None:
         if self._output_buffer is None:
             return
-        self.ctx.output(self._output_buffer)
+        self.ctx.send_output(self._output_buffer)
         self._output_buffer = None
 
     def _refresh_sync_output(self, trace: Trace | None) -> None:
@@ -76,7 +76,7 @@ class SendingImpl(Sender):
             trace=trace_data,
             is_async=True,
         )
-        self.ctx.async_input(async_input)
+        self.ctx.send_async_input(async_input)
         return self
 
     def destroy(self) -> None:

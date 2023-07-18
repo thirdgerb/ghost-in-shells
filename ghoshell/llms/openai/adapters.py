@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from abc import ABCMeta, abstractmethod
 from typing import Dict, List
@@ -150,7 +152,7 @@ class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
 
             # functions
             if functions:
-                request["functions"] = [func.model_dump() for func in functions]
+                request["functions"] = [func.dict() for func in functions]
 
             # function_call
             if functions:

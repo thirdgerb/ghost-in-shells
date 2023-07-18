@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Type, Dict, TypeVar
+from typing import Type, Dict, TypeVar, Callable
 
 Contract = TypeVar('Contract', bound=object)
 
@@ -94,3 +94,26 @@ class Provider(metaclass=ABCMeta):
     @abstractmethod
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         pass
+
+
+class AbsProvider(Provider):
+
+    def __init__(
+            self,
+            contract_type: Type[Contract],
+            factory: Callable[[Container, Dict | None], Contract | None],
+            singleton: bool = True
+    ):
+        self._contract_type = contract_type
+        self._factory = factory
+        self._singleton = singleton
+
+    def singleton(self) -> bool:
+        return self._singleton
+
+    def contract(self) -> Type[Contract]:
+        return self._contract_type
+
+    def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
+        return self._factory(con, params)
+

@@ -4,8 +4,8 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost.url import URL
 from ghoshell.messages.base import Payload
+from ghoshell.url import URL
 
 
 class Trace(BaseModel):

@@ -7,8 +7,8 @@ __all__ = [
 
     "ShellKernel",
     "ShellBootstrapper",
-    "ShellInputPipe", "InputPipe", "InputPipeline",
-    "ShellOutputPipe", "OutputPipe", "OutputPipeline",
+    "ShellInputMdw", "InputPipe", "InputPipeline",
+    "ShellOutputMdw", "OutputPipe", "OutputPipeline",
 
     "AsyncShellMessenger", "SyncGhostMessenger",
 ]

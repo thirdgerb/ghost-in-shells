@@ -200,9 +200,9 @@ class SpheroGhostCore:
 
     @classmethod
     def _unpack_yaml_in_text(cls, text: str) -> str:
-        if text.startswith("`") or text.endswith("`"):
-            text.strip("`")
         sections = text.split("```")
         if len(sections) == 3:
             text = sections[1]
+        if text.startswith("`") or text.endswith("`"):
+            text.strip("`")
         return text

@@ -1,10 +1,12 @@
-from abc import ABCMeta, abstractmethod
-from typing import Type
+from __future__ import annotations
 
-from ghoshell.container import Container, Provider
+from abc import ABCMeta, abstractmethod
 
 
 class Cache(metaclass=ABCMeta):
+    """
+    通用的 cache 封装.
+    """
 
     @abstractmethod
     def lock(self, key: str, overdue: int = 0) -> bool:
@@ -39,16 +41,4 @@ class Cache(metaclass=ABCMeta):
 
     @abstractmethod
     def remove(self, *keys: str) -> int:
-        pass
-
-
-class AbsCacheProvider(Provider, metaclass=ABCMeta):
-    def singleton(self) -> bool:
-        return True
-
-    def contract(self) -> Type[Cache]:
-        return Cache
-
-    @abstractmethod
-    def factory(self, con: Container) -> Cache | None:
         pass

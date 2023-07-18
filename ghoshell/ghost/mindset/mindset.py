@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Iterator
 
-from ghoshell.ghost.exceptions import MindsetNotFoundException
+from ghoshell.ghost.exceptions import MindsetNotFoundError
 from ghoshell.ghost.mindset.focus import Focus
 from ghoshell.ghost.mindset.think import Think, ThinkDriver, ThinkMeta
 
@@ -50,7 +50,7 @@ class Mindset(metaclass=ABCMeta):
         """
         fetched = self.fetch(thinking)
         if fetched is None:
-            raise MindsetNotFoundException(f"mindset can not find think with name '{thinking}'")
+            raise MindsetNotFoundError(f"mindset can not find think with name '{thinking}'")
         return fetched
 
     @abstractmethod

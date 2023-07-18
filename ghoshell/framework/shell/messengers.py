@@ -8,19 +8,21 @@ from ghoshell.shell import Messenger
 
 
 class SyncGhostMessenger(Messenger):
+    """
+    """
 
     def __init__(self, ghost: Ghost, queue: MessageQueue):
         self._ghost = ghost
         self._queue = queue
 
-    def send(self, _input: Input) -> Optional[List[Output]]:
+    async def send(self, _input: Input) -> Optional[List[Output]]:
         try:
             outputs = self._ghost.respond(_input)
 
             result = []
             for _output in outputs:
                 if _output.is_async:
-                    self._queue.push_output(_output)
+                    await self._queue.push_output(_output)
                 else:
                     result.append(_output)
             return result
@@ -33,13 +35,13 @@ class SyncGhostMessenger(Messenger):
         finally:
             pass
 
-    def send_async_input(self, _input: Input) -> None:
+    async def send_async_input(self, _input: Input) -> None:
         _input.is_async = True
-        self._queue.push_input(_input)
+        await self._queue.push_input(_input)
 
     async def await_async_output(self, handler: Callable[[Output], None]) -> None:
         _input = await self._queue.pop_input()
-        outputs = self.send(_input)
+        outputs = await self.send(_input)
         if outputs is None:
             # success
             self._queue.ack_input(_input.mid, False)

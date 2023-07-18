@@ -584,7 +584,7 @@ class UndercoverGameDemoThink(Think):
         self.driver = driver
 
     def url(self) -> URL:
-        return URL.new_resolver(self.driver.think_name)
+        return URL.new_think(self.driver.think_name)
 
     def to_meta(self) -> ThinkMeta:
         return self.driver.to_meta()
@@ -649,7 +649,7 @@ class _AbsStage(Stage, metaclass=ABCMeta):
         self.driver = driver
 
     def url(self) -> URL:
-        return URL(resolver=self.driver.think_name, stage=self.stage_name)
+        return URL(think=self.driver.think_name, stage=self.stage_name)
 
     def intentions(self, ctx: Context) -> List[Intention] | None:
         return None

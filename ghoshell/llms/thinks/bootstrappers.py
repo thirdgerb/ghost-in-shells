@@ -1,4 +1,5 @@
 import os
+from typing import Iterator, Tuple
 
 import yaml
 
@@ -19,14 +20,36 @@ class ConversationalThinksBootstrapper(GhostBootstrapper):
     def bootstrap(self, ghost: Ghost):
         config_path = ghost.config_path.rstrip("/") + "/" + self.relative_config_dir.lstrip("/")
         mindset = ghost.mindset
-        for root, ds, fs in os.walk(config_path):
+        for value in self.iterate_think_filename(config_path):
+            filename, fullname = value
+            with open(filename) as f:
+                config_data = yaml.safe_load(f)
+            config = ConversationalConfig(**config_data)
+            if not config.name:
+                config.name = fullname
+            think = ConversationalThink(config)
+            mindset.register_think(think)
+
+        # for root, ds, fs in os.walk(config_path):
+        #     for filename in fs:
+        #         file_path = config_path.rstrip("/") + "/" + filename
+        #         with open(file_path) as f:
+        #             config_data = yaml.safe_load(f)
+        #         config = ConversationalConfig(**config_data)
+        #         think = ConversationalThink(config)
+        #         mindset.register_think(think)
+
+    @classmethod
+    def iterate_think_filename(cls, directory: str) -> Iterator[Tuple[str, str]]:
+        for root, ds, fs in os.walk(directory):
             for filename in fs:
-                file_path = config_path.rstrip("/") + "/" + filename
-                with open(file_path) as f:
-                    config_data = yaml.safe_load(f)
-                config = ConversationalConfig(**config_data)
-                think = ConversationalThink(config)
-                mindset.register_think(think)
+                if not filename.endswith(".yaml"):
+                    continue
+                name = filename[: len(filename) - 5]
+                filename = root.rstrip("/") + "/" + filename
+                namespace = root[len(directory):]
+                fullname = namespace.rstrip("/") + "/" + name
+                yield filename, fullname.lstrip("/")
 
 
 class FileAgentFuncStorageBootstrapper(GhostBootstrapper):

@@ -1,10 +1,10 @@
-from ghoshell.ghost import URL
+from ghoshell.url import URL
 
 
 def test_ghost_url():
     class Test(URL):
-        resolver: str = "e/f/g"
-        args: str = {
+        think: str = "e/f/g"
+        args: dict = {
             "h": 123
         }
 
@@ -14,9 +14,9 @@ def test_ghost_url():
             "stage": "",
             "args": {"e": 123}
         },
-        Test().model_dump(exclude_none=True),
+        Test().model_dump(),
     ]
 
     for case in cases:
         url = URL(**case)
-        assert url.model_dump(exclude_none=True) == case
+        assert url.model_dump() == case

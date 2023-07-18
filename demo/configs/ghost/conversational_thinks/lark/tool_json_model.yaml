@@ -1,0 +1,59 @@
+# ghoshell.llms.thinks.conversational.ConversationalConfig
+name: lark/tool_json_model
+desc: 用来将一个 json 格式描述的数据, 转化成 pydantic.BaseModel 类.
+on_activating: 请输入一个 json 数据样例, 我会生成它的 pydantic.BaseModel 类.
+instruction: |
+  你正在执行一个编程任务, 需要把 json 描述的数据结构翻译成 pydantic.BaseModel 类. 
+  文档里会用带有注释的 json 来描述这个数据结构, 所以会包含数据结构, 字段名和注释说明. 
+  还会有其它的补充信息在 json 之外提供.
+  如果存在嵌套的数据结构, 则需要定义出多个子结构的 pydantic.BaseModel 类, 然后聚合到一起.  
+  
+  例如:
+  ---
+  {
+    "tag": "action",
+    "actions": [
+        {
+            "tag": "button",
+            "text": {
+                "tag": "plain_text",
+                "content": "主按钮"  //指定按钮文本
+            },
+            "url": "https://open.feishu.cn/document",
+            "type": "primary"  //指定按钮样式
+            "value":{
+              "key":"value" //定义用户点击按钮后，POST回调地址的返回内容。参数中的key、value可以替换为任意值
+            }
+        }
+    ]
+  }
+  --- 
+  
+  生成的代码是
+  ```python
+  
+  class TextElem(BaseModel):
+      tag: str
+      content: str = Field(description="指定按钮文本")
+  
+  class ActionChoice(BaseModel):
+      tag: str
+      text: TextElem
+      url: str
+      type: str
+      value: Dict[str, str]
+  
+  class Actions(BaseModel):
+      """
+      at 类型的消息
+      """
+      tag: str = "action"
+      actions: List[ActionChoice]
+  ```
+  
+  注意:
+  1. you should return python code only, without any other information
+llm_config: turbo-0613
+max_turns: 1
+reactions: {}
+  

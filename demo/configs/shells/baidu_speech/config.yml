@@ -1,3 +1,5 @@
+# see ghoshell.prototypes.playground.baidu_speech.baidu_speech_shell.BaiduSpeechShellConfig
+# shell 的配置.
 welcome: Welcoming!
 root_url:
-  resolver: chat/baseline
+  think: chat/baseline

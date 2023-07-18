@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.mindset.stage import Stage
 from ghoshell.ghost.mindset.thought import Thought
-from ghoshell.ghost.url import URL
+from ghoshell.url import URL
 
 
 class ThinkMeta(BaseModel):

@@ -6,12 +6,12 @@ from typing import Optional, Dict, List, Tuple
 from pydantic import ValidationError
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.exceptions import MindsetNotFoundException, RuntimeException
+from ghoshell.ghost.exceptions import MindsetNotFoundError, CloneError
+from ghoshell.ghost.mindset import Intention, Attention
 from ghoshell.ghost.mindset import Think, Thought, Stage, Event
-from ghoshell.ghost.mindset.focus import Intention, Attention
 from ghoshell.ghost.mindset.operator import Operator
 from ghoshell.ghost.runtime import Task, TaskStatus, Process, TaskLevel
-from ghoshell.ghost.url import URL
+from ghoshell.url import URL
 
 GroupedIntentions = Dict[str, List[Intention]]
 
@@ -48,7 +48,7 @@ class CtxTool:
         if task.status != TaskStatus.FINISHED:
             return False, None
         thought = RuntimeTool.fetch_thought_by_task(ctx, task)
-        think = ctx.clone.mindset.force_fetch(task.url.resolver)
+        think = ctx.clone.mindset.force_fetch(task.url.think)
         return True, think.result(ctx, thought)
 
     # ---- thought 相关方法 ----#
@@ -60,7 +60,7 @@ class CtxTool:
         """
         stage_instance = cls.fetch_stage(ctx, think, stage)
         if stage_instance is None:
-            raise MindsetNotFoundException(f"force fetch think '{think}' with stage '{stage}' failed, not found")
+            raise MindsetNotFoundError(f"force fetch think '{think}' with stage '{stage}' failed, not found")
         return stage_instance
 
     @classmethod
@@ -141,7 +141,7 @@ class CtxTool:
     @classmethod
     def current_think_stage(cls, ctx: "Context") -> Stage:
         task = RuntimeTool.fetch_current_task(ctx)
-        return cls.fetch_stage(ctx, task.url.resolver, task.url.stage)
+        return cls.fetch_stage(ctx, task.url.think, task.url.stage)
 
     @classmethod
     def context_attentions(cls, ctx: "Context") -> List[Attention]:
@@ -213,7 +213,7 @@ class CtxTool:
     #         return result
     #
     #     for target in url_list:
-    #         stage = CtxTool.force_fetch_stage(ctx, target.resolver, target.stage)
+    #         stage = CtxTool.force_fetch_stage(ctx, target.think, target.stage)
     #
     #         # 从 stage 里获取 intention
     #         intentions = stage.intentions(ctx)
@@ -263,7 +263,7 @@ class RuntimeTool:
         thought.url.stage = event.stage
 
         # 触发事件. 要使用 event 的 stage
-        stage = CtxTool.force_fetch_stage(ctx, thought.url.resolver, thought.url.stage)
+        stage = CtxTool.force_fetch_stage(ctx, thought.url.think, thought.url.stage)
         after = stage.on_event(ctx, thought, event)
 
         # 这时 thought 已经变更了, 变更的信息要保存到 task 里.
@@ -281,9 +281,14 @@ class RuntimeTool:
     @classmethod
     def fetch_thought_by_task(cls, ctx: Context, task: Task) -> Thought:
         # 初始化 thought. 这个 thought 里应该包含正确的 tid.
+        # instance_task 理论上只应该执行一次.
         task = ctx.runtime.instance_task(task)
         thought = cls.new_thought(ctx, task.url)
-        thought = cls.merge_task_to_thought(task, thought)
+        try:
+            thought = cls.merge_task_to_thought(task, thought)
+        except Exception as e:
+            # 忽视掉任何错误, 当作遗忘了记忆.
+            ctx.error(e)
         return thought
 
     @classmethod
@@ -315,7 +320,7 @@ class RuntimeTool:
     def force_fetch_task(cls, ctx: Context, tid: str) -> Task:
         task = cls.fetch_task(ctx, tid)
         if task is None:
-            raise RuntimeException(f"force fetch task with id {tid} failed")
+            raise CloneError(f"force fetch task with id {tid} failed")
         return task
 
     @classmethod
@@ -324,7 +329,7 @@ class RuntimeTool:
         process = runtime.current_process()
         task = runtime.fetch_task(process.root)
         if task is None:
-            raise RuntimeException("fetch root task failed")
+            raise CloneError("fetch root task failed")
         return task
 
     @classmethod
@@ -333,7 +338,7 @@ class RuntimeTool:
         process = runtime.current_process()
         task = runtime.fetch_task(process.current)
         if task is None:
-            raise RuntimeException("fetch awaiting task failed")
+            raise CloneError("fetch awaiting task failed")
         return task
 
     @classmethod
@@ -342,13 +347,13 @@ class RuntimeTool:
         根据 url 初始化一个 thought
         并没有执行实例化
         """
-        think = ctx.clone.mindset.force_fetch(url.resolver)
+        think = ctx.clone.mindset.force_fetch(url.think)
         args_type = think.args_type()
         if args_type is not None:
             try:
                 args_type(**url.args)
             except ValidationError as e:
-                raise RuntimeException(str(e))
+                raise CloneError(str(e))
         thought = think.new_thought(ctx, url.args)
         return thought
 
@@ -386,7 +391,7 @@ class RuntimeTool:
         url = task.url
         thought = cls.new_thought(ctx, url)
         thought = cls.merge_task_to_thought(task, thought)
-        think = ctx.clone.mindset.force_fetch(url.resolver)
+        think = ctx.clone.mindset.force_fetch(url.think)
         return think.result(ctx, thought)
 
     @classmethod
@@ -408,7 +413,7 @@ class RuntimeTool:
         # todo: 以后实现一个 ctx 级别的缓存, 避免重复生成.
         clone = ctx.clone
         mindset = clone.mindset
-        think = mindset.force_fetch(url.resolver)
+        think = mindset.force_fetch(url.think)
         tid = think.new_task_id(ctx, url.args)
         return tid
 
@@ -453,7 +458,7 @@ class RuntimeTool:
     #
     #     return Task(
     #         tid=tid,
-    #         resolver=url.think,
+    #         think=url.think,
     #         stage="",
     #         args=url.args.copy(),
     #     )

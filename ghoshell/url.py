@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 from typing import Dict, List, Any, Set
 
@@ -10,7 +12,7 @@ class UniformResolverLocator(BaseModel):
     """
 
     # 对应的 Resolver 名, 对标 url 的 path. 用来标记一个 Resolver, 本质上是一个有限状态机.
-    resolver: str
+    think: str
 
     # Resolver 的一个状态，对标 url 的 fragment。
     stage: str = ""
@@ -22,10 +24,10 @@ class UniformResolverLocator(BaseModel):
     # def is_same(self, url: "UniformMindLocator") -> bool:
     #     return (self.ghost == url.ghost or url.ghost == "") and self.Resolver == url.Resolver
     @classmethod
-    def new(cls, resolver: str, stage: str = "", args: Dict | None = None):
+    def new(cls, think: str, stage: str = "", args: Dict | None = None):
         if args is None:
             args = {}
-        return URL(resolver=resolver, stage=stage, args=args)
+        return URL(think=think, stage=stage, args=args)
 
     def copy_with(self, stage: str | None = None, args: Dict | None = None) -> "URL":
         if stage is None:
@@ -33,7 +35,7 @@ class UniformResolverLocator(BaseModel):
         if args is None:
             args = self.args.copy()
         return UniformResolverLocator(
-            resolver=self.resolver,
+            think=self.think,
             stage=stage,
             args=args,
         )
@@ -54,8 +56,8 @@ class UniformResolverLocator(BaseModel):
         return result
 
     @classmethod
-    def new_resolver(cls, resolver) -> "UniformResolverLocator":
-        return cls(resolver=resolver)
+    def new_think(cls, think) -> "UniformResolverLocator":
+        return cls(think=think)
 
     def new_id(
             self,
@@ -84,7 +86,7 @@ class UniformResolverLocator(BaseModel):
             for key in sort:
                 args_str += f"&{key}={self.args[key]}"
 
-        template = f"{self.resolver}::{self.stage}?{extra_str}::{args_str}::{enums_str}"
+        template = f"{self.think}::{self.stage}?{extra_str}::{args_str}::{enums_str}"
         return hashlib.md5(template.encode()).hexdigest()
 
     # def is_same(self, other: "url") -> bool:

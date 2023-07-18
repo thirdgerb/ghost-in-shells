@@ -24,7 +24,7 @@ class SpheroLLMFunc(LLMFunc):
         return OpenAIFuncSchema(
             name=self.cmd.method,
             desc=self.cmd.desc(),
-            parameters_schema=self.cmd.schema(),
+            parameters_schema=self.cmd.model_json_schema(),
         )
 
     def call(self, ctx: Context, this: Thought, content: str, arguments: Dict | str | None) -> Operator | str | None:

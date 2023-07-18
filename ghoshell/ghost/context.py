@@ -24,6 +24,8 @@ class Context(metaclass=ABCMeta):
     Context 主要包含单条输入消息处理时所需要的各种系统模块.
     """
 
+    # --- context 属性 --- #
+
     @property
     @abstractmethod
     def input(self) -> "Input":
@@ -67,6 +69,8 @@ class Context(metaclass=ABCMeta):
         """
         pass
 
+    # --- context 方法 --- #
+
     @abstractmethod
     def mind(self, this: Optional["Thought"]) -> "Mind":
         """
@@ -92,15 +96,7 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def set_input(self, _input: "Input") -> None:
-        """
-        通过 set_input 可以强行变更当前上下文.
-        后续所有的逻辑都会受影响. 通常是用在中间件中.
-        """
-        pass
-
-    @abstractmethod
-    def async_input(self, _input: "Input") -> None:
+    def send_async_input(self, _input: "Input") -> None:
         """
         ghost 给 ghost 发送信息时使用
         pid 为 None, Trace 为 None 时, 默认是发送给当前 Clone 自己.
@@ -108,24 +104,35 @@ class Context(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def output(self, _output: "Output") -> None:
+    def send_output(self, _output: "Output") -> None:
         """
         输出各种动作, 实际上输出到 output 里, 给 shell 去处理
         """
         pass
 
     @abstractmethod
-    def get_outputs(self) -> List["Output"]:
+    def reset_input(self, _input: "Input") -> None:
         """
-        将所有的输出动作组合起来, 输出为 Output
-        所有 act 会积累新的 action 到 output
-        它应该是幂等的, 可以多次输出.
+        通过 set_input 可以强行变更当前上下文.
+        后续所有的逻辑都会受影响. 通常是用在中间件中.
         """
         pass
 
     @abstractmethod
-    def get_async_inputs(self) -> List["Input"]:
+    def get_unsent_outputs(self) -> List["Output"]:
+        """
+        获取剩余没有立刻发送的 output
+        """
         pass
+
+    @abstractmethod
+    def get_unsent_async_inputs(self) -> List["Input"]:
+        """
+        获取剩余没有立刻发生的 async inputs.
+        """
+        pass
+
+    # --- context variables --- #
 
     @abstractmethod
     def set(self, key: str, value: Any) -> None:
@@ -141,8 +148,17 @@ class Context(metaclass=ABCMeta):
         """
         pass
 
+    # --- close context --- #
+
     @abstractmethod
-    def fail(self) -> None:
+    def on_fatal(self, err: Exception) -> None:
+        pass
+
+    @abstractmethod
+    def error(self, e: Exception) -> None:
+        """
+        记录错误日志.
+        """
         pass
 
     @abstractmethod

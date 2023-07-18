@@ -1,4 +1,5 @@
-import importlib
+from __future__ import annotations
+
 from typing import List
 from typing import Optional, Dict, Any
 
@@ -8,6 +9,7 @@ from ghoshell.framework.stages import BasicStage
 from ghoshell.ghost import *
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion
 from ghoshell.messages import *
+from ghoshell.utils import import_module_value
 
 
 class ConversationalConfig(BaseModel):
@@ -16,9 +18,11 @@ class ConversationalConfig(BaseModel):
     """
 
     # think 的名字.
-    name: str
+    name: str = ""
     # think 的自我描述, 后面用于做能力的提示.
     desc: str = ""
+
+    on_activating: str = "你好!"
 
     # 使用的 llm 的配置名. 详见 OpenAIChatCompletion 接口
     llm_config: str = ""
@@ -40,7 +44,6 @@ class ConversationalConfig(BaseModel):
 
     # 全局的对话说明.
     instruction: str = "你可以回复任何内容, 但请使用中文来回复."
-    on_activating: str = "你好!"
     # 发生 prompt 事件时的回复.
     on_preempted: str = "preempting"
     # 发生 cancel 事件时的回复.
@@ -49,6 +52,7 @@ class ConversationalConfig(BaseModel):
     on_conclusion: str = ""
     on_none_text: str = "can only response text message."
     on_empty_text: str = "you speak nothing."
+    on_beyond_max_turns: str = "超过最大对话轮次, 重置任务."
 
 
 class ConversationalThought(Thought):
@@ -98,7 +102,7 @@ class DefaultConversationalStage(BasicStage):
         self.stage_name = stage_name
         self._reactions = reactions
 
-    def desc(self, ctx: "Context") -> str:
+    def desc(self, ctx: "Context", this: None) -> str:
         return self.config.desc
 
     def on_received(self, ctx: "Context", this: ConversationalThought, e: OnReceived) -> Operator | None:
@@ -119,10 +123,13 @@ class DefaultConversationalStage(BasicStage):
         resp = self._prompt(ctx, this)
 
         # 删除超额的内容.
-        self._check_max_turns(this)
 
         # 发送消息.
         ctx.send_at(this).text(resp)
+
+        if self._beyond_max_turns(this):
+            ctx.send_at(this).text(self.config.on_beyond_max_turns)
+            return ctx.mind(this).restart()
         return ctx.mind(this).awaits()
 
     @classmethod
@@ -136,14 +143,12 @@ class DefaultConversationalStage(BasicStage):
         )
         return
 
-    def _check_max_turns(self, this: ConversationalThought) -> None:
+    def _beyond_max_turns(self, this: ConversationalThought) -> bool:
         """
         如果超过了最大会话长度, 就删除掉历史记录.
         todo: 让 llm 自己对前文进行总结.
         """
-        if len(this.data.context) > self.config.max_turns:
-            # 删除两轮对话. 当然最好的做法应该是让 bot 自己总结.
-            this.data.context = this.data.context[2:]
+        return len(this.data.context) > self.config.max_turns
 
     def _prompt(self, ctx: Context, this: ConversationalThought) -> str:
         chats = [
@@ -184,7 +189,7 @@ class DefaultConversationalStage(BasicStage):
         return self._send_and_await(ctx, this, self.config.on_preempted)
 
     def url(self) -> URL:
-        return URL(resolver=self.config.name, stage=self.stage_name)
+        return URL(think=self.config.name, stage=self.stage_name)
 
     def intentions(self, ctx: Context) -> List[Intention] | None:
         # todo: 下一步要实现 "能力" 的匹配.
@@ -205,15 +210,14 @@ class ConversationalThink(Think, ThinkDriver):
             # think 的名字.
             config: ConversationalConfig,
     ):
+        if not config.name:
+            raise ValueError("conversational think name should not be empty")
         self.config = config
         default_reactions: Dict[str, Reaction] = {}
         for name in self.config.reactions:
             fullpath = self.config.reactions[name]
-            sections = fullpath.split(".")
-            value_name = sections[len(sections) - 1]
-            module = ".".join(sections[:len(sections) - 1])
-            imported = importlib.import_module(module)
-            default_reactions[name] = getattr(imported, value_name)
+            imported = import_module_value(fullpath)
+            default_reactions[name] = imported
 
         self.stages = {
             "": DefaultConversationalStage(
@@ -224,7 +228,7 @@ class ConversationalThink(Think, ThinkDriver):
         }
 
     def url(self) -> URL:
-        return URL(resolver=self.config.name)
+        return URL(think=self.config.name)
 
     def driver_name(self) -> str:
         return f"{ConversationalThink.__name__}/{self.config.name}"
@@ -233,9 +237,9 @@ class ConversationalThink(Think, ThinkDriver):
         return self
 
     def to_meta(self) -> ThinkMeta:
-        resolver = self.url().resolver
+        think = self.url().think
         return ThinkMeta(
-            id=resolver,
+            id=think,
             kind=f"{self.driver_name()}",
         )
 

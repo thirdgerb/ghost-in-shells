@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 from typing import List, Dict, Any, Optional, Type
 
 from ghoshell.container import Container
 from ghoshell.contracts import Cache
-from ghoshell.framework.contracts import RuntimeDriver
 from ghoshell.framework.ghost.config import GhostConfig
 from ghoshell.framework.ghost.mind import MindImpl
 from ghoshell.framework.ghost.runtime import RuntimeImpl
@@ -65,7 +66,7 @@ class ContextImpl(Context):
     def input(self) -> "Input":
         return self._input
 
-    def set_input(self, _input: "Input") -> None:
+    def reset_input(self, _input: "Input") -> None:
         self._input = _input
 
     def mind(self, this: Optional["Thought"]) -> "Mind":
@@ -81,12 +82,12 @@ class ContextImpl(Context):
     def read(self, expect: Type[Message]) -> Message | None:
         return expect.read(self.input.payload)
 
-    def async_input(self, _input: Input) -> None:
+    def send_async_input(self, _input: Input) -> None:
         _input.is_async = True
         self._async_inputs_buffer.append(_input)
         return
 
-    def output(self, _output: "Output") -> None:
+    def send_output(self, _output: "Output") -> None:
         # 异步输入只能返回异步输出.
         if self._input.is_async:
             # 这一步应该有别的地方实现了.
@@ -94,10 +95,10 @@ class ContextImpl(Context):
         # 用一个数组 buffer
         self._outputs_buffer.append(_output)
 
-    def get_outputs(self) -> List["Output"]:
+    def get_unsent_outputs(self) -> List["Output"]:
         return self._outputs_buffer
 
-    def get_async_inputs(self) -> List["Input"]:
+    def get_unsent_async_inputs(self) -> List["Input"]:
         return self._async_inputs_buffer
 
     def set(self, key: str, value: Any) -> None:
@@ -109,19 +110,12 @@ class ContextImpl(Context):
     @property
     def runtime(self) -> "Runtime":
         if self._runtime is None:
-            driver = self._container.force_fetch(RuntimeDriver)
-            trace = self._input.trace
-
-            def new_process_id() -> str:
-                return self.session.new_process_id()
-
             runtime = RuntimeImpl(
-                driver,
-                self._config,
-                self._clone.clone_id,
-                trace.session_id,
-                trace.process_id,
-                new_process_id,
+                self.session,
+                self._config.root_url,
+                self._input.stateless,
+                self._config.process_max_tasks,
+                self._config.process_lock_overdue,
             )
             self._container.set(Runtime, runtime)
             self._runtime = runtime
@@ -142,12 +136,20 @@ class ContextImpl(Context):
             self._session = session
         return self._session
 
-    def fail(self):
+    def on_fatal(self, e: Exception):
+        self.error(e)
+        # 清空上下文. 重置会话.
+        if self._session is not None:
+            self._session.clear_all()
+
         self._failed = True
         # 清空数据.
-        self._input = self._origin_input.copy()
+        self._input = self._origin_input.model_copy()
         self._async_inputs_buffer = []
         self._outputs_buffer = []
+
+    def error(self, e: Exception) -> None:
+        pass
 
     def finish(self) -> None:
         if self._failed:

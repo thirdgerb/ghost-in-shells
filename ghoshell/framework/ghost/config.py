@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from ghoshell.ghost import URL
+from ghoshell.url import URL
 
 
 class GhostConfig(BaseModel):
@@ -13,5 +13,4 @@ class GhostConfig(BaseModel):
     session_overdue: int = 1800
 
     process_max_tasks: int = 20
-    process_default_overdue: int = 1800
     process_lock_overdue: int = 30

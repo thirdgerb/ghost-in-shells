@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from typing import Dict, ClassVar, List, Optional, Any, Iterator
 
@@ -173,7 +175,7 @@ class PromptUnitTestThinkDriver(ThinkDriver):
     def from_meta(self, meta: ThinkMeta) -> "Think":
         think_name = meta.id
         if not think_name.startswith(self.think_prefix):
-            raise MindsetNotFoundException(f"think {think_name} not found in prompt unittest thinks")
+            raise MindsetNotFoundError(f"think {think_name} not found in prompt unittest thinks")
         sub_dir = think_name[len(self.think_prefix):]
         dirname = self.root_dir.rstrip("/") + "/" + sub_dir
         storage = PromptUnitTestLoader(
@@ -199,7 +201,7 @@ class PromptUnitTestThink(Think, Stage):
         self.config = loader.load()
 
     def url(self) -> URL:
-        return URL.new_resolver(self.think_name)
+        return URL.new_think(self.think_name)
 
     def to_meta(self) -> ThinkMeta:
         return ThinkMeta(
@@ -327,7 +329,7 @@ class PromptUnitTestCaseStage(Stage):
         self.config = case
 
     def url(self) -> URL:
-        return URL(resolver=self.think_name, stage=self.stage_name)
+        return URL(think=self.think_name, stage=self.stage_name)
 
     def intentions(self, ctx: Context) -> List[Intention] | None:
         return None

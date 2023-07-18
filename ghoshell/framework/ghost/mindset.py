@@ -82,7 +82,7 @@ class MindsetImpl(Mindset):
         # 遍历所有的子节点.
         for sub in self._sub_mindsets:
             for think in sub.foreach_think():
-                name = think.url().resolver
+                name = think.url().think
                 if name in names:
                     continue
                 names.add(name)

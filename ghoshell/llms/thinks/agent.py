@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 from abc import abstractmethod, ABCMeta
@@ -8,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from ghoshell.container import Container
 from ghoshell.framework.stages import BasicStage
-from ghoshell.ghost import LogicException
+from ghoshell.ghost import LogicError
 from ghoshell.ghost import Think, Event, OnReceived, CtxTool, Stage, ThinkMeta, Reaction, Intention, ThinkDriver, Focus
 from ghoshell.ghost import Thought, Operator, Context, URL, Mindset
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion, OpenAIFuncSchema, OpenAIFuncCalled
@@ -212,7 +214,7 @@ class LLMFunc(metaclass=ABCMeta):
         if isinstance(arguments, Dict):
             return args_type(**arguments)
         if isinstance(arguments, str):
-            properties = args_type.schema().get("properties")
+            properties = args_type.model_json_schema().get("properties")
             if len(properties) == 1:
                 params = {}
                 for key in properties:
@@ -235,7 +237,7 @@ class AdapterAsFunc(LLMFunc):
         return self.alias
 
     def schema(self, ctx: Context, this: AgentThought) -> OpenAIFuncSchema:
-        schema = self.func.schema(ctx, this)
+        schema = self.func.model_json_schema(ctx, this)
         schema.name = self.name()
         if self.desc:
             schema.desc = self.desc
@@ -269,7 +271,7 @@ class MethodAsFunc(LLMFunc):
         return OpenAIFuncSchema(
             name=self._name,
             desc=self._desc,
-            parameters_schema=self._params_type.schema() if self._params_type is not None else None
+            parameters_schema=self._params_type.model_json_schema() if self._params_type is not None else None
         )
 
     def call(self, ctx: Context, this: AgentThought, content: str, arguments: Dict | str | None) -> Operator | None:
@@ -307,7 +309,7 @@ class RedirectFunc(LLMFunc):
         return OpenAIFuncSchema(
             name=self._name,
             desc=think.desc(ctx, None),
-            parameters_schema=args_type.schema() if args_type else None,
+            parameters_schema=args_type.model_json_schema() if args_type else None,
         )
 
     def call(self, ctx: Context, this: AgentThought, content: str, arguments: Dict) -> Operator | str | None:
@@ -319,7 +321,7 @@ class RedirectFunc(LLMFunc):
         if content:
             this.say(ctx, content)
 
-        url = URL.new(resolver=self._think, args=arguments.copy())
+        url = URL.new(think=self._think, args=arguments.copy())
         return ctx.mind(this).redirect(url)
 
 
@@ -411,17 +413,17 @@ class AgentThink(Think, Stage):
         if self.config.default_stage:
             name = self.config.default_stage.name
             if name in stages:
-                raise LogicException(f"duplicated stage name {name}")
+                raise LogicError(f"duplicated stage name {name}")
             stages.add(name)
         if self.config.stages:
             for config in self.config.stages:
                 name = config.name
                 if name in stages:
-                    raise LogicException(f"duplicated stage name {name}")
+                    raise LogicError(f"duplicated stage name {name}")
                 stages.add(name)
 
     def url(self) -> URL:
-        return URL.new(resolver=self.config.name)
+        return URL.new(think=self.config.name)
 
     def to_meta(self) -> ThinkMeta:
         return ThinkMeta(
@@ -513,7 +515,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
 
     def url(self) -> URL:
         return URL(
-            resolver=self.think_name,
+            think=self.think_name,
             stage=self.think_name,
         )
 
@@ -602,7 +604,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
                     done.add(name)
                     funcs.append(func)
                 else:
-                    raise LogicException(
+                    raise LogicError(
                         f"global func {name} not registered, required by {self.think_name}:{self.config.name} "
                     )
 
@@ -687,7 +689,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
 
         # 输入上下文.
         for m in this.data.dialog:
-            chat_context.append(m.copy())
+            chat_context.append(m.model_copy())
 
         # 加入最后的提示.
         if prompt:
@@ -732,7 +734,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         return chat_context
 
     def _context_think_instruction(self, ctx: Context, this: AgentThought, chat_context: List[OpenAIChatMsg]) -> None:
-        think_instruction = this.data.think_instruction.format(name=this.url.resolver)
+        think_instruction = this.data.think_instruction.format(name=this.url.think)
         if think_instruction:
             chat_context.append(OpenAIChatMsg(
                 role=OpenAIChatMsg.ROLE_SYSTEM,
@@ -741,13 +743,13 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
 
     def _context_think_args(self, ctx: Context, this: AgentThought, chat_context: List[OpenAIChatMsg]) -> None:
         # 处理有参数的情况.
-        think = CtxTool.force_fetch_think(ctx, this.url.resolver)
+        think = CtxTool.force_fetch_think(ctx, this.url.think)
         args_type = think.args_type()
         if args_type is not None:
             chat_context.append(
                 OpenAIChatMsg(
                     role=OpenAIChatMsg.ROLE_SYSTEM,
-                    content="args schema: " + json.dumps(args_type.schema(), ensure_ascii=False)
+                    content="args schema: " + json.dumps(args_type.model_json_schema(), ensure_ascii=False)
                 )
             )
             chat_context.append(
@@ -797,7 +799,7 @@ class AgentStage(BasicStage, metaclass=ABCMeta):
         if isinstance(result, Operator):
             return result
 
-        raise LogicException(f"invalid type `{type(result)}` of llm func {called_name} result")
+        raise LogicError(f"invalid type `{type(result)}` of llm func {called_name} result")
 
     def llm_func_not_found(self, ctx: Context, this: AgentThought, method: str) -> Operator:
         this.data.add_system_message(f"function `{method}` not found")

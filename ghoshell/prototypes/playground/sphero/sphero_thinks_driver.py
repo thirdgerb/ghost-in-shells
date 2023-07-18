@@ -3,7 +3,7 @@ from typing import List
 import yaml
 
 from ghoshell.framework.ghost import GhostBootstrapper
-from ghoshell.ghost import Ghost, ThinkDriver, ThinkMeta, Think, MindsetNotFoundException
+from ghoshell.ghost import Ghost, ThinkDriver, ThinkMeta, Think, MindsetNotFoundError
 from ghoshell.prototypes.playground.sphero.mode_learn import SpheroLearningModeThink
 from ghoshell.prototypes.playground.sphero.mode_runtime import SpheroRuntimeModeThink
 from ghoshell.prototypes.playground.sphero.mode_simple import SpheroSimpleCommandModeThink
@@ -47,7 +47,7 @@ class SpheroThinkDriver(ThinkDriver):
             case self.config.runtime_mode.name:
                 return SpheroRuntimeModeThink(self._core)
             case _:
-                raise MindsetNotFoundException(f"think {meta.id} not found")
+                raise MindsetNotFoundError(f"think {meta.id} not found")
 
     def to_metas(self) -> List[ThinkMeta]:
         result = []

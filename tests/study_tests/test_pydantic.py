@@ -20,9 +20,6 @@ def test_typing_dict() -> None:
     zoo = Zoo(**foo.model_dump())
     assert zoo.bar.a == "b"
 
-    zoo = Zoo.parse_obj(foo)
-    assert zoo.bar.a == "b"
-
     # 判断默认值不会相互污染
     foo2 = Foo()
     assert len(foo2.bar) == 0
@@ -54,7 +51,7 @@ def test_children_copy() -> None:
     # 可以通过字典给子实体赋值.
     p = Parent(child={"foo": "foo", "bar": 123})
 
-    copied = p.copy()
+    copied = p.model_copy()
     copied.child.foo = "bar"
     assert copied.child.foo == "bar"
     # copy 不是深拷贝
@@ -130,7 +127,7 @@ def test_schema():
     class Foo(BaseModel):
         foo: str = Field(description="foo")
 
-    schema = Foo.schema()
+    schema = Foo.model_json_schema()
     assert len(schema["properties"]) == 1
     assert schema["properties"]["foo"]["description"] == "foo"
 
@@ -141,7 +138,7 @@ def test_schema_with_includes() -> None:
         _bar: str
         zoo: ClassVar[str] = "value"
 
-    schema = Foo.schema()
+    schema = Foo.model_json_schema()
     assert len(schema["properties"]) == 1
 
 # def test_single_arg() -> None:

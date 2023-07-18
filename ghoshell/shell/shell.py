@@ -42,26 +42,26 @@ class Shell(metaclass=ABCMeta):
     @abstractmethod
     def on_event(self, event: Any) -> Optional[Input]:
         """
-        收到一个事件时, 可以初始化一个 shell 的 context
+        收到一个事件时, 可以初始化一个 Input 消息
         """
         pass
 
     @abstractmethod
-    def tick(self, e: Any) -> None:
+    async def tick(self, e: Any) -> None:
         """
         处理单个 shell 事件. 同步逻辑.
         """
         pass
 
     @abstractmethod
-    def on_input(self, _input: Input) -> Tuple[Input, Optional[Output]]:
+    async def on_input(self, _input: Input) -> Tuple[Input, Optional[Output]]:
         """
         响应 shell 的输入事件.
         """
         pass
 
     @abstractmethod
-    def on_output(self, _outputs: Output) -> None:
+    async def on_output(self, _outputs: Output) -> None:
         """
         得到一个 shell 的输出 (同步或异步)
         需要有能力将之发送给用户.

@@ -1,20 +1,21 @@
-import sys
+from __future__ import annotations
+
 import traceback
 import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Callable, List
 
 from ghoshell.container import Container, Provider
-from ghoshell.contracts import Cache
+from ghoshell.contracts import Cache, APIRepository
 from ghoshell.framework.contracts.think_meta_storage import ThinkMetaStorage
 from ghoshell.framework.ghost import providers
 from ghoshell.framework.ghost.clone import CloneImpl
 from ghoshell.framework.ghost.config import GhostConfig
 from ghoshell.framework.ghost.context import ContextImpl
 from ghoshell.framework.ghost.middleware import CtxMiddleware, ExceptionHandlerMiddleware, CtxPipe, CtxPipeline
+from ghoshell.ghost import CloneError, BootstrapError, GhostError, ContextError
 from ghoshell.ghost import Ghost, Clone, Context, OperationKernel
 from ghoshell.ghost import Mindset, Focus, Memory
-from ghoshell.ghost import RuntimeException, GhostException
 from ghoshell.messages import Input, Output, ErrMsg
 from ghoshell.utils import create_pipeline
 
@@ -30,9 +31,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     """
     Ghost 框架实现的内核
     """
-
-    # 启动流程. 想用这种方式解耦掉系统文件读取等逻辑.
-    bootstrapper: List[GhostBootstrapper] = []
 
     def __init__(
             self,
@@ -56,12 +54,12 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     def boostrap(self) -> "Ghost":
         self._init_container()
         # bootstrapper
-        for boot in self.bootstrapper:
+        for boot in self.get_bootstrapper():
             boot.bootstrap(self)
 
         for depending in self.get_depending_contracts():
             if not self._container.bound(depending):
-                raise GhostException(f"ghost depending contract {depending} is not bound")
+                raise BootstrapError(f"ghost depending contract {depending} is not bound")
         return self
 
     def _init_container(self):
@@ -76,7 +74,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
 
     # ---- 配置类函数 ---- #
 
-    def get_bootstrappers(self) -> List[GhostBootstrapper]:
+    def get_bootstrapper(self) -> List[GhostBootstrapper]:
         return []
 
     def get_context_middleware(self) -> List[CtxMiddleware]:
@@ -94,6 +92,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         return [
             Cache,
             ThinkMetaStorage,
+            APIRepository,
         ]
 
     def get_contracts_providers(self) -> List[Provider]:
@@ -115,7 +114,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         ghost 启动的时候执行的 providers
         """
         return [
-            providers.CacheRuntimeDriverProvider(),
             providers.MindsetProvider(),
             providers.FocusProvider(),
             providers.MemoryProvider(),
@@ -128,7 +126,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         机器人构建上下文, 最核心的能力
         """
         if not inpt.trace.clone_id:
-            raise RuntimeException("todo xxxx")
+            raise CloneError("todo xxxx")
 
         clone = self.new_clone(inpt.trace.clone_id)
         ctx_container = Container(self._container)
@@ -146,9 +144,8 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             ctx_container.register(provider)
         return ctx
 
-    @abstractmethod
     def new_operation_kernel(self) -> "OperationKernel":
-        pass
+        return self.container.force_fetch(OperationKernel)
 
     def respond(self, inpt: Input) -> List[Output] | None:
         """
@@ -157,14 +154,15 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         try:
             ctx = self.new_context(inpt)
             return self._react(ctx)
-        except GhostException as e:
-            return [self._failure_message(_input=inpt, err=e)]
         except Exception as e:
-            ex = GhostException("unexpected ghost err", e=e)
-            return [self._failure_message(_input=inpt, err=ex)]
+            self._fail(e)
         finally:
             # todo: handle exception
             pass
+
+    def _fail(self, e: Exception) -> None:
+        print("\n".join(traceback.format_exception(e)))
+        exit(1)
 
     def _react(self, ctx: Context) -> List[Output]:
         """
@@ -174,18 +172,20 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             pipeline = self._build_pipeline()
             ctx = pipeline(ctx)
 
-            return ctx.get_outputs()
-        except GhostException as e:
-            ctx.fail()
+            return ctx.get_unsent_outputs()
+        except ContextError as e:
+            # todo
             return [self._failure_message(_input=ctx.input, err=e)]
+        except CloneError as e:
+            ctx.on_fatal(e)
+            return [self._failure_message(_input=ctx.input, err=e)]
+
         finally:
             ctx.finish()
 
     @classmethod
-    def _failure_message(cls, _input: Input, err: GhostException) -> Output:
-        stack_info = err.stack_info
-        if not stack_info:
-            stack_info = "\n".join(traceback.format_exception(*sys.exc_info(), limit=5))
+    def _failure_message(cls, _input: Input, err: GhostError) -> Output:
+        stack_info = "\n".join(traceback.format_exception(err))
         msg = ErrMsg(errcode=err.CODE, errmsg=str(err), at=err.at, stack_info=stack_info)
         _output = Output.new(uuid.uuid4().hex, _input)
         msg.join(_output.payload)

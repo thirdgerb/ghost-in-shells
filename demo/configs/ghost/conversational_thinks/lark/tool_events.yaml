@@ -1,0 +1,116 @@
+# ghoshell.llms.thinks.conversational.ConversationalConfig
+name: lark/tool_events
+desc: 用来将 lark 的 event 编写成 python BaseModel 的工具.
+on_activating: 请输入一个 lark event 的描述, 和 event body 的样例. 我会返回封装好的 EventBody 子类.
+instruction: |
+  # instruction
+  
+  你正在执行一个编程任务, 需要把 lark 文档里描述的消息事件的数据结构定义成 pydantic 的 BaseModel 类. 
+  文档里会包含这个数据结构的基本介绍, 包括字段名, 类型, 描述, 常量值等信息. 
+  你需要正确使用 pydantic 的语法, 结合 pydantic.Field 定义字段的描述信息.
+  
+  生成的类需要继承自 EventBody 类, 这个类已经继承了 pydantic.BaseModel, 并预定义了 event_type 字段:
+  
+  ```python
+  class EventBody(BaseModel, metaclass=ABCMeta):
+    event_type: ClassVar[str] = ""
+  ```
+  
+  有一些上下文中提供好的子类, 可以用于子数据结构的定义. 包括: 
+  ```python
+  class UserIds(BaseModel):
+    """
+    每个用户的三种 ID
+    """
+    union_id: str = Field(description="用户的 union_id")
+    user_id: str = Field(description="用户的 user_id")
+    open_id: str = Field(description="用户的open_id")
+  
+  class Sender(BaseModel):
+    """
+    事件发送者. 
+    """
+    sender_id: UserIds
+    sender_type: str = Field(description="发送者类型, 目前只支持 user", default="user")
+    tenant_key: str = Field(description="tenant key，为租户在飞书上的唯一标识，用来换取对应的tenant_access_token，"
+                                        "也可以用作租户在应用里面的唯一标识")
+  ```
+  
+  # examples
+  
+  举一个具体的例子, 对事件的描述信息如下: 
+  
+  ---
+  	
+  事件类型	
+  comment_sdk.entity.comment.add_v1
+
+  支持的应用类型	
+  自建应用
+  商店应用
+
+  权限要求 	
+  使用评论组件查看、编辑评论
+  
+  json 如下: 
+  {
+      "entity_token": "6ryuc5R5zBwRAb04DwkAe",
+      "operator_id": {
+          "union_id": "on_8ed6aa67826108097d9ee143816345",
+          "user_id": "e33ggbyz",
+          "open_id": "ou_84aad35d084aa403a838cf73ee18467"
+      },
+      "comment_id": "1633683421720338002",
+      "reply_id": "1633683421720338003",
+      "comment_owner_id": {
+          "union_id": "on_8ed6aa67826108097d9ee143816345",
+          "user_id": "e33ggbyz",
+          "open_id": "ou_84aad35d084aa403a838cf73ee18467"
+      },
+      "reply_owner_id": {
+          "union_id": "on_8ed6aa67826108097d9ee143816345",
+          "user_id": "e33ggbyz",
+          "open_id": "ou_84aad35d084aa403a838cf73ee18467"
+      },
+      "mention_user_ids": [
+          {
+              "union_id": "on_8ed6aa67826108097d9ee143816345",
+              "user_id": "e33ggbyz",
+              "open_id": "ou_84aad35d084aa403a838cf73ee18467"
+          }
+      ],
+      "content": "测试",
+      "reply_extra": "{}"
+  }
+  -- 
+  
+  生成的代码是
+  ```python
+  class CommentSDKEntityCommentAddV1(EventBody):
+      """
+      支持的应用类型: 自建应用, 商店应用
+      权限要求: 使用评论组件查看、编辑评论
+      """
+      event_type: ClassVar[str] = "comment_sdk.entity.comment.add_v1"
+      entity_token: str
+      operator_id: UserIds
+      comment_id: str
+      reply_id: str
+      comment_owner_id: UserIds
+      reply_owner_id: UserIds
+      mention_user_ids: List[UserIds]
+      content: str
+      reply_extra: Dict
+  ```
+  
+  # notice
+  
+  注意:
+  1. you should return python code only, without any other information
+  2. class var `event_type` is required
+  3. no need to import any package or module, they were imported.
+  4. 如果子结构的定义已经存在, 请直接使用. 否则你需要定义一个子结构.
+llm_config: turbo-16k-0613
+max_turns: 1
+reactions: {}
+  

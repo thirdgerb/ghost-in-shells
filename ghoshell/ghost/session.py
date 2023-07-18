@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
 from typing import Dict
 
@@ -26,33 +28,81 @@ class Session(metaclass=ABCMeta):
         """
         pass
 
+    def is_new(self) -> bool:
+        """
+        是否是新 session
+        """
+        pass
+
     @abstractmethod
     def new_process_id(self) -> str:
+        """
+        生成一个新的 process id
+        """
         pass
 
     def current_process_id(self) -> str:
+        """
+        获取当前的 process id
+        """
         pass
 
     @abstractmethod
     def new_message_id(self) -> str:
+        """
+        生成一个新的 message id.
+        """
         pass
 
     @abstractmethod
     def set(self, key: str, value: Dict) -> bool:
+        """
+        向 Session 中存入一个数据. 和 Session 一起过期.
+        """
         pass
 
     @abstractmethod
     def get(self, key: str) -> Dict | None:
+        """
+        从 session 中读取一个数据.
+        """
         pass
 
-    # todo: 先不急于实现
-    # @abstractmethod
-    # def save_input(self, _input: Input) -> None:
-    #     pass
-    #
-    # @abstractmethod
-    # def save_output(self, _output: Output) -> None:
-    #     pass
+    @abstractmethod
+    def remove(self, *key: str) -> None:
+        """
+        删除 session 中的数据.
+        """
+        pass
+
+    @abstractmethod
+    def lock(self, key: str, overdue: int = -1) -> bool:
+        """
+        session 给一个 key 上锁.
+        """
+        pass
+
+    @abstractmethod
+    def unlock(self, key: str) -> bool:
+        """
+        session 给一个 key 解锁. 注意这里并没有强行要求上锁成功才能解锁.
+        """
+        pass
+
+    @abstractmethod
+    def get_task_data(self, tid: str) -> Dict | None:
+        pass
+
+    @abstractmethod
+    def set_task_data(self, tid: str, value: Dict, overdue: int) -> None:
+        pass
+
+    @abstractmethod
+    def clear_all(self) -> None:
+        """
+        清空 Session 内的数据.
+        """
+        pass
 
     @abstractmethod
     def destroy(self) -> None:

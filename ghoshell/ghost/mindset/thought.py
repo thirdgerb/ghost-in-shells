@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Dict
 
 from ghoshell.ghost.runtime import TaskLevel, TaskStatus
-from ghoshell.ghost.url import URL
+from ghoshell.url import URL
 
 
 class Thought(metaclass=ABCMeta):

@@ -22,9 +22,19 @@ class OpenAIFuncSchema:
         self.name = name
         self.desc = desc
         if parameters_schema is None:
-            parameters_schema = BaseModel.schema()
+            parameters_schema = {"type": "object", "properties": {}}
+        properties = parameters_schema.get("properties", {})
+        params_properties = {}
+        for key in properties:
+            _property = properties[key]
+            if "title" in _property:
+                del _property["title"]
+            params_properties[key] = _property
+        parameters_schema["properties"] = params_properties
+
         if "title" in parameters_schema:
             del parameters_schema["title"]
+
         self.parameters_schema = parameters_schema
 
     def dict(self) -> Dict:
@@ -36,6 +46,10 @@ class OpenAIFuncSchema:
 
 
 class OpenAIChatMsg(BaseModel):
+    """
+    OpenAI 接口的消息.
+    """
+
     ROLE_SYSTEM: ClassVar[str] = "system"
     ROLE_USER: ClassVar[str] = "user"
     ROLE_ASSISTANT: ClassVar[str] = "assistant"

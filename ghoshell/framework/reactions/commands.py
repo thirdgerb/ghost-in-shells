@@ -265,7 +265,7 @@ class RedirectCmdReaction(CommandReaction):
         if not think_name:
             ctx.send_at(None).err("think name must not be empty")
             return ctx.mind(None).rewind()
-        if think_name == this.url.resolver:
+        if think_name == this.url.think:
             if not stage_name or stage_name == this.url.stage:
                 ctx.send_at(None).err(f"think name '{think_name}' is same as current")
                 return ctx.mind(None).rewind()
@@ -273,4 +273,4 @@ class RedirectCmdReaction(CommandReaction):
                 # 重定向节点
                 return ctx.mind(None).forward(stage_name)
         # 重定向思维.
-        return ctx.mind(None).redirect(URL(resolver=think_name))
+        return ctx.mind(None).redirect(URL(think=think_name))

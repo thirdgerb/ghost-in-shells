@@ -6,11 +6,11 @@ from ghoshell.messages import Output, Input
 class MessageQueue(metaclass=ABCMeta):
 
     @abstractmethod
-    def push_input(self, _input: Input) -> None:
+    async def push_input(self, _input: Input) -> None:
         pass
 
     @abstractmethod
-    def push_output(self, _output: Output) -> None:
+    async def push_output(self, _output: Output) -> None:
         pass
 
     @abstractmethod

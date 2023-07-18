@@ -188,7 +188,7 @@ show current commands. use -h option on command to see details:
         result = self._parse_command(matched_meta, arguments)
         if result is None:
             return None
-        matched = matched_meta.copy()
+        matched = matched_meta.model_copy()
         matched.params = result
         return matched
 

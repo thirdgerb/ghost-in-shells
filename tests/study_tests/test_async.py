@@ -49,3 +49,19 @@ def test_async_runner():
     loop.run_until_complete(cors)
 
     assert r.val == 30 + 11 * 5
+
+# def test_sync_method_in_async():
+#     def plus(a: int, b: int) -> int:
+#         await asyncio.sleep(0.01)
+#         return a + b
+#
+#     async def task(a: int, b: int) -> int:
+#         return plus(a, b)
+#
+#     err = None
+#     try:
+#         value = await task(1, 2)
+#     except SyntaxError as e:
+#         err = e
+#
+#     assert err is not None
