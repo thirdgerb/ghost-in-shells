@@ -1,9 +1,23 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Type, Dict, Iterator, ClassVar
+from typing import Type, Iterator, ClassVar
 
 from pydantic import BaseModel
+
+
+class APIResp(BaseModel, metaclass=ABCMeta):
+    """
+    API 的返回值定义.
+    """
+    api_caller: ClassVar[str] = ""
+
+    @classmethod
+    def call(cls, repo: "APIRepository", args: "APIArgs") -> APIResp:
+        """
+        强类型约束的语法糖.
+        """
+        return repo.call(args)
 
 
 class APIArgs(BaseModel, metaclass=ABCMeta):
@@ -12,12 +26,10 @@ class APIArgs(BaseModel, metaclass=ABCMeta):
     """
     api_caller: ClassVar[str] = ""
 
-
-class APIResp(BaseModel, metaclass=ABCMeta):
-    """
-    API 的返回值定义.
-    """
-    api_caller: ClassVar[str] = ""
+    @classmethod
+    @abstractmethod
+    def resp_type(cls) -> Type[APIResp]:
+        pass
 
 
 class APIError(RuntimeError):
@@ -42,24 +54,12 @@ class APICaller(metaclass=ABCMeta):
     def args_type(cls) -> Type[APIArgs]:
         pass
 
-    @classmethod
     @abstractmethod
-    def resp_type(cls) -> Type[APIResp]:
-        pass
-
-    @abstractmethod
-    def call(self, args: APIArgs) -> APIResp | None:
+    def call(self, args: APIArgs) -> APIResp:
         """
         :raise APIError
         """
         pass
-
-    def vague_call(self, args: Dict) -> Dict | None:
-        args = self.args_type()(**args)
-        resp = self.call(args)
-        if resp is not None:
-            return resp.model_dump()
-        return None
 
 
 class APIRepository(metaclass=ABCMeta):
@@ -68,16 +68,13 @@ class APIRepository(metaclass=ABCMeta):
     还需要和测试用例结合到一起.
     """
 
-    def vague_call(self, api_caller: str, args: Dict) -> Dict | None:
-        api = self.get_api(api_caller)
-        if api is None:
-            raise ImportError(f"api caller {api_caller} not found")
-        return api.vague_call(args)
-
-    def call(self, args: APIArgs) -> APIResp | None:
+    def call(self, args: APIArgs) -> APIResp:
         api = self.get_api(args.api_caller)
         if api is None:
             raise ImportError(f"api caller {args.api_caller} not found")
+        api_type = api.args_type()
+        if not isinstance(args, api_type):
+            raise ValueError(f"arguments type {type(args)} is not instance of {type(api_type)}")
         return api.call(args)
 
     @abstractmethod
