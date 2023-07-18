@@ -131,8 +131,6 @@ log:
         err = ErrMsg.read(_output.payload)
         if err is not None:
             where = ""
-            if err.at:
-                where = f"at {err.at}"
             err_info = self._markdown_output(
                 f"# Error Occur {err.errcode}\n\n{err.errmsg} {where}\n\n{err.stack_info}")
             self._app.print(err_info)

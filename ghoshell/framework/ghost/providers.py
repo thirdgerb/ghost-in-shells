@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from logging import Logger, LoggerAdapter
+from logging import LoggerAdapter
 from typing import Dict, Type
 
 from ghoshell.container import Provider, Container, Contract
@@ -70,7 +70,7 @@ class ContextLoggerProvider(Provider):
         return True
 
     def contract(self) -> Type[Contract]:
-        return Logger
+        return LoggerAdapter
 
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         ctx = con.force_fetch(Context)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from logging import LoggerAdapter
 from typing import List, Dict, Any, Optional, Type
 
 from ghoshell.container import Container
@@ -34,13 +35,16 @@ class ContextImpl(Context):
         # 防止交叉污染.
         self._input = Input(**inpt.model_dump())
 
-        # 初始化其它参数.
+        # 初始化组件参数
         self._failed: bool = False
         self._cache: Dict[str, Any] = {}
         self._async_inputs_buffer: List[Input] = []
         self._minder: MindImpl | None = None
         self._outputs_buffer = []
         self._messenger: SendingImpl | None = None
+        self._logger: LoggerAdapter | None = None
+
+        # 初始化控制参数
         self._failed: bool = False
         # set container
         self.container.set(Context, self)
@@ -115,6 +119,12 @@ class ContextImpl(Context):
         return self._runtime
 
     @property
+    def logger(self) -> LoggerAdapter:
+        if self._logger is None:
+            self._logger = self.container.force_fetch(LoggerAdapter)
+        return self._logger
+
+    @property
     def session(self) -> "Session":
         if self._session is None:
             session = self._container.force_fetch(Session)
@@ -134,7 +144,7 @@ class ContextImpl(Context):
         self._outputs_buffer = []
 
     def error(self, e: Exception) -> None:
-        pass
+        self.logger.exception(e)
 
     def finish(self) -> None:
         if self._failed:
@@ -155,6 +165,7 @@ class ContextImpl(Context):
             self._session.destroy()
 
         # del
+        del self._logger
         del self._clone
         del self._container
         del self._session

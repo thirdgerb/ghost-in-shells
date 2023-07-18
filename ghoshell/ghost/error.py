@@ -15,7 +15,7 @@ class ContextError(GhostError):
     CODE: int = 400
 
 
-class ForbiddenException(ContextError):
+class ForbiddenError(ContextError):
     CODE: int = 403
 
 
@@ -27,14 +27,14 @@ class UnexpectedError(ContextError):
     pass
 
 
-class BusyException(ContextError):
+class BusyError(ContextError):
     """
     系统忙碌.
     """
     CODE: int = 420
 
 
-class ErrMessageError(ContextError):
+class ThinkError(ContextError):
     """
     用来传递信息的 err
     """

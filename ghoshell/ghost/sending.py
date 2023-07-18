@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import json
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Any
 
-from ghoshell.ghost.exceptions import ErrMessageError
+from ghoshell.ghost.error import ThinkError
 from ghoshell.messages import *
 
 
@@ -44,11 +46,11 @@ class Sender(metaclass=ABCMeta):
         string = json.dumps(value, indent=indent, ensure_ascii=False)
         return self.text(f"```json\n{string}\n```", markdown=True)
 
-    def err(self, errmsg: str, code: int = ErrMessageError.CODE, at: str = "") -> "Sender":
+    def err(self, errmsg: str, code: int = ThinkError.CODE) -> "Sender":
         """
         输出错误消息的语法糖.
         """
-        message = ErrMsg(errcode=code, errmsg=errmsg, at=at)
+        message = ErrMsg(errcode=code, errmsg=errmsg)
         return self.output(message)
 
     @abstractmethod

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Iterator
 
-from ghoshell.ghost.exceptions import MindsetNotFoundError
+from ghoshell.ghost.error import MindsetNotFoundError
 from ghoshell.ghost.mindset.focus import Focus
 from ghoshell.ghost.mindset.think import Think, ThinkDriver, ThinkMeta
 
