@@ -9,7 +9,7 @@ import yaml
 
 from ghoshell.container import Provider, Container, Contract
 from ghoshell.prototypes.playground.baidu_speech.config import BaiduSpeechConfig
-from ghoshell.shell import Shell, BoostrapException
+from ghoshell.shell import Shell, BoostrapError
 
 
 #
@@ -162,6 +162,6 @@ class BaiduSpeechProvider(Provider):
         app_key = os.environ.get(self.APP_KEY_ENV_NAME, "")
         app_secret = os.environ.get(self.APP_SECRET_ENV_NAME, "")
         if not app_key or not app_secret:
-            raise BoostrapException("baidu app key or secret is empty")
+            raise BoostrapError("baidu app key or secret is empty")
         adapter = BaiduSpeechAdapter(app_key, app_secret, adapter_config)
         return adapter

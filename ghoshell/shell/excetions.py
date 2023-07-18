@@ -1,6 +1,6 @@
-class ShellException(RuntimeError):
+class ShellError(RuntimeError):
     pass
 
 
-class BoostrapException(ShellException):
+class BoostrapError(ShellError):
     pass

@@ -107,6 +107,8 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         """
         return [
             providers.ContextLoggerProvider(),
+            providers.SessionProvider(),
+            providers.RuntimeProvider(),
         ]
 
     def get_ghost_providers(self) -> List[Provider]:
@@ -130,6 +132,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
 
         clone = self.new_clone(inpt.trace.clone_id)
         ctx_container = Container(self._container)
+        ctx_container.set(Clone, clone)
         # instance
         ctx = ContextImpl(
             inpt=inpt,
@@ -137,9 +140,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             container=ctx_container,
             config=self._config
         )
-        # bound instances
-        ctx_container.set(Clone, clone)
-        ctx_container.set(Context, ctx)
         for provider in self.get_context_providers():
             ctx_container.register(provider)
         return ctx

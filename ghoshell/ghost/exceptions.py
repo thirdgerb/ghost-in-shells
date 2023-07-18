@@ -6,10 +6,9 @@ class GhostError(RuntimeError):
 
     CODE: int = 100
 
-    def __init__(self, message: str, at: str = ""):
+    def __init__(self, message: str):
         self.message: str = message
-        self.at = at
-        super().__init__()
+        super().__init__(message)
 
 
 class ContextError(GhostError):
