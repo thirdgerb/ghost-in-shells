@@ -1,14 +1,14 @@
 import uuid
 
-from ghoshell.framework.shell import ShellInputPipe, InputPipe, InputPipeline
+from ghoshell.framework.shell import ShellInputMdw, InputPipe, InputPipeline
 from ghoshell.messages import Input, Output, Text
 from ghoshell.shell import Shell
 
 
 #
-class InputTestMiddleware(ShellInputPipe):
+class InputTestMiddleware(ShellInputMdw):
 
-    def new(self, shell: Shell) -> InputPipe:
+    def new_pipe(self, shell: Shell) -> InputPipe:
         def pipe(_input: Input, after: InputPipeline):
             text = Text.read(_input.payload)
             # 拦截 text, 直接返回.

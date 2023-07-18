@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import List, Optional, ClassVar
+from typing import Optional, ClassVar, List
 
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -11,28 +11,15 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from ghoshell.container import Container
+from ghoshell.container import Provider
 from ghoshell.framework.shell import ShellKernel
-from ghoshell.framework.shell import ShellOutputPipe
+from ghoshell.framework.shell import ShellOutputMdw, ShellInputMdw, ShellBootstrapper
 from ghoshell.ghost import Ghost
 from ghoshell.messages import *
 
 
 class ConsoleShell(ShellKernel):
     KIND: ClassVar[str] = "console"
-
-    providers = []
-
-    # 初始化流程
-    bootstrapping = []
-
-    # 输入处理
-    input_middlewares = [
-        # InputTestMiddleware()
-    ]
-
-    # 输出处理
-    output_middlewares: ClassVar[List[ShellOutputPipe]] = [
-    ]
 
     def __init__(self, container: Container, config_path: str, runtime_path: str):
         # message_queue = ghost
@@ -43,6 +30,18 @@ class ConsoleShell(ShellKernel):
         self._ghost = ghost
         self._session: PromptSession | None = None
         super().__init__(container, config_path, runtime_path)
+
+    def get_bootstrapper(self) -> List[ShellBootstrapper]:
+        return []
+
+    def get_providers(self) -> List[Provider]:
+        return []
+
+    def get_input_mdw(self) -> List[ShellInputMdw]:
+        return []
+
+    def get_output_mdw(self) -> List[ShellOutputMdw]:
+        return []
 
     def _welcome(self) -> None:
         self._app.print(Markdown("""
@@ -78,12 +77,12 @@ log:
         self._session = session
         bindings = KeyBindings()
 
-        self.tick("")
+        await self.tick("")
         while True:
             try:
                 event = await session.prompt_async(multiline=False, key_bindings=bindings)
                 self._app.print(Markdown("\n----\n"))
-                self.tick(event)
+                await self.tick(event)
             except (EOFError, KeyboardInterrupt):
                 self._app.print(f"quit!!")
                 exit(0)
@@ -117,7 +116,7 @@ log:
         if signal.code == signal.QUIT_CODE:
             self._quit()
 
-    def deliver(self, _output: Output) -> None:
+    async def deliver(self, _output: Output) -> None:
         signal = Signal.read(_output.payload)
         if signal is not None:
             self._on_signal(signal)
