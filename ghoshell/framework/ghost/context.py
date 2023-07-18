@@ -1,14 +1,12 @@
 from __future__ import annotations
 
+from logging import LoggerAdapter
 from typing import List, Dict, Any, Optional, Type
 
 from ghoshell.container import Container
-from ghoshell.contracts import Cache
 from ghoshell.framework.ghost.config import GhostConfig
 from ghoshell.framework.ghost.mind import MindImpl
-from ghoshell.framework.ghost.runtime import RuntimeImpl
 from ghoshell.framework.ghost.sending import SendingImpl
-from ghoshell.framework.ghost.session import SessionImpl
 from ghoshell.ghost import *
 from ghoshell.messages import *
 from ghoshell.utils import InstanceCount
@@ -37,14 +35,20 @@ class ContextImpl(Context):
         # 防止交叉污染.
         self._input = Input(**inpt.model_dump())
 
-        # 初始化其它参数.
+        # 初始化组件参数
         self._failed: bool = False
         self._cache: Dict[str, Any] = {}
         self._async_inputs_buffer: List[Input] = []
         self._minder: MindImpl | None = None
         self._outputs_buffer = []
         self._messenger: SendingImpl | None = None
+        self._logger: LoggerAdapter | None = None
+
+        # 初始化控制参数
         self._failed: bool = False
+        # set container
+        self.container.set(Context, self)
+
         InstanceCount.add(self.__class__.__name__)
 
     @property
@@ -110,29 +114,20 @@ class ContextImpl(Context):
     @property
     def runtime(self) -> "Runtime":
         if self._runtime is None:
-            runtime = RuntimeImpl(
-                self.session,
-                self._config.root_url,
-                self._input.stateless,
-                self._config.process_max_tasks,
-                self._config.process_lock_overdue,
-            )
-            self._container.set(Runtime, runtime)
+            runtime = self._container.force_fetch(Runtime)
             self._runtime = runtime
         return self._runtime
 
     @property
+    def logger(self) -> LoggerAdapter:
+        if self._logger is None:
+            self._logger = self.container.force_fetch(LoggerAdapter)
+        return self._logger
+
+    @property
     def session(self) -> "Session":
         if self._session is None:
-            cache = self._container.force_fetch(Cache)
-            trace = self._input.trace
-            session = SessionImpl(
-                cache,
-                clone_id=self._clone.clone_id,
-                session_id=trace.session_id,
-                expire=self._config.session_overdue,
-            )
-            self._container.set(Session, session)
+            session = self._container.force_fetch(Session)
             self._session = session
         return self._session
 
@@ -149,7 +144,7 @@ class ContextImpl(Context):
         self._outputs_buffer = []
 
     def error(self, e: Exception) -> None:
-        pass
+        self.logger.exception(e)
 
     def finish(self) -> None:
         if self._failed:
@@ -159,22 +154,18 @@ class ContextImpl(Context):
             self._messenger.destroy()
         if self._minder is not None:
             self._minder.destroy()
-
-        # session saving
-        # self.session.save_input(self._input)
-        # for output in self._outputs_buffer:
-        #     self.session.save_output(output)
         self.runtime.finish()
 
     def destroy(self) -> None:
+        if self._container is not None:
+            self._container.destroy()
         if self._runtime is not None:
             self._runtime.destroy()
         if self._session is not None:
             self._session.destroy()
-        if self._container is not None:
-            self._container.destroy()
 
         # del
+        del self._logger
         del self._clone
         del self._container
         del self._session

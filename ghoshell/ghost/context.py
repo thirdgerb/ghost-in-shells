@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from logging import LoggerAdapter
 from typing import Any, Optional, TYPE_CHECKING, List, TypeVar, Type, ClassVar
 
 from pydantic import BaseModel
@@ -50,6 +51,11 @@ class Context(metaclass=ABCMeta):
         """
         提供面向接口的容器, 可以通过容器获取各种组件.
         """
+        pass
+
+    @property
+    @abstractmethod
+    def logger(self) -> LoggerAdapter:
         pass
 
     @property

@@ -8,6 +8,10 @@ class GhostConfig(BaseModel):
 
     root_url: URL
 
+    on_busy: str = "系统正在处理消息中... 请稍后"
+
+    on_unexpected: str = "无法处理的消息"
+
     exception_traceback_limit: int = 5
 
     session_overdue: int = 1800

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
 from typing import Optional, List, ClassVar, Type, Dict
 
@@ -9,6 +11,7 @@ from ghoshell.ghost import OnWithdrawing, OnCanceling, OnFailing, OnQuiting
 from ghoshell.ghost import Operator
 from ghoshell.ghost import RuntimeTool
 from ghoshell.ghost import Task, TaskStatus, TaskLevel
+from ghoshell.ghost import UnexpectedError
 from ghoshell.messages import Tasked, Signal
 from ghoshell.url import URL
 
@@ -289,15 +292,14 @@ class TaskedMessageOperator(AbsOperator):
         task.merge_tasked(tasked)
         RuntimeTool.store_task(ctx, task)
         # 进入到下一个状态.
-        match task.status:
-            case TaskStatus.DEAD:
-                return CancelOperator(task.tid, tasked.stage)
-            case TaskStatus.WAITING:
-                return AwaitOperator(task.tid, tasked.stage, None, None, self.fr)
-            case TaskStatus.FINISHED:
-                return FinishOperator(task.tid, task.url.stage, self.fr)
-            case _:
-                return ForwardOperator(task.tid, list(tasked.stage), self.fr)
+        if task.status == TaskStatus.DEAD:
+            return CancelOperator(task.tid, tasked.stage)
+        elif task.status == TaskStatus.WAITING:
+            return AwaitOperator(task.tid, tasked.stage, None, None, self.fr)
+        elif task.status == TaskStatus.FINISHED:
+            return FinishOperator(task.tid, task.url.stage, self.fr)
+        else:
+            return ForwardOperator(task.tid, list(tasked.stage), self.fr)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         # 什么也不干.
@@ -329,37 +331,37 @@ class ActivateOperator(AbsOperator):
             task = RuntimeTool.force_fetch_task(ctx, self.target_tid)
         else:
             task = RuntimeTool.fetch_task_by_url(ctx, self.to, True)
-        match task.status:
-            case TaskStatus.NEW:
-                # think = CtxTool.force_fetch_think(ctx, self.to.think)
-                # if think.is_async():
-                #     # 设置 task 为 yielding, 保留了一个指针.
-                #     task.status = TaskStatus.YIELDING
-                #     RuntimeTool.store_task(ctx, task)
-                #     # 发送异步消息, 新开一个子进程.
-                #     ctx.send(None).async_input(task.to_tasked())
-                #     # 正常回调任务, 当前任务已经 yielding.
-                #     return ScheduleOperator()
-                # 保证至少是 Running 状态.
-                task.status = TaskStatus.RUNNING
-                RuntimeTool.store_task(ctx, task)
 
-                event = OnActivating(task.tid, self.to.stage, self.fr)
-                return RuntimeTool.fire_event(ctx, event)
-            case [TaskStatus.FINISHED, TaskStatus.DEAD]:
-                # 重启任务.
-                task.restart()
-                RuntimeTool.store_task(ctx, task)
-                event = OnActivating(task.tid, self.to.stage, self.fr)
-                return RuntimeTool.fire_event(ctx, event)
+        if task.status == TaskStatus.NEW:
+            # think = CtxTool.force_fetch_think(ctx, self.to.think)
+            # if think.is_async():
+            #     # 设置 task 为 yielding, 保留了一个指针.
+            #     task.status = TaskStatus.YIELDING
+            #     RuntimeTool.store_task(ctx, task)
+            #     # 发送异步消息, 新开一个子进程.
+            #     ctx.send(None).async_input(task.to_tasked())
+            #     # 正常回调任务, 当前任务已经 yielding.
+            #     return ScheduleOperator()
+            # 保证至少是 Running 状态.
+            task.status = TaskStatus.RUNNING
+            RuntimeTool.store_task(ctx, task)
 
-            # preempting
-            case [TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING]:
-                event = OnPreempted(task.tid, task.url.stage, self.fr)
-                return RuntimeTool.fire_event(ctx, event)
-            case _:
-                event = OnActivating(task.tid, self.to.stage, self.fr)
-                return RuntimeTool.fire_event(ctx, event)
+            event = OnActivating(task.tid, self.to.stage, self.fr)
+            return RuntimeTool.fire_event(ctx, event)
+        elif task.status in [TaskStatus.FINISHED, TaskStatus.DEAD]:
+            # 重启任务.
+            task.restart()
+            RuntimeTool.store_task(ctx, task)
+            event = OnActivating(task.tid, self.to.stage, self.fr)
+            return RuntimeTool.fire_event(ctx, event)
+
+        # preempting
+        elif task.status in [TaskStatus.PREEMPTING, TaskStatus.DEPENDING, TaskStatus.YIELDING]:
+            event = OnPreempted(task.tid, task.url.stage, self.fr)
+            return RuntimeTool.fire_event(ctx, event)
+        else:
+            event = OnActivating(task.tid, self.to.stage, self.fr)
+            return RuntimeTool.fire_event(ctx, event)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         # 启动了目标节点, 但没有发生任何事件?
@@ -592,7 +594,7 @@ class UnhandledInputOperator(AbsOperator):
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         # 装作没听懂.
-        return RewindOperator(repeat=False)
+        raise UnexpectedError("input is not response-able")
 
     def destroy(self) -> None:
         return
@@ -704,15 +706,14 @@ class ScheduleOperator(AbsOperator):
             if process.quiting:
                 return QuitOperator(tid, None)
             else:
-                match fallback.status:
-                    case TaskStatus.CANCELING:
-                        return CancelOperator(tid, None)
-                    case TaskStatus.FAILING:
-                        return FailOperator(tid, None)
-                    case TaskStatus.RUNNING:
-                        return ForwardOperator(tid, [], self.fr)
-                    case _:
-                        return self._preempt(ctx, tid)
+                if fallback.status == TaskStatus.CANCELING:
+                    return CancelOperator(tid, None)
+                elif fallback.status == TaskStatus.FAILING:
+                    return FailOperator(tid, None)
+                elif fallback.status == TaskStatus.RUNNING:
+                    return ForwardOperator(tid, [], self.fr)
+                else:
+                    return self._preempt(ctx, tid)
 
         root = RuntimeTool.fetch_root_task(ctx)
         if TaskStatus.is_working(root.status):
@@ -813,20 +814,19 @@ class DependOnOperator(AbsOperator):
         self_task = RuntimeTool.force_fetch_task(ctx, self.tid)
         target_task = RuntimeTool.fetch_task_by_url(ctx, self.target, create=True)
 
-        match target_task.status:
-            case TaskStatus.FINISHED:
-                # callback 事件
-                result = RuntimeTool.task_result(ctx, target_task)
-                event = OnCallback(self_task.tid, self_task.url.stage, target_task.url.copy_with(), result)
-                return RuntimeTool.fire_event(ctx, event)
-            case TaskStatus.DEAD:
-                # cancel 事件
-                return CancelOperator(self.tid, None)
-            case _:
-                target_task.add_callback(self.tid)
-                self_task.depend(self.stage)
-                RuntimeTool.store_task(ctx, target_task, self_task)
-                return ActivateOperator(target_task.url, self_task.url, target_task.tid)
+        if target_task.status == TaskStatus.FINISHED:
+            # callback 事件
+            result = RuntimeTool.task_result(ctx, target_task)
+            event = OnCallback(self_task.tid, self_task.url.stage, target_task.url.copy_with(), result)
+            return RuntimeTool.fire_event(ctx, event)
+        elif target_task.status == TaskStatus.DEAD:
+            # cancel 事件
+            return CancelOperator(self.tid, None)
+        else:
+            target_task.add_callback(self.tid)
+            self_task.depend(self.stage)
+            RuntimeTool.store_task(ctx, target_task, self_task)
+            return ActivateOperator(target_task.url, self_task.url, target_task.tid)
 
     def _fallback(self, ctx: "Context") -> Optional["Operator"]:
         return None

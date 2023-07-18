@@ -12,7 +12,8 @@ from ghoshell.framework.ghost import providers
 from ghoshell.framework.ghost.clone import CloneImpl
 from ghoshell.framework.ghost.config import GhostConfig
 from ghoshell.framework.ghost.context import ContextImpl
-from ghoshell.framework.ghost.middleware import CtxMiddleware, ExceptionHandlerMiddleware, CtxPipe, CtxPipeline
+from ghoshell.framework.ghost.middleware import CtxMiddleware, CtxPipe, CtxPipeline
+from ghoshell.framework.ghost.middleware import ExceptionHandlerMiddleware, ProcessLockerMiddleware
 from ghoshell.ghost import CloneError, BootstrapError, GhostError, ContextError
 from ghoshell.ghost import Ghost, Clone, Context, OperationKernel
 from ghoshell.ghost import Mindset, Focus, Memory
@@ -83,6 +84,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         """
         return [
             ExceptionHandlerMiddleware(),
+            ProcessLockerMiddleware(),
         ]
 
     def get_depending_contracts(self) -> List:
@@ -107,6 +109,8 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         """
         return [
             providers.ContextLoggerProvider(),
+            providers.SessionProvider(),
+            providers.RuntimeProvider(),
         ]
 
     def get_ghost_providers(self) -> List[Provider]:
@@ -130,6 +134,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
 
         clone = self.new_clone(inpt.trace.clone_id)
         ctx_container = Container(self._container)
+        ctx_container.set(Clone, clone)
         # instance
         ctx = ContextImpl(
             inpt=inpt,
@@ -137,9 +142,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             container=ctx_container,
             config=self._config
         )
-        # bound instances
-        ctx_container.set(Clone, clone)
-        ctx_container.set(Context, ctx)
         for provider in self.get_context_providers():
             ctx_container.register(provider)
         return ctx
@@ -186,7 +188,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
     @classmethod
     def _failure_message(cls, _input: Input, err: GhostError) -> Output:
         stack_info = "\n".join(traceback.format_exception(err))
-        msg = ErrMsg(errcode=err.CODE, errmsg=str(err), at=err.at, stack_info=stack_info)
+        msg = ErrMsg(errcode=err.CODE, errmsg=str(err), stack_info=stack_info)
         _output = Output.new(uuid.uuid4().hex, _input)
         msg.join(_output.payload)
         return _output

@@ -1,5 +1,5 @@
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.exceptions import *
+from ghoshell.ghost.error import *
 from ghoshell.ghost.ghost import Ghost, Clone
 from ghoshell.ghost.memory import Memory, MemoryDriver, Memo
 from ghoshell.ghost.mindset import Event, OnActivating, OnCallback, OnPreempted, OnWithdrawing, \
@@ -37,7 +37,7 @@ __all__ = [
     "TaskLevel", "TaskStatus",
     # exceptions
     "StackoverflowError", "UnexpectedError", "CloneError", "MindsetNotFoundError", "GhostError", "ContextError",
-    "ErrMessageError", "BootstrapError", "LogicError",
+    "ThinkError", "BootstrapError", "LogicError", "BusyError",
     # events
     "Event",
     "OnActivating",

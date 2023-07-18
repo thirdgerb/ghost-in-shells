@@ -7,6 +7,7 @@ from typing import Dict, List
 import openai
 from pydantic import BaseModel, Field
 
+from ghoshell.ghost import ContextError
 from ghoshell.llms.contracts import LLMTextCompletion
 from ghoshell.llms.openai_contracts import OpenAIChatCompletion, OpenAIChatChoice, OpenAIChatMsg, OpenAIFuncSchema
 
@@ -117,9 +118,10 @@ class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
                 prompt=prompt,
                 **request,
             )
-        except Exception as e:
-            err = e
-            raise e
+        except openai.error.OpenAIError as e:
+            err = ContextError(str(e))
+            err.with_traceback(e.__traceback__)
+            raise err
         finally:
             self._storage.record(request, resp, err)
 
@@ -165,6 +167,10 @@ class OpenAIAdapter(LLMTextCompletion, OpenAIChatCompletion):
 
             resp = openai.ChatCompletion.create(**request)
             resp_dict = resp.to_dict_recursive()
+        except openai.error.OpenAIError as e:
+            err = ContextError(str(e))
+            err.with_traceback(e.__traceback__)
+            raise err
         finally:
             self._storage.record(request, resp_dict, err)
 

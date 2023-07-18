@@ -12,10 +12,9 @@ class MockCache(Cache):
     __overdue: Dict[str, int] = {}
 
     def lock(self, key: str, overdue: int = 0) -> bool:
-        if key in self.__locker:
+        if key in self.__locker and not self.__is_overdue(key):
             return False
-        if self.__is_overdue(key):
-            return False
+
         self.__locker.add(key)
         self.__set_overdue(key, overdue)
         return True
@@ -37,6 +36,7 @@ class MockCache(Cache):
 
     def unlock(self, key: str) -> bool:
         if key in self.__locker:
+            self.__locker.remove(key)
             self.remove(key)
             return True
         return False

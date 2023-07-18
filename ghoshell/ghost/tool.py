@@ -6,7 +6,7 @@ from typing import Optional, Dict, List, Tuple
 from pydantic import ValidationError
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.exceptions import MindsetNotFoundError, CloneError
+from ghoshell.ghost.error import MindsetNotFoundError, CloneError
 from ghoshell.ghost.mindset import Intention, Attention
 from ghoshell.ghost.mindset import Think, Thought, Stage, Event
 from ghoshell.ghost.mindset.operator import Operator

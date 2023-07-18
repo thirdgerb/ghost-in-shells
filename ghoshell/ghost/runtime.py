@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Set
 
 from pydantic import BaseModel, Field
 
-from ghoshell.ghost.exceptions import CloneError
+from ghoshell.ghost.error import CloneError
 from ghoshell.ghost.mindset import Attention
 from ghoshell.messages import Tasked
 from ghoshell.url import URL

@@ -6,5 +6,4 @@ class ErrMsg(Message):
 
     errcode: int = 500
     errmsg: str = ""
-    at: str = ""
     stack_info: str = ""
