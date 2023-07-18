@@ -4,7 +4,6 @@ from abc import ABCMeta, abstractmethod
 from typing import Optional, Iterator
 
 from ghoshell.ghost.error import MindsetNotFoundError
-from ghoshell.ghost.mindset.focus import Focus
 from ghoshell.ghost.mindset.think import Think, ThinkDriver, ThinkMeta
 
 
@@ -13,15 +12,6 @@ class Mindset(metaclass=ABCMeta):
     定义了 Ghost 拥有的思维方式
     核心是可以通过 UniformReactionLocator 取出 Reaction
     """
-
-    @property
-    @abstractmethod
-    def focus(self) -> Focus:
-        """
-        mindset with focus component
-        for register global intentions
-        """
-        pass
 
     @abstractmethod
     def clone(self, clone_id: str) -> Mindset:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import os
 from typing import Optional, Iterator, List, Dict
@@ -5,25 +7,20 @@ from typing import Optional, Iterator, List, Dict
 import yaml
 
 from ghoshell.framework.contracts.think_meta_storage import ThinkMetaStorage  # ThinkMetaDriverProvider
-from ghoshell.ghost import Mindset, Think, Focus
+from ghoshell.ghost import Mindset, Think
 from ghoshell.ghost.mindset import ThinkMeta, ThinkDriver
 
 
 class MindsetImpl(Mindset):
 
-    def __init__(self, driver: ThinkMetaStorage, focus: Focus, clone_id: str | None):
+    def __init__(self, driver: ThinkMetaStorage, clone_id: str | None):
         self._think_metas_driver = driver  # 这个 driver 专门用于保存 ThinkMeta. 用于动态存储.
         self._clone_id = clone_id
         self._sub_mindsets: List[Mindset] = []
         self._think_drivers: Dict[str, ThinkDriver] = {}
-        self._focus = focus
-
-    @property
-    def focus(self) -> Focus:
-        return self._focus
 
     def clone(self, clone_id: str) -> Mindset:
-        mindset = MindsetImpl(self._think_metas_driver, self._focus, clone_id)
+        mindset = MindsetImpl(self._think_metas_driver, clone_id)
         mindset.register_sub_mindset(self)
         return mindset
 
