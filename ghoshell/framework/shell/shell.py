@@ -1,38 +1,34 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Tuple, Optional, Callable, List, Any, ClassVar, Awaitable
+from typing import Optional, Callable, List, Any, ClassVar
 
 from ghoshell.container import Container, Provider
-from ghoshell.messages import Output, Input
-from ghoshell.shell import Shell, Messenger
+from ghoshell.messages import Input, Batch
+from ghoshell.shell import Shell
 from ghoshell.utils import create_pipeline
 
 # input 处理管道
 InputPipeline = Callable[
     [Input],
-    Awaitable[
-        Tuple[
-            Input,
-            Optional[List[Output]]
-        ]
-    ]
+    Batch,
 ]
 
 InputPipe = Callable[
     [Input, InputPipeline],
-    Awaitable[
-        Tuple[
-            Input,
-            Optional[List[Output]]
-        ]
-    ]
+    Batch,
 ]
 
 # output 处理管道
-OutputPipeline = Callable[[Output], Awaitable[Output]]
+OutputPipeline = Callable[
+    [Batch],
+    Batch,
+]
 
-OutputPipe = Callable[[Output, OutputPipeline], Awaitable[Output]]
+OutputPipe = Callable[
+    [Batch, OutputPipeline],
+    Batch,
+]
 
 
 class ShellInputMdw(metaclass=ABCMeta):
@@ -91,7 +87,6 @@ class ShellKernel(Shell, metaclass=ABCMeta):
         self._container.set(Shell, self)
         self._config_path = config_path
         self._runtime_path = runtime_path
-        self._messenger: Messenger | None = None
 
     @property
     def kind(self) -> str:
@@ -126,17 +121,12 @@ class ShellKernel(Shell, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def on_event(self, e: Any) -> Optional[Input]:
+    def parse_event(self, e: Any) -> Optional[Input]:
         pass
 
     @property
     def container(self) -> Container:
         return self._container
-
-    def messenger(self, _input: Input | None) -> Messenger:
-        if self._messenger is None:
-            self._messenger = self._container.force_fetch(Messenger)
-        return self._messenger
 
     # ----- implements ----- #
 
@@ -147,20 +137,15 @@ class ShellKernel(Shell, metaclass=ABCMeta):
         for provider in self.get_providers():
             self._container.register(provider)
 
+        self._container.register_meta_repos()
+
         for bootstrapper in self.get_bootstrapper():
             bootstrapper.bootstrap(self)
         return self
 
     # ----- async methods ----- #
 
-    @abstractmethod
-    async def deliver(self, _output: Output) -> None:
-        """
-        发送输出消息.
-        """
-        pass
-
-    async def on_input(self, _input: Input) -> Tuple[Input, List[Output] | None]:
+    def handle_input(self, _input: Input) -> Batch:
         """
         用管道的方式来处理 input
         todo: try catch
@@ -170,18 +155,22 @@ class ShellKernel(Shell, metaclass=ABCMeta):
             for mdw in self.get_input_mdw():
                 pipes.append(mdw.new_pipe(self))
 
-            async def destination(_input: Input) -> Tuple[Input, List[Output] | None]:
-                return _input, None
-
-            pipeline = create_pipeline(pipes, destination)
-            _input, _outputs = await pipeline(_input)
+            pipeline = create_pipeline(pipes, self._input_destination)
+            batch = pipeline(_input)
             # 解决入参的 shell_env 封装问题.
-            return _input, _outputs
+            return batch
         finally:
             # todo ?
             pass
 
-    async def on_output(self, _output: Output) -> None:
+    def _input_destination(self, _input: Input) -> Batch:
+        outputs = self.deliver(_input)
+        batch = Batch(input=_input.model_dump())
+        if outputs is not None:
+            batch.outputs = outputs
+        return batch
+
+    def handle_outputs(self, batch: Batch) -> None:
         """
         用管道的形式处理输出
         """
@@ -190,50 +179,31 @@ class ShellKernel(Shell, metaclass=ABCMeta):
             for mdw in self.get_output_mdw():
                 pipes.append(mdw.new_pipe(self))
 
-            async def destination(__output: Output) -> Output:
-                return __output
+            pipeline = create_pipeline(pipes, self._output_destination)
 
-            pipeline = create_pipeline(pipes, destination)
-            final_output = await pipeline(_output)
-            await self.deliver(final_output)
+            final_batch = pipeline(batch)
+            for _output in final_batch.outputs:
+                self.output(_output, final_batch.input)
         # todo: exception handler
         finally:
             pass
 
-    async def listen_async_output(self) -> None:
-        try:
-            await self._messenger.await_async_output(self.on_output)
-        # todo exception
-        finally:
-            pass
+    @staticmethod
+    def _output_destination(batch: Batch) -> Batch:
+        return batch
 
-    async def tick(self, e: Any) -> None:
+    def handle(self, e: Any) -> None:
         """
         响应一个普通事件.
         """
         try:
             # todo: 没有做正确的异常处理.
-            _input = self.on_event(e)
+            _input = self.parse_event(e)
             if _input is None:
                 # 默认无法处理的事件. 不做任何响应.
                 return
-            _input, _outputs = await self.on_input(_input)
-            if _outputs is not None:
-                # 被拦截了.
-                for _output in _outputs:
-                    await self.on_output(_output)
-                return
-
-            # 发送给 Ghost
-            messenger = self.messenger(_input)
-            _outputs = await messenger.send(_input)
-            if _outputs is None:
-                # 为 None 时表示服务端没有返回消息.
-                return
-            else:
-                for _output in _outputs:
-                    await self.on_output(_output)
-                return
+            batch = self.handle_input(_input)
+            self.handle_outputs(batch)
         finally:
             # todo: 异常处理
             pass

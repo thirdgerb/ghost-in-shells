@@ -65,11 +65,7 @@ log:
 
     async def _main(self):
         with patch_stdout(raw=True):
-            background_task = asyncio.create_task(self.listen_async_output())
-            try:
-                await self._prompt_loop()
-            finally:
-                background_task.cancel()
+            await self._prompt_loop()
             self._app.print("Quitting event loop. Bye.")
 
     async def _prompt_loop(self):
@@ -77,17 +73,17 @@ log:
         self._session = session
         bindings = KeyBindings()
 
-        await self.tick("")
+        self.handle("")
         while True:
             try:
                 event = await session.prompt_async(multiline=False, key_bindings=bindings)
                 self._app.print(Markdown("\n----\n"))
-                await self.tick(event)
+                self.handle(event)
             except (EOFError, KeyboardInterrupt):
                 self._app.print(f"quit!!")
                 exit(0)
 
-    def on_event(self, prompt: str) -> Optional[Input]:
+    def parse_event(self, prompt: str) -> Optional[Input]:
         if prompt == "/exit":
             self._quit()
         prompt = prompt.strip()
@@ -116,7 +112,7 @@ log:
         if signal.code == signal.QUIT_CODE:
             self._quit()
 
-    async def deliver(self, _output: Output) -> None:
+    def output(self, _output: Output, _input: Input) -> None:
         signal = Signal.read(_output.payload)
         if signal is not None:
             self._on_signal(signal)
@@ -146,3 +142,6 @@ log:
             # line = "\n\n".join(line.split("\n"))
             result.append(line)
         return Markdown("\n\n".join(result))
+
+    def deliver(self, _input: Input) -> List[Output] | None:
+        return self._ghost.respond(_input)

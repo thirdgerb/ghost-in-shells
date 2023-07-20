@@ -8,11 +8,9 @@ import yaml
 
 from ghoshell.container import Container
 from ghoshell.framework.ghost import GhostConfig
-from ghoshell.framework.shell import SyncGhostMessenger, MessageQueue
 from ghoshell.ghost import Ghost
 from ghoshell.mocks.ghost_mock import MockGhost
 from ghoshell.prototypes.playground.baidu_speech import BaiduSpeechShell
-from ghoshell.shell import Messenger
 
 
 def demo_ghost(root_path: str, root_container: Container) -> Ghost:
@@ -32,14 +30,13 @@ def demo_ghost(root_path: str, root_container: Container) -> Ghost:
     return ghost
 
 
-def run_console_shell(root_path: str, root_container: Container):
+def run_console_shell(root_path: str, ghost: Ghost):
     """
     run console shell with local demo ghost
     """
-    container = root_container
     config_path = "/".join([root_path, "configs", "shells/baidu_speech"])
     runtime_path = "/".join([root_path, "runtime"])
-    shell = BaiduSpeechShell(container, config_path, runtime_path)
+    shell = BaiduSpeechShell(ghost, config_path, runtime_path)
     shell.bootstrap().run_as_app()
 
 
@@ -67,8 +64,5 @@ def main() -> None:
     ghost = demo_ghost(root_path, root_container)
     ghost.boostrap()
 
-    message_queue = ghost.container.force_fetch(MessageQueue)
-    messenger = SyncGhostMessenger(ghost, queue=message_queue)
-    root_container.set(Messenger, messenger)
     root_container.set(Ghost, ghost)
-    run_console_shell(root_path, root_container)
+    run_console_shell(root_path, ghost)

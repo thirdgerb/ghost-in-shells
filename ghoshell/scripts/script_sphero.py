@@ -8,11 +8,9 @@ import yaml
 
 from ghoshell.container import Container
 from ghoshell.framework.ghost import GhostConfig
-from ghoshell.framework.shell import SyncGhostMessenger, MessageQueue
 from ghoshell.ghost import Ghost
 from ghoshell.mocks.ghost_mock import MockGhost
 from ghoshell.prototypes.playground.sphero import SpheroGhostBootstrapper, SpheroBoltShell
-from ghoshell.shell import Messenger
 
 
 def demo_ghost(root_path: str, root_container: Container) -> Ghost:
@@ -69,8 +67,5 @@ def main() -> None:
     ghost = demo_ghost(root_path, root_container)
     ghost.boostrap()
 
-    message_queue = ghost.container.force_fetch(MessageQueue)
-    messenger = SyncGhostMessenger(ghost, queue=message_queue)
-    root_container.set(Messenger, messenger)
     root_container.set(Ghost, ghost)
     run_sphero_shell(root_path, root_container)

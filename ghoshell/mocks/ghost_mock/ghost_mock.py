@@ -45,7 +45,6 @@ class MockGhost(GhostKernel):
     contracts_providers: ClassVar[List] = [
         MockCacheProvider(),
         MockAPIRepositoryProvider(),
-        MockMessageQueueProvider(),
         MockOperationKernelProvider(),
         MockThinkMetaDriverProvider(),
     ]

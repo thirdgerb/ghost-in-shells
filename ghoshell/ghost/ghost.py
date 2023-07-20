@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, List
 
@@ -93,7 +95,8 @@ class Ghost(metaclass=ABCMeta):
     @abstractmethod
     def respond(self, _input: "Input") -> List["Output"] | None:
         """
-        完成一轮的响应. 要支持没有任何响应.
+        完成一轮的响应.
+        有可能返回一个同步的消息, 也可能不返回任何消息.
         """
         pass
 

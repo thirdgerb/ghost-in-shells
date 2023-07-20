@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from pydantic import BaseModel, Field
 
@@ -109,3 +109,11 @@ class Output(BaseModel):
             payload=payload,
             is_async=_input.is_async,
         )
+
+
+class Batch(BaseModel):
+    """
+    一个完整的输入与输出.
+    """
+    input: Input
+    outputs: List[Output] = Field(default_factory=list)
