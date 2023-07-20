@@ -4,7 +4,8 @@ import yaml
 
 from ghoshell.framework.ghost import GhostBootstrapper
 from ghoshell.ghost import Ghost
-from ghoshell.prototypes.playground.llm_test_ghost.conversational import ConversationalThinkConfig, ConversationalThink
+from ghoshell.prototypes.playground.llm_test_ghost.conversational import DeprecatedConversationalThinkConfig, \
+    DeprecatedConversationalThink
 from ghoshell.prototypes.playground.llm_test_ghost.prompt_unittest import PromptUnitTestThinkDriver
 from ghoshell.prototypes.playground.llm_test_ghost.undercover import UndercoverGameDriver
 
@@ -14,6 +15,8 @@ class LLMConversationalThinkBootstrapper(GhostBootstrapper):
     实现一个最简单的 LLMs 单任务多轮对话的注册机.
     直接注册实例.
     todo: 需要实现从路径读取 json 或者 yaml 配置的办法.
+
+    Deprecated
     """
 
     def __init__(self, relative_path: str = "/conversational"):
@@ -31,12 +34,15 @@ class LLMConversationalThinkBootstrapper(GhostBootstrapper):
                 file_path = config_path.rstrip("/") + "/" + filename
                 with open(file_path) as f:
                     config_data = yaml.safe_load(f)
-                config = ConversationalThinkConfig(**config_data)
-                think = ConversationalThink(config)
-                mindset.register_think(think)
+                config = DeprecatedConversationalThinkConfig(**config_data)
+                driver = DeprecatedConversationalThink(config)
+                mindset.register_meta_driver(driver)
 
 
 class PromptUnitTestsBootstrapper(GhostBootstrapper):
+    """
+    Deprecated
+    """
 
     def __init__(self, relative_config_path: str = "/llms/unittests", think_prefix: str = "unittests"):
         self.relative_config_path = relative_config_path
@@ -46,12 +52,13 @@ class PromptUnitTestsBootstrapper(GhostBootstrapper):
         mindset = ghost.mindset
         root_dir = ghost.config_path.rstrip("/") + "/" + self.relative_config_path.strip("/")
         driver = PromptUnitTestThinkDriver(root_dir, think_prefix=self.think_prefix)
-        mindset.register_driver(driver)
-        for meta in driver.foreach_think():
-            mindset.register_meta(meta)
+        mindset.register_meta_driver(driver)
 
 
 class GameUndercoverBootstrapper(GhostBootstrapper):
+    """
+    Deprecated
+    """
 
     def __init__(self, relative_review_dir: str = "/games/undercover", think_name: str = None):
         self.relative_review_path = relative_review_dir
@@ -64,5 +71,4 @@ class GameUndercoverBootstrapper(GhostBootstrapper):
             self.think_name,
         )
         mindset = ghost.mindset
-        mindset.register_driver(driver)
-        mindset.register_meta(driver.to_meta())
+        mindset.register_meta_driver(driver)

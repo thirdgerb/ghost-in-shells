@@ -1,4 +1,6 @@
-from typing import Optional, Any, ClassVar
+from __future__ import annotations
+
+from typing import Optional, Any, ClassVar, Iterator
 
 from ghoshell.framework.reactions.commands import *
 from ghoshell.framework.stages import BasicStage
@@ -12,16 +14,22 @@ class HelloWorldThink(Think, ThinkDriver):
     def url(self) -> URL:
         return URL(think=self.name)
 
-    def to_meta(self) -> ThinkMeta:
-        return ThinkMeta(
+    def to_meta(self) -> Meta:
+        return Meta(
             id=self.url().think,
-            kind=self.driver_name(),
+            kind=self.meta_kind()
         )
 
-    def driver_name(self) -> str:
+    def preload_metas(self) -> Iterator[Meta]:
+        return [self.to_meta()]
+
+    def meta_kind(self) -> str:
         return HelloWorldThink.__name__
 
-    def from_meta(self, meta: ThinkMeta) -> "Think":
+    def meta_config_json_schema(self) -> Dict:
+        return {}
+
+    def from_meta(self, meta) -> "Think":
         return self
 
     def desc(self, ctx: Context, thought: Thought) -> Any:

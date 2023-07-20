@@ -8,9 +8,16 @@ from pydantic import BaseModel, Field
 from ghoshell.ghost import *
 from ghoshell.llms.utils import fetch_ctx_prompter
 from ghoshell.messages import *
+from ghoshell.meta import Meta
 
 
 class PromptUnitTestConfig(BaseModel):
+    """
+    实验性质的测试用例.
+
+    Deprecated
+    """
+
     DESC_MARK: ClassVar[str] = "# DESC"
     PROMPT_MARK: ClassVar[str] = "# PROMPT"
     EXPECT_MARK: ClassVar[str] = "# EXPECT"
@@ -101,19 +108,19 @@ class PromptUnitTestLoader:
         idx = 0
         for line in lines:
             is_mark = False
-            match line.strip():
-                case PromptUnitTestConfig.DESC_MARK:
-                    mark_idxes["desc"] = idx
-                    is_mark = True
-                case PromptUnitTestConfig.PROMPT_MARK:
-                    mark_idxes["prompt"] = idx
-                    is_mark = True
-                case PromptUnitTestConfig.EXPECT_MARK:
-                    mark_idxes["expect"] = idx
-                    is_mark = True
-                case PromptUnitTestConfig.CONCLUSION_MARK:
-                    mark_idxes["conclusion"] = idx
-                    is_mark = True
+            stripped_line = line.strip()
+            if stripped_line == PromptUnitTestConfig.DESC_MARK:
+                mark_idxes["desc"] = idx
+                is_mark = True
+            elif stripped_line == PromptUnitTestConfig.PROMPT_MARK:
+                mark_idxes["prompt"] = idx
+                is_mark = True
+            elif stripped_line == PromptUnitTestConfig.EXPECT_MARK:
+                mark_idxes["expect"] = idx
+                is_mark = True
+            elif stripped_line == PromptUnitTestConfig.CONCLUSION_MARK:
+                mark_idxes["conclusion"] = idx
+                is_mark = True
 
             if is_mark:
                 if mark_idx >= 0:
@@ -160,22 +167,25 @@ class PromptUnitTestThinkDriver(ThinkDriver):
         self.root_dir = root_dir
 
     @classmethod
-    def driver_name(cls) -> str:
+    def meta_kind(cls) -> str:
         return cls.__name__
 
-    def foreach_think(self) -> Iterator[ThinkMeta]:
+    def meta_config_json_schema(self) -> Dict:
+        return {}
+
+    def preload_metas(self) -> Iterator[Meta]:
         for root, ds, fs in os.walk(self.root_dir):
             for dirname in ds:
                 think_name = self.think_prefix.rstrip("/") + "/" + dirname
-                yield ThinkMeta(
+                yield Meta(
                     id=think_name,
-                    kind=self.driver_name(),
+                    kind=self.meta_kind(),
                 )
 
-    def from_meta(self, meta: ThinkMeta) -> "Think":
+    def from_meta(self, meta: Meta) -> "Think":
         think_name = meta.id
         if not think_name.startswith(self.think_prefix):
-            raise MindsetNotFoundError(f"think {think_name} not found in prompt unittest thinks")
+            raise MindNotImplementedError(f"think {think_name} not found in prompt unittest thinks")
         sub_dir = think_name[len(self.think_prefix):]
         dirname = self.root_dir.rstrip("/") + "/" + sub_dir
         storage = PromptUnitTestLoader(
@@ -203,10 +213,10 @@ class PromptUnitTestThink(Think, Stage):
     def url(self) -> URL:
         return URL.new_think(self.think_name)
 
-    def to_meta(self) -> ThinkMeta:
-        return ThinkMeta(
+    def to_meta(self) -> Meta:
+        return Meta(
             id=self.think_name,
-            kind=PromptUnitTestThinkDriver.driver_name(),
+            kind=PromptUnitTestThinkDriver.meta_kind(),
         )
 
     def desc(self, ctx: Context, thought: Thought) -> Any:

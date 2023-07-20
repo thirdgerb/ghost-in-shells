@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import time
 from abc import ABCMeta, abstractmethod
 from random import randint
-from typing import Optional, List, Dict, Any, ClassVar, Tuple
+from typing import Optional, List, Dict, Any, ClassVar, Tuple, Iterator
 
 import yaml
 from pydantic import BaseModel, Field
@@ -10,6 +12,7 @@ from ghoshell.framework.reactions import CommandReaction, Command, CommandOutput
 from ghoshell.ghost import *
 from ghoshell.llms.utils import fetch_ctx_prompter
 from ghoshell.messages import *
+from ghoshell.meta import Meta
 
 
 # ----- Thought ----- #
@@ -527,10 +530,10 @@ reason: 原因
         self.think_name = think_name
 
     @classmethod
-    def driver_name(cls) -> str:
+    def meta_kind(cls) -> str:
         return cls.__name__
 
-    def from_meta(self, meta: ThinkMeta) -> "Think":
+    def from_meta(self, meta) -> "Think":
         return UndercoverGameDemoThink(self)
 
     def review_saving_filename(self) -> str:
@@ -541,10 +544,10 @@ reason: 原因
         filename = f"{self.review_dir.rstrip('/')}/{now}.yaml"
         return filename
 
-    def to_meta(self) -> ThinkMeta:
-        return ThinkMeta(
+    def to_meta(self) -> Meta:
+        return Meta(
             id=self.think_name,
-            kind=self.driver_name(),
+            kind=self.meta_kind(),
         )
 
     @classmethod
@@ -552,6 +555,12 @@ reason: 原因
         config = game_info.model_dump()
         with open(filename, 'w') as f:
             yaml.dump(config, f, allow_unicode=True)
+
+    def preload_metas(self) -> Iterator[Meta]:
+        return [self.to_meta()]
+
+    def meta_config_json_schema(self) -> Dict:
+        return {}
 
 
 # ----- think ----- #
@@ -586,7 +595,7 @@ class UndercoverGameDemoThink(Think):
     def url(self) -> URL:
         return URL.new_think(self.driver.think_name)
 
-    def to_meta(self) -> ThinkMeta:
+    def to_meta(self) -> Meta:
         return self.driver.to_meta()
 
     def desc(self, ctx: Context, thought: Thought) -> Any:

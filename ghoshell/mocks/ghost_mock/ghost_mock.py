@@ -4,7 +4,6 @@ from ghoshell.container import Provider
 from ghoshell.framework.bootstrapper import FileLoggerBootstrapper, \
     CommandFocusDriverBootstrapper, LLMToolsFocusDriverBootstrapper
 from ghoshell.framework.ghost import GhostKernel
-from ghoshell.framework.ghost.providers import LocalThinkMetaStorageProvider
 from ghoshell.llms import LLMTextCompletion, OpenAIChatCompletion
 from ghoshell.llms.openai import OpenAIBootstrapper
 from ghoshell.llms.thinks import ConversationalThinksBootstrapper, FileAgentMindsetBootstrapper
@@ -56,6 +55,6 @@ class MockGhost(GhostKernel):
             MockAPIRepositoryProvider(),
             MockMessageQueueProvider(),
             MockOperationKernelProvider(),
-            # MockThinkMetaDriverProvider()
-            LocalThinkMetaStorageProvider(),
+            MockThinkMetaDriverProvider(),
+            # LocalThinkMetaStorageProvider(),
         ]

@@ -49,7 +49,7 @@ class CloneError(GhostError):
     CODE: int = 500
 
 
-class MindsetNotFoundError(CloneError):
+class MindNotImplementedError(CloneError):
     """
     表示来到了没有思维存在的荒漠.
     通常是注册出了问题.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from abc import abstractmethod, ABCMeta
-from typing import Dict, List, Callable, Type, Optional, AnyStr, Iterator
+from typing import Dict, List, Callable, Type, Optional, AnyStr, Union, Iterator
 
 import yaml
 from pydantic import BaseModel, Field
@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field
 from ghoshell.container import Container
 from ghoshell.framework.stages import BasicStage
 from ghoshell.ghost import LogicError
-from ghoshell.ghost import Think, Event, OnReceived, CtxTool, Stage, ThinkMeta, Reaction, Intention, ThinkDriver, Focus
-from ghoshell.ghost import Thought, Operator, Context, URL, Mindset
+from ghoshell.ghost import Think, Event, OnReceived, CtxTool, Stage, Meta, Reaction, Intention, ThinkDriver
+from ghoshell.ghost import Thought, Operator, Context, URL
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion, OpenAIFuncSchema, OpenAIFuncCalled
 from ghoshell.messages import Text
 from ghoshell.utils import import_module_value
@@ -101,8 +101,8 @@ class AgentThinkConfig(BaseModel):
 
     stages: List[AgentStageConfig] = Field(default_factory=list)
 
-    def as_think_meta(self) -> ThinkMeta:
-        return ThinkMeta(
+    def as_think_meta(self) -> Meta:
+        return Meta(
             id=self.name,
             kind=AGENT_THINK_DRIVER_NAME,
             config=self.model_dump(),
@@ -187,7 +187,7 @@ class AgentThought(Thought):
 # ----- functions ----- #
 
 # 定义在 stage 类中的, 响应一个大模型函数调用的类方法.
-LLMCallable = Callable[[Context, Thought, BaseModel | None], Operator | str | None]
+LLMCallable = Callable[[Context, Thought, Union[BaseModel, None]], Union[Operator, str, None]]
 
 
 class LLMFunc(metaclass=ABCMeta):
@@ -237,7 +237,7 @@ class AdapterAsFunc(LLMFunc):
         return self.alias
 
     def schema(self, ctx: Context, this: AgentThought) -> OpenAIFuncSchema:
-        schema = self.func.model_json_schema(ctx, this)
+        schema = self.func.schema(ctx, this)
         schema.name = self.name()
         if self.desc:
             schema.desc = self.desc
@@ -425,8 +425,8 @@ class AgentThink(Think, Stage):
     def url(self) -> URL:
         return URL.new(think=self.config.name)
 
-    def to_meta(self) -> ThinkMeta:
-        return ThinkMeta(
+    def to_meta(self) -> Meta:
+        return Meta(
             id=self.config.name,
             kind=AGENT_THINK_DRIVER_NAME,
             config=self.config.model_dump(),
@@ -909,7 +909,7 @@ class FileAgentFuncStorage(AgentFuncStorage):
         with open(filename) as f:
             data = yaml.safe_load(f)
             for config_data in data:
-                config = AgentFuncConfig(config_data)
+                config = AgentFuncConfig(**config_data)
                 self._cached_configs[config.name] = config
 
     def get_func(self, name: str) -> LLMFunc | None:
@@ -935,8 +935,29 @@ def get_agent_func(container: Container, name: str) -> LLMFunc | None:
 
 # ---- mindset and driver ---- #
 
+class BasicAgentDriver(ThinkDriver, metaclass=ABCMeta):
 
-class FileAgentMindset(Mindset, ThinkDriver):
+    def meta_kind(self) -> str:
+        return AGENT_THINK_DRIVER_NAME
+
+    def from_meta(self, meta: Meta) -> "Think":
+        config = AgentThinkConfig(**meta.config)
+        return self._make_think(config)
+
+    def meta_config_json_schema(self) -> Dict:
+        return AgentThinkConfig.model_json_schema()
+
+    @classmethod
+    def _make_think(cls, config: AgentThinkConfig) -> AgentThink:
+        wrapper = DefaultAgentThink
+        class_name = config.class_name
+        if class_name:
+            wrapper: Type[DefaultAgentThink] = import_module_value(class_name)
+        think = wrapper(config)
+        return think
+
+
+class FileAgentDriver(BasicAgentDriver):
     """
     通过文件配置来获取所有的 Agent
     """
@@ -960,77 +981,21 @@ class FileAgentMindset(Mindset, ThinkDriver):
                 full_filename = config_path.rstrip("/") + "/" + filename
                 with open(full_filename) as f:
                     data = yaml.safe_load(f)
-                    name = data.get("name", None)
-                    if name is None:
-                        name = self._prefix.rstrip("/") + "/" + basename
-                        data["name"] = name
+                    think_name = data.get("name", None)
+                    if think_name is None:
+                        think_name = self._prefix.rstrip("/") + "/" + basename
+                        data["name"] = think_name
                     config = AgentThinkConfig(**data)
-                    self._cached_think_configs[name] = config
+                    self._cached_think_configs[think_name] = config
 
-    @property
-    def focus(self) -> Focus:
-        raise NotImplementedError("focus not implemented")
-
-    def clone(self, clone_id: str) -> Mindset:
-        return self
-
-    def fetch(self, thinking: str) -> Optional[Think]:
-        think = self._cached_thinks.get(thinking, None)
-        if think is not None:
-            return think
-
-        config = self._cached_think_configs.get(thinking, None)
-        if config is None:
-            return None
-        return self._make_think(config)
-
-    def fetch_meta(self, thinking: str) -> Optional[ThinkMeta]:
-        config = self._cached_think_configs.get(thinking, None)
-        if config is None:
-            return None
-        return config.as_think_meta()
-
-    def register_sub_mindset(self, mindset: Mindset) -> None:
-        raise NotImplementedError("register_sub_mindset not implemented")
-
-    def register_driver(self, driver: ThinkDriver) -> None:
-        raise NotImplementedError("register_driver not implemented")
-
-    def get_driver(self, driver_name: str) -> ThinkDriver | None:
-        if driver_name == AGENT_THINK_DRIVER_NAME:
-            return self
-        return None
-
-    def register_meta(self, meta: ThinkMeta) -> None:
-        raise NotImplementedError("register_meta not implemented")
-
-    def foreach_think(self) -> Iterator[Think]:
-        for name in self._cached_think_configs:
-            config = self._cached_think_configs[name]
-            yield self._make_think(config)
-
-    def driver_name(self) -> str:
-        return AGENT_THINK_DRIVER_NAME
-
-    def from_meta(self, meta: ThinkMeta) -> "Think":
-        if meta.id in self._cached_thinks:
-            return self._cached_thinks[meta.id]
-
-        config = AgentThinkConfig(**meta.config)
-        return self._make_think(config)
-
-    def _make_think(self, config: AgentThinkConfig) -> AgentThink:
-        name = config.name
-        if name in self._cached_thinks:
-            return self._cached_thinks[name]
-
-        wrapper = DefaultAgentThink
-        class_name = config.class_name
-        if class_name:
-            wrapper: Type[DefaultAgentThink] = import_module_value(class_name)
-        think = wrapper(config)
-        self._cached_thinks[config.name] = think
-        return think
+    def preload_metas(self) -> Iterator[Meta]:
+        for think_name in self._cached_think_configs:
+            config = self._cached_think_configs[think_name]
+            yield Meta(
+                id=think_name,
+                kind=self.meta_kind(),
+                config=config.model_dump(),
+            )
 
     def destroy(self) -> None:
         del self._cached_thinks

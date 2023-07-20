@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import List
-from typing import Optional, Dict, Any
+import os
+from typing import List, Iterator
+from typing import Optional, Dict, Any, Tuple
 
+import yaml
 from pydantic import BaseModel, Field
 
 from ghoshell.framework.stages import BasicStage
@@ -10,6 +12,8 @@ from ghoshell.ghost import *
 from ghoshell.llms import OpenAIChatMsg, OpenAIChatCompletion
 from ghoshell.messages import *
 from ghoshell.utils import import_module_value
+
+CONVERSATION_THINK_KIND = "llms/conversational_think_driver"
 
 
 class ConversationalConfig(BaseModel):
@@ -199,10 +203,11 @@ class DefaultConversationalStage(BasicStage):
         return self._reactions if self._reactions else {}
 
 
-class ConversationalThink(Think, ThinkDriver):
+class ConversationalThink(Think):
     """
     先实现一个不可配置的 conversational
     用于简单测试.
+    Deprecated
     """
 
     def __init__(
@@ -230,17 +235,11 @@ class ConversationalThink(Think, ThinkDriver):
     def url(self) -> URL:
         return URL(think=self.config.name)
 
-    def driver_name(self) -> str:
-        return f"{ConversationalThink.__name__}/{self.config.name}"
-
-    def from_meta(self, meta: ThinkMeta) -> "Think":
-        return self
-
-    def to_meta(self) -> ThinkMeta:
-        think = self.url().think
-        return ThinkMeta(
-            id=think,
-            kind=f"{self.driver_name()}",
+    def to_meta(self) -> Meta:
+        return Meta(
+            id=self.config.name,
+            kind=CONVERSATION_THINK_KIND,
+            config=self.config.model_dump()
         )
 
     def desc(self, ctx: Context, thought: Thought) -> Any:
@@ -267,3 +266,49 @@ class ConversationalThink(Think, ThinkDriver):
 
     def fetch_stage(self, stage_name: str = "") -> Optional[Stage]:
         return self.stages.get(stage_name, None)
+
+
+class ConversationThinkDriver(ThinkDriver):
+
+    def meta_kind(self) -> str:
+        return CONVERSATION_THINK_KIND
+
+    def meta_config_json_schema(self) -> Dict:
+        return ConversationalConfig.model_json_schema()
+
+    def from_meta(self, meta) -> "Think":
+        config = ConversationalConfig(**meta.config)
+        return ConversationalThink(config)
+
+    def preload_metas(self) -> Iterator[Meta]:
+        return []
+
+
+class FileConversationalThinkDriver(ConversationThinkDriver):
+
+    def __init__(self, dirname: str):
+        self.dirname = dirname
+
+    def preload_metas(self) -> Iterator[Meta]:
+        for value in self.iterate_think_filename(self.dirname):
+            filename, fullname = value
+            with open(filename) as f:
+                config_data = yaml.safe_load(f)
+            config = ConversationalConfig(**config_data)
+            yield Meta(
+                id=config.name,
+                kind=CONVERSATION_THINK_KIND,
+                config=config.model_dump(),
+            )
+
+    @classmethod
+    def iterate_think_filename(cls, directory: str) -> Iterator[Tuple[str, str]]:
+        for root, ds, fs in os.walk(directory):
+            for filename in fs:
+                if not filename.endswith(".yaml"):
+                    continue
+                name = filename[: len(filename) - 5]
+                filename = root.rstrip("/") + "/" + filename
+                namespace = root[len(directory):]
+                fullname = namespace.rstrip("/") + "/" + name
+                yield filename, fullname.lstrip("/")

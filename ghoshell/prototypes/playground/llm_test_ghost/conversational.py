@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import random
 import string
-from typing import List
+from typing import List, Iterator
 from typing import Optional, Dict, Any
 
 from pydantic import BaseModel, Field
@@ -27,7 +29,7 @@ The conversation context are below {quote_notice}:
 """
 
 
-class ConversationalThinkConfig(BaseModel):
+class DeprecatedConversationalThinkConfig(BaseModel):
     """
     通过配置实现一个 llms 的多轮对话.
     """
@@ -76,7 +78,7 @@ class Line(BaseModel):
     text: str
 
 
-class ConversationalThought(Thought):
+class DeprecatedConversationalThought(Thought):
     """
     最基本的多轮对话实现.
     """
@@ -99,10 +101,10 @@ class ConversationalThought(Thought):
 
     def prepare(self, args: Dict) -> None:
         if self.data is None:
-            self.data = ConversationalThought.Vars()
+            self.data = DeprecatedConversationalThought.Vars()
 
     def set_variables(self, variables: Dict) -> None:
-        self.data = ConversationalThought.Vars(**variables)
+        self.data = DeprecatedConversationalThought.Vars(**variables)
 
     def vars(self) -> Dict | None:
         if self.data is None:
@@ -113,11 +115,11 @@ class ConversationalThought(Thought):
         del self.data
 
 
-class DefaultConversationalStage(BasicStage):
+class DeprecatedDefaultConversationalStage(BasicStage):
 
     def __init__(
             self,
-            config: ConversationalThinkConfig,
+            config: DeprecatedConversationalThinkConfig,
             reactions: Dict[str, Reaction] = None,
             stage_name: str = "",
     ):
@@ -130,7 +132,7 @@ class DefaultConversationalStage(BasicStage):
             self._talk_start_quote = "=" + "".join(random.sample(string.ascii_letters, 3)) + "="
             self._talk_end_quote = "=" + "".join(random.sample(string.ascii_letters, 3)) + "="
 
-    def on_received(self, ctx: "Context", this: ConversationalThought, e: OnReceived) -> Operator | None:
+    def on_received(self, ctx: "Context", this: DeprecatedConversationalThought, e: OnReceived) -> Operator | None:
         text = ctx.read(Text)
         # 非文字消息.
         if text is None:
@@ -161,14 +163,14 @@ class DefaultConversationalStage(BasicStage):
         ctx.send_at(this).text(resp)
         return ctx.mind(this).awaits()
 
-    def _record_dialog(self, ctx: Context, this: ConversationalThought, role: str, content: str) -> None:
+    def _record_dialog(self, ctx: Context, this: DeprecatedConversationalThought, role: str, content: str) -> None:
         """
         todo: 实现一个对话记录, 方便日后查阅.
         """
         this.data.last_input = content
         this.data.dialog.append(Line(role=self.config.user_role, text=content))
 
-    def _check_max_turns(self, this: ConversationalThought) -> None:
+    def _check_max_turns(self, this: DeprecatedConversationalThought) -> None:
         """
         如果超过了最大会话长度, 就删除掉历史记录.
         todo: 让 llm 自己对前文进行总结.
@@ -177,7 +179,7 @@ class DefaultConversationalStage(BasicStage):
             # 删除两轮对话. 当然最好的做法应该是让 bot 自己总结.
             self._reduce_dialog(this)
 
-    def _reduce_dialog(self, this: ConversationalThought) -> None:
+    def _reduce_dialog(self, this: DeprecatedConversationalThought) -> None:
         this.data.dialog = this.data.dialog[2:]
 
     def _prompt(self, ctx: Context, prompt: str) -> str:
@@ -191,7 +193,7 @@ class DefaultConversationalStage(BasicStage):
                 resp = resp[:len(resp) - len(self._talk_end_quote)]
         return resp
 
-    def _join_resp_prompt(self, this: ConversationalThought) -> str:
+    def _join_resp_prompt(self, this: DeprecatedConversationalThought) -> str:
         dialog = []
         for line in this.data.dialog:
             info = f"{line.role}:\n{self._talk_start_quote} {line.text} {self._talk_end_quote}"
@@ -215,21 +217,21 @@ class DefaultConversationalStage(BasicStage):
         return prompt
 
     @classmethod
-    def _send_and_await(cls, ctx: Context, this: ConversationalThought, content: str) -> Operator | None:
+    def _send_and_await(cls, ctx: Context, this: DeprecatedConversationalThought, content: str) -> Operator | None:
         if content:
             ctx.send_at(this).text(content)
         return ctx.mind(this).awaits()
 
-    def on_activating(self, ctx: "Context", this: ConversationalThought, e: OnActivating) -> Operator | None:
+    def on_activating(self, ctx: "Context", this: DeprecatedConversationalThought, e: OnActivating) -> Operator | None:
         return self._send_and_await(ctx, this, self.config.instructions.on_activating)
 
-    def on_quiting(self, ctx: "Context", this: ConversationalThought, e: OnQuiting) -> Operator | None:
+    def on_quiting(self, ctx: "Context", this: DeprecatedConversationalThought, e: OnQuiting) -> Operator | None:
         return self._send_and_await(ctx, this, self.config.instructions.on_quiting)
 
-    def on_canceling(self, ctx: "Context", this: ConversationalThought, e: OnCanceling) -> Operator | None:
+    def on_canceling(self, ctx: "Context", this: DeprecatedConversationalThought, e: OnCanceling) -> Operator | None:
         return self._send_and_await(ctx, this, self.config.instructions.on_canceling)
 
-    def on_preempt(self, ctx: "Context", this: ConversationalThought, e: OnPreempted) -> Operator | None:
+    def on_preempt(self, ctx: "Context", this: DeprecatedConversationalThought, e: OnPreempted) -> Operator | None:
         return self._send_and_await(ctx, this, self.config.instructions.on_preempted)
 
     def url(self) -> URL:
@@ -243,7 +245,7 @@ class DefaultConversationalStage(BasicStage):
         return self._reactions if self._reactions else {}
 
 
-class ConversationalThink(Think, ThinkDriver):
+class DeprecatedConversationalThink(Think, ThinkDriver):
     """
     先实现一个不可配置的 conversational
     用于简单测试. 
@@ -252,7 +254,7 @@ class ConversationalThink(Think, ThinkDriver):
     def __init__(
             self,
             # think 的名字.
-            config: ConversationalThinkConfig,
+            config: DeprecatedConversationalThinkConfig,
             stages: List[Stage] = None,
             default_reactions: Dict[str, Reaction] = None,
     ):
@@ -262,7 +264,7 @@ class ConversationalThink(Think, ThinkDriver):
         else:
             self.stages = {}
 
-        self.stages[""] = DefaultConversationalStage(
+        self.stages[""] = DeprecatedDefaultConversationalStage(
             self.config,
             reactions=default_reactions,
             stage_name="",
@@ -271,17 +273,20 @@ class ConversationalThink(Think, ThinkDriver):
     def url(self) -> URL:
         return URL(think=self.config.think)
 
-    def driver_name(self) -> str:
-        return f"{ConversationalThink.__name__}/{self.config.think}"
+    def meta_kind(self) -> str:
+        return f"{DeprecatedConversationalThink.__name__}/{self.config.think}"
 
-    def from_meta(self, meta: ThinkMeta) -> "Think":
+    def preload_metas(self) -> Iterator[Meta]:
+        return [self.to_meta()]
+
+    def from_meta(self, meta: Meta) -> "Think":
         return self
 
-    def to_meta(self) -> ThinkMeta:
+    def to_meta(self) -> Meta:
         resolver = self.url().think
-        return ThinkMeta(
+        return Meta(
             id=resolver,
-            kind=f"{self.driver_name()}",
+            kind=self.meta_kind(),
         )
 
     def desc(self, ctx: Context, thought: Thought) -> Any:
@@ -293,19 +298,19 @@ class ConversationalThink(Think, ThinkDriver):
         return self.url().new_id(extra=ctx.input.trace.model_dump(include={"session_id"}))
 
     def new_thought(self, ctx: "Context", args: Dict) -> Thought:
-        thought = ConversationalThought(args)
+        thought = DeprecatedConversationalThought(args)
         # 初始化 instruction, debug 模式可以变更.
         thought.data.instruction = self.config.instructions.instruction
         # 默认的 debug 模式.
         thought.data.debug = self.config.debug
         return thought
 
-    def result(self, ctx: "Context", this: ConversationalThought) -> Optional[Dict]:
+    def result(self, ctx: "Context", this: DeprecatedConversationalThought) -> Optional[Dict]:
         if this.data.conclusion:
             return {"conclusion": this.data.conclusion}
         return self._reach_conclusion(this)
 
-    def _reach_conclusion(self, this: ConversationalThought) -> None:
+    def _reach_conclusion(self, this: DeprecatedConversationalThought) -> None:
         # todo
         pass
 
@@ -314,3 +319,7 @@ class ConversationalThink(Think, ThinkDriver):
 
     def fetch_stage(self, stage_name: str = "") -> Optional[Stage]:
         return self.stages.get(stage_name, None)
+
+    def meta_config_json_schema(self) -> Dict:
+        return {}
+

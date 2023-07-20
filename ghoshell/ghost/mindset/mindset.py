@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Iterator
+from typing import Optional, Type
 
-from ghoshell.ghost.error import MindsetNotFoundError
-from ghoshell.ghost.mindset.think import Think, ThinkDriver, ThinkMeta
+from ghoshell.ghost.error import MindNotImplementedError
+from ghoshell.ghost.mindset.think import Think
+from ghoshell.meta import Meta, MetaRepository
 
 
-class Mindset(metaclass=ABCMeta):
+class Mindset(MetaRepository[Think], metaclass=ABCMeta):
     """
     定义了 Ghost 拥有的思维方式
     核心是可以通过 UniformReactionLocator 取出 Reaction
@@ -20,15 +21,12 @@ class Mindset(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
-    def fetch(self, thinking: str) -> Optional[Think]:
-        """
-        获取一个 Thinking
-        """
-        pass
+    @classmethod
+    def meta_instance_type(cls) -> Type[Think]:
+        return Think
 
     @abstractmethod
-    def fetch_meta(self, thinking: str) -> Optional[ThinkMeta]:
+    def fetch_meta(self, thinking: str) -> Optional[Meta]:
         """
         获取一个 Thinking的 Meta, 如果存在的话.
         """
@@ -38,57 +36,10 @@ class Mindset(metaclass=ABCMeta):
         """
         随手放一个语法糖方便自己.
         """
-        fetched = self.fetch(thinking)
+        fetched = self.fetch_meta_instance(thinking)
         if fetched is None:
-            raise MindsetNotFoundError(f"mindset can not find think with name '{thinking}'")
+            raise MindNotImplementedError(f"mindset can not find think with name '{thinking}'")
         return fetched
-
-    @abstractmethod
-    def register_sub_mindset(self, mindset: Mindset) -> None:
-        """
-        注册子级 mindset
-        父级里查不到, 就到 sub mindset 里查
-        """
-        pass
-
-    @abstractmethod
-    def register_driver(self, driver: ThinkDriver) -> None:
-        """
-        注册 think 的驱动.
-        deprecated: 似乎没有 sub mindset 的形式好.
-        """
-        pass
-
-    @abstractmethod
-    def get_driver(self, driver_name: str) -> ThinkDriver | None:
-        pass
-
-    @abstractmethod
-    def register_meta(self, meta: ThinkMeta) -> None:
-        """
-        注册一个 thinking
-        当然, Mindset 可以有自己的实现, 从某个配置体系中获取.
-        或者合并多个 Mindset.
-
-        deprecated: mindset 可以自己实现特殊配置的读取机制. 不需要用 ThinkMeta 这种形式.
-        """
-        pass
-
-    def register_think(self, think: Think) -> None:
-        """
-        用现成的 Think 完成注册.
-        """
-        meta = think.to_meta()
-        self.register_meta(meta)
-        if isinstance(think, ThinkDriver):
-            self.register_driver(think)
-
-    @abstractmethod
-    def foreach_think(self) -> Iterator[Think]:
-        """
-        需要提供一种机制, 遍历所有的 Think 对象.
-        """
-        pass
 
     @abstractmethod
     def destroy(self) -> None:

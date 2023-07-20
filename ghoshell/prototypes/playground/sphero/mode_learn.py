@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from ghoshell.framework.reactions.commands import ProcessCmdReaction
 from ghoshell.framework.thinks import SingleStageThink
-from ghoshell.ghost import Context, Thought, ThinkMeta, URL
+from ghoshell.ghost import Context, Thought, Meta, URL
 from ghoshell.ghost import Operator, Reaction, Intention
 from ghoshell.llms import OpenAIChatMsg
 from ghoshell.messages import Text
@@ -139,21 +139,20 @@ class SpheroLearningModeThink(SingleStageThink):
                 ctx.send_at(this).output(out)
                 return ctx.mind(this).awaits()
 
-        match parsed.reaction:
-            case "restart":
-                ctx.send_at(this).output(out)
-                return ctx.mind(this).restart()
-            case "test":
-                return self._run_test(ctx, this, out)
-            case "save":
-                this.add_system_message(f"保存所有指令为 `{parsed.title}`")
-                return self._save_case(ctx, this, out)
-            case "finish":
-                ctx.send_at(this).output(out)
-                return ctx.mind(this).finish()
-            case _:
-                ctx.send_at(this).output(out)
-                return ctx.mind(this).awaits()
+        if parsed.reaction == "restart":
+            ctx.send_at(this).output(out)
+            return ctx.mind(this).restart()
+        elif parsed.reaction == "test":
+            return self._run_test(ctx, this, out)
+        elif parsed.reaction == "save":
+            this.add_system_message(f"保存所有指令为 `{parsed.title}`")
+            return self._save_case(ctx, this, out)
+        elif parsed.reaction == "finish":
+            ctx.send_at(this).output(out)
+            return ctx.mind(this).finish()
+
+        ctx.send_at(this).output(out)
+        return ctx.mind(this).awaits()
 
     def _save_case(self, ctx: Context, this: LearningModeThought, message: SpheroCommandMessage) -> Operator:
         for direction in this.data.directions:
@@ -192,8 +191,8 @@ class SpheroLearningModeThink(SingleStageThink):
     def url(self) -> URL:
         return URL.new_think(self._config.name)
 
-    def to_meta(self) -> ThinkMeta:
-        return ThinkMeta(
+    def to_meta(self) -> Meta:
+        return Meta(
             id=self._config.name,
             kind=self._core.config.driver_name,
         )

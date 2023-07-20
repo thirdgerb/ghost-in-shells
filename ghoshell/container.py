@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Type, Dict, TypeVar, Callable
+from typing import Type, Dict, TypeVar, Callable, Set
+
+from ghoshell.meta import MetaRepository, MetaManager
 
 Contract = TypeVar('Contract', bound=object)
 
@@ -23,16 +25,23 @@ class Container:
         self.parent = parent
         self.__instances: Dict[Type[Contract], Contract] = {}
         self.__providers: Dict[Type[Contract], Provider] = {}
+        self.__bound: Set = set()
+        self.__meta_repo_contracts: Set = set()
 
     def set(self, contract: Type[Contract], instance: Contract) -> None:
         """
         设置一个实例, 不会污染父容器.
         """
+        self._bind_contract(contract)
         self.__instances[contract] = instance
 
+    def _bind_contract(self, contract: Type[Contract]) -> None:
+        self.__bound.add(contract)
+        if self.parent is None and isinstance(contract, type(object)) and issubclass(contract, MetaRepository):
+            self.__meta_repo_contracts.add(contract)
+
     def bound(self, contract: Type[Contract]) -> bool:
-        return contract in self.__instances or contract in self.__providers or \
-            (self.parent is not None and self.parent.bound(contract))
+        return contract in self.__bound or (self.parent is not None and self.parent.bound(contract))
 
     def get(self, contract: Type[Contract], params: Dict | None = None) -> Contract | None:
         """
@@ -57,6 +66,7 @@ class Container:
 
     def register(self, provider: Provider) -> None:
         contract = provider.contract()
+        self._bind_contract(contract)
         if contract in self.__instances:
             del self.__instances[contract]
         self.__providers[contract] = provider
@@ -75,10 +85,17 @@ class Container:
             raise Exception(f"contract {contract} not register in container")
         return ins
 
+    def register_meta_repos(self):
+        for contract in self.__meta_repo_contracts:
+            repo = self.force_fetch(contract, True)
+            MetaManager.add(repo)
+
     def destroy(self) -> None:
         del self.__instances
         del self.parent
         del self.__providers
+        del self.__bound
+        del self.__meta_repo_contracts
 
 
 class Provider(metaclass=ABCMeta):
@@ -116,4 +133,3 @@ class AbsProvider(Provider):
 
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         return self._factory(con, params)
-
