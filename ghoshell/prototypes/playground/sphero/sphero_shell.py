@@ -30,12 +30,12 @@ class SpheroBoltShell(BaiduSpeechShell):
     ):
         super().__init__(container, config_path, runtime_path, config_filename)
 
-    async def deliver(self, _output: Output) -> None:
+    async def output(self, _output: Output) -> None:
         commands = SpheroCommandMessage.read(_output.payload)
         if commands is not None:
             self._sphero_runtime.set_cmd_message(commands)
 
-        await super().deliver(_output)
+        await super().output(_output)
 
     def _output_text(self, text: Text) -> None:
         # 输出这块重写去掉了 speak, 交给了 runtime 去 speak.
@@ -43,7 +43,7 @@ class SpheroBoltShell(BaiduSpeechShell):
 
     def _speak_str(self, content: str) -> None:
         text = Text(content=content)
-        return self._speak_text(text)
+        return self._say(text)
 
     def run_as_app(self) -> None:
         self._console.print("bootstrap sphero bolt...")

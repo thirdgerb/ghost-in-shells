@@ -21,12 +21,22 @@ prompt-toolkit = "3"
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.0"
 
+[tool.poetry.group.speech.dependencies]
+speechrecognition = "^3.10.0"
+pyaudio = "^0.2.13"
+
 
 [tool.poetry.group.sphero.dependencies]
 spherov2 = "^0.12"
 speechrecognition = "^3.10.0"
 pyaudio = "^0.2.13"
 bleak = "^0.20.2"
+
+[tool.poetry.scripts]
+init = 'ghoshell.scripts.script_init:initialize_env'
+console = 'ghoshell.scripts.script_console:main'
+speech = 'ghoshell.scripts.script_speech:main'
+sphero = 'ghoshell.scripts.script_sphero:main'
 
 [build-system]
 requires = ["poetry-core"]

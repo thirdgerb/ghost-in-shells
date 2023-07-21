@@ -4,13 +4,13 @@ from ghoshell.ghost.mindset.mind import Mind
 from ghoshell.ghost.mindset.mindset import Mindset
 from ghoshell.ghost.mindset.operator import Operator, OperationKernel
 from ghoshell.ghost.mindset.stage import Stage, Reaction
-from ghoshell.ghost.mindset.think import Think, ThinkMeta, ThinkDriver
+from ghoshell.ghost.mindset.think import Think, ThinkDriver
 from ghoshell.ghost.mindset.thought import Thought, DictThought
 
 __all__ = [
     "Mindset",
     "Mind",
-    "Think", "ThinkDriver", "ThinkMeta",
+    "Think", "ThinkDriver",
     "Thought", "DictThought",
     "Stage", "Reaction",
     "Focus", "FocusDriver", "Intention", "Attention",

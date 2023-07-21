@@ -128,3 +128,17 @@ def test_method_decorator():
 
     f = Foo()
     assert f.foo("bar_") == "bar_zoo"
+
+
+def test_is_instance():
+    class Bar:
+        bar: int = 1
+
+    class Foo(Bar):
+        foo: int = 2
+
+    v = 1
+
+    assert issubclass(Foo, Bar)
+    assert not isinstance(1, type(object))
+    assert isinstance(Foo, type(object))

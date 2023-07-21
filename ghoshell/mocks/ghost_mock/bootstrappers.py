@@ -7,7 +7,6 @@ class RegisterThinkDemosBootstrapper(GhostBootstrapper):
 
     def bootstrap(self, ghost: Ghost):
         # thinks
-        helloworld = HelloWorldThink()
-
+        helloworld_driver = HelloWorldThink()
         # register
-        ghost.mindset.register_think(helloworld)
+        ghost.mindset.register_meta_driver(helloworld_driver)

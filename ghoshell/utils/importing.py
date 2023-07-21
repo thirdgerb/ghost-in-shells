@@ -1,7 +1,15 @@
 import importlib
 
+__cached_module_value = {}
+
 
 def import_module_value(module_value_path: str):
+    if module_value_path not in __cached_module_value:
+        __cached_module_value[module_value_path] = _import_module_value(module_value_path)
+    return __cached_module_value.get(module_value_path)
+
+
+def _import_module_value(module_value_path: str):
     """
     import module value by string
     """

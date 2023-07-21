@@ -1,32 +1,18 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Dict, List, AnyStr, Type
+from typing import Optional, Dict, List, AnyStr, Type, Iterator
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ghoshell.ghost.context import Context
 from ghoshell.ghost.mindset.stage import Stage
 from ghoshell.ghost.mindset.thought import Thought
+from ghoshell.meta import Meta, MetaClass, MetaDriver
 from ghoshell.url import URL
 
 
-class ThinkMeta(BaseModel):
-    """
-    Think 的元数据.
-    要求所有的 Think 都可以产出元数据, 使之可配置.
-    这么做, 是为了可以在运行时动态生成 Think
-    机器人也因此可以自己生产自己的 Think.
-
-    Think Meta 没有实现 contracts.Meta
-    原因是还没想明白.
-    """
-    id: str
-    kind: str
-    config: Dict = Field(default_factory=dict)
-
-
-class Think(metaclass=ABCMeta):
+class Think(MetaClass, metaclass=ABCMeta):
     """
     ghost 拥有的思维模块
     """
@@ -39,7 +25,7 @@ class Think(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def to_meta(self) -> ThinkMeta:
+    def to_meta(self) -> Meta:
         """
         所有的 Think 都要求可以返回 Meta 数据.
         """
@@ -119,25 +105,16 @@ class Think(metaclass=ABCMeta):
         return f"think:[{self.url()}]"
 
 
-class ThinkDriver(metaclass=ABCMeta):
+class ThinkDriver(MetaDriver[Think], metaclass=ABCMeta):
     """
     实现 Think 的驱动.
     通过 meta 的不同, 可以实例化出多个 Think
     """
 
     @abstractmethod
-    def driver_name(self) -> str:
+    def preload_metas(self) -> Iterator[Meta]:
         """
-        驱动的名称. 用来和 ThinkMeta 配对.
-        """
-        pass
-
-    @abstractmethod
-    def from_meta(self, meta: ThinkMeta) -> "Think":
-        """
-        可以根据 meta, 生产出 Think 的实例.
-        这样, 机器人可以用一个 ConfigStorage 来读取 meta 数据
-        然后实例化成 Think.
-        当 meta 被修改时, 机器人的状态在线也会变更.
+        如果存在 preload metas, 会在注册 driver 时自动注册到 mindset.
+        有可能会覆盖 mindset 已经存在的数据.
         """
         pass

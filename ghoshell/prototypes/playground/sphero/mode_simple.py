@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Optional, Dict, AnyStr
+from typing import Optional, Dict, AnyStr, List
 
 from ghoshell.framework.thinks import SingleStageThink
-from ghoshell.ghost import Context, Thought, ThinkMeta, URL, DictThought
+from ghoshell.ghost import Context, Thought, Meta, URL, DictThought
 from ghoshell.ghost import Operator, Reaction, Intention
 from ghoshell.messages import Text
 from ghoshell.prototypes.playground.sphero.sphero_ghost_core import SpheroGhostCore
@@ -26,8 +26,8 @@ class SpheroSimpleCommandModeThink(SingleStageThink):
     def url(self) -> URL:
         return URL.new_think(self._config.name)
 
-    def to_meta(self) -> ThinkMeta:
-        return ThinkMeta(
+    def to_meta(self) -> Meta:
+        return Meta(
             id=self._config.name,
             driver=self._core.config.driver_name,
         )

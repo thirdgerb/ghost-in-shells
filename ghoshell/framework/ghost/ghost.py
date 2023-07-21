@@ -49,7 +49,6 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         self._runtime_path = runtime_path
         container.set(Ghost, self)
         container.set(GhostConfig, config)
-        config = container.force_fetch(GhostConfig)
         # self._messenger: Messenger = messenger
 
     def boostrap(self) -> "Ghost":
@@ -73,6 +72,9 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         for provider in self.get_contracts_providers():
             self._container.register(provider)
 
+        # all meta repository shall be registered
+        self._container.register_meta_repos()
+
     # ---- 配置类函数 ---- #
 
     def get_bootstrapper(self) -> List[GhostBootstrapper]:
@@ -95,6 +97,7 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
             Cache,
             ThinkMetaStorage,
             APIRepository,
+            GhostConfig,
         ]
 
     def get_contracts_providers(self) -> List[Provider]:

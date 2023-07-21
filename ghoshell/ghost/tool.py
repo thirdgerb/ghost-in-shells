@@ -6,7 +6,7 @@ from typing import Optional, Dict, List, Tuple
 from pydantic import ValidationError
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.error import MindsetNotFoundError, CloneError
+from ghoshell.ghost.error import MindNotImplementedError, CloneError
 from ghoshell.ghost.mindset import Intention, Attention
 from ghoshell.ghost.mindset import Think, Thought, Stage, Event
 from ghoshell.ghost.mindset.operator import Operator
@@ -60,7 +60,7 @@ class CtxTool:
         """
         stage_instance = cls.fetch_stage(ctx, think, stage)
         if stage_instance is None:
-            raise MindsetNotFoundError(f"force fetch think '{think}' with stage '{stage}' failed, not found")
+            raise MindNotImplementedError(f"force fetch think '{think}' with stage '{stage}' failed, not found")
         return stage_instance
 
     @classmethod
@@ -69,7 +69,7 @@ class CtxTool:
 
     @classmethod
     def fetch_stage(cls, ctx: Context, think: str, stage: str) -> Optional["Stage"]:
-        think = ctx.clone.mindset.fetch(think)
+        think = ctx.clone.mindset.fetch_meta_instance(think)
         stage = think.fetch_stage(stage)
         return stage
 
@@ -191,49 +191,6 @@ class CtxTool:
     @classmethod
     def current_process(cls, ctx: Context) -> Process:
         return ctx.runtime.current_process()
-
-    # @classmethod
-    # def _add_task_intentions(
-    #         cls,
-    #         ctx: Context,
-    #         result: GroupedIntentions,
-    #         task: Task,
-    #         private: bool,
-    #         forward: bool,
-    # ) -> GroupedIntentions:
-    #
-    #     fr = None
-    #     if forward:
-    #         fr = task.url
-    #         url_list = task.intentions
-    #     else:
-    #         url_list = [task.url]
-    #
-    #     if not url_list:
-    #         return result
-    #
-    #     for target in url_list:
-    #         stage = CtxTool.force_fetch_stage(ctx, target.think, target.stage)
-    #
-    #         # 从 stage 里获取 intention
-    #         intentions = stage.intentions(ctx)
-    #         if not intentions:
-    #             continue
-    #         #  初始化 intentions
-    #         for intention in intentions:
-    #             # 添加好关联路径.
-    #             intention.target = fr
-    #
-    #         # 从 intentions 组装成为 GroupedIntentions
-    #         for meta in intentions:
-    #             # 私有意图无法在非私有场景使用.
-    #             if meta.private and not private:
-    #                 continue
-    #             kind = meta.kind
-    #             if kind not in result:
-    #                 result[kind] = []
-    #             result[kind].append(meta)
-    #     return result
 
 
 class RuntimeTool:
@@ -432,47 +389,3 @@ class RuntimeTool:
         process = runtime.current_process()
         process.quiting = quiting
         runtime.store_process(process)
-
-    #
-    # @classmethod
-    # def fetch_task(cls, ctx: Context, url: url, or_create: bool = True) -> Optional[Task]:
-    #     clone = ctx.clone
-    #     intentions = clone.mind
-    #     think = intentions.fetch(url.think)
-    #     if think is None:
-    #         return None
-    #     tid = think.new_task_id(ctx, url.args)
-    #     runtime = clone.runtime
-    #     process = runtime.current_process()
-    #     task = process.get_task(tid)
-    #     if task is not None:
-    #         return task
-    #
-    #     if think.is_long_term():
-    #         task = runtime.fetch_long_term_task(tid)
-    #     if task is not None:
-    #         return task
-    #
-    #     if not or_create:
-    #         return None
-    #
-    #     return Task(
-    #         tid=tid,
-    #         think=url.think,
-    #         stage="",
-    #         args=url.args.copy(),
-    #     )
-
-    # @classmethod
-    # def state_msg_to_task(cls, ctx: Context, state: StateMsg) -> Task:
-    #     task = CtxTool.fetch_task(ctx, state.url, or_create=True)
-    #     task.vars = state.vars
-    #     return task
-    #
-    # @classmethod
-    # def task_to_state_msg(cls, task: Task, action: str) -> StateMsg:
-    #     return StateMsg(
-    #         url=cls.task_to_url(task),
-    #         vars=task.vars,
-    #         action=action,
-    #     )

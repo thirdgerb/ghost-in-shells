@@ -45,8 +45,7 @@ class MindsetProvider(Provider):
 
     def factory(self, con: Container, params: Dict | None = None) -> Contract | None:
         driver = con.force_fetch(ThinkMetaStorage)
-        focus = con.force_fetch(Focus)
-        return MindsetImpl(driver, focus, None)
+        return MindsetImpl(driver, None)
 
 
 class MemoryProvider(Provider):
