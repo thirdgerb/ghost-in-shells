@@ -35,11 +35,11 @@ def run_sphero_shell(root_path: str, root_container: Container):
     """
     run console shell with local demo ghost
     """
-    container = root_container
     config_path = "/".join([root_path, "configs", "shells/sphero"])
     runtime_path = "/".join([root_path, "runtime"])
     # 分享相同的 path.
-    shell = SpheroBoltShell(container, config_path, runtime_path)
+    ghost = demo_ghost(root_path, root_container)
+    shell = SpheroBoltShell(ghost, config_path, runtime_path)
     shell.bootstrap().run_as_app()
 
 
