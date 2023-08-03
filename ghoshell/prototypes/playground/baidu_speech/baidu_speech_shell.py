@@ -47,7 +47,7 @@ class BaiduSpeechShell(ShellKernel):
             config_path: str,
             runtime_path: str,
             config_filename: str = "config.yml",
-    ):
+    ) -> None:
         self._console = Console()
         self._ghost = ghost
         self.session_id = str(uuid.uuid4().hex)

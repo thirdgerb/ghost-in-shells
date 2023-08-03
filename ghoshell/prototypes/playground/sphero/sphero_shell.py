@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import time
 
-from ghoshell.container import Container
-from ghoshell.messages import Output, Text
+from ghoshell.ghost import Ghost
+from ghoshell.messages import Output, Input, Text
 from ghoshell.prototypes.playground.baidu_speech import BaiduSpeechShell
 from ghoshell.prototypes.playground.sphero.sphero_messages import SpheroCommandMessage
 from ghoshell.prototypes.playground.sphero.sphero_runtime import SpheroBoltRuntime
@@ -23,19 +23,18 @@ class SpheroBoltShell(BaiduSpeechShell):
 
     def __init__(
             self,
-            container: Container,
+            ghost: Ghost,
             config_path: str,
             runtime_path: str,
             config_filename: str = "sphero_shell_config.yml",
     ):
-        super().__init__(container, config_path, runtime_path, config_filename)
+        super().__init__(ghost, config_path, runtime_path, config_filename)
 
-    async def output(self, _output: Output) -> None:
+    def output(self, _output: Output, _input: Input) -> None:
         commands = SpheroCommandMessage.read(_output.payload)
         if commands is not None:
             self._sphero_runtime.set_cmd_message(commands)
-
-        await super().output(_output)
+        super().output(_output, _input)
 
     def _output_text(self, text: Text) -> None:
         # 输出这块重写去掉了 speak, 交给了 runtime 去 speak.
@@ -71,8 +70,3 @@ class SpheroBoltShell(BaiduSpeechShell):
     def _quit(self, message: str):
         self._sphero_runtime.close()
         super()._quit(message)
-
-    def _close(self) -> None:
-        if self._sphero_runtime is not None:
-            self._sphero_runtime.close()
-        super()._close()

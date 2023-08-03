@@ -110,6 +110,7 @@ instruction: |
   2. class var `event_type` is required
   3. no need to import any package or module, they were imported.
   4. 如果子结构的定义已经存在, 请直接使用. 否则你需要定义一个子结构.
+  5. 不允许回答任何与编程任务无关的问题.
 llm_config: turbo-16k-0613
 max_turns: 1
 reactions: {}
