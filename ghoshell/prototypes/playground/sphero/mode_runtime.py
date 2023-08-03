@@ -114,6 +114,7 @@ class SpheroRuntimeModeThink(Think, AgentStage):
         return chat_context
 
     def _on_receive_event(self, ctx: Context, this: SpheroRuntimeThought, event: SpheroEventMessage) -> Operator:
+        is_ran: bool = False
         for log in event.runtime_logs:
             index = log.find("|")
             method = log[:index]
@@ -121,14 +122,17 @@ class SpheroRuntimeModeThink(Think, AgentStage):
 
             # hack 一下
             if method == Say.method or method == LambdaSpeak.method:
-                this.data.add_ai_message(log_text)
+                this.data.add_system_message(f"you've spoke: `{log_text}`")
             else:
-                this.data.add_system_message(f"我调用了函数 `{method}`, 运行结果如下: {log_text}")
+                is_ran = True
+                this.data.add_system_message(f"you called method: `{method}`; result is : `{log_text}`")
         #
         # if event.stopped:
         #     message = f"指令运行中断, 原因: {event.stopped}"
         #     this.data.add_system_message(message)
-        return self.on_receive_prompt(ctx, this)
+        if is_ran:
+            return self.on_receive_prompt(ctx, this)
+        return ctx.mind(this).awaits()
 
     #
     # def on_llm_text_message(self, ctx: Context, this: AgentThought, message: str) -> Operator:

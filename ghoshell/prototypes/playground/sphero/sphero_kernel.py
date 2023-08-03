@@ -99,15 +99,20 @@ class SpheroCmdStatus:
         if self.stopped:
             return
         self.stopped = True
-        if self.start_at == 0:
-            duration = 0
-        else:
-            duration = stop_at - self.start_at
+        if self.runtime_log:
+            return
+        try:
+            if self.start_at == 0:
+                duration = 0
+            else:
+                duration = stop_at - self.start_at
 
-        duration = round(duration, 2)
-        log_str = self._runnable.runtime_info(duration, interrupt)
-        if self.logging:
-            self.runtime_log = self._runnable.name() + "|" + log_str
+            duration = round(duration, 2)
+            log_str = self._runnable.runtime_info(duration, interrupt)
+            if self.logging:
+                self.runtime_log = self._runnable.name() + "|" + log_str
+        except Exception as e:
+            self.runtime_log = interrupt
 
 
 class SpheroKernel:

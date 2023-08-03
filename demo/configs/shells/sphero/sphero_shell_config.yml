@@ -1,3 +1,5 @@
+# BaiduSpeechShellConfig
 welcome: "进入简单命令模式"
+use_command_cache: false
 root_url:
   think: sphero/runtime_mode
