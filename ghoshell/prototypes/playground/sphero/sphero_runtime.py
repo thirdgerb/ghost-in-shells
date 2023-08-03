@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+import traceback
 from typing import Callable
 
 from spherov2 import scanner
@@ -76,19 +77,24 @@ class SpheroBoltRuntime:
             # 运行每一帧.
             while self._running:
                 now = time.time()
-                stage = kernel.current_stage()
-                if stage is None:
-                    self._sleep_frame()
-                    continue
-                cmd_is_running = stage.run_frame(kernel, now)
+                try:
+                    stage = kernel.current_stage()
+                    if stage is None:
+                        self._sleep_frame()
+                        continue
+                    cmd_is_running = stage.run_frame(kernel, now)
 
-                # 命令是否已经结束.
-                if not cmd_is_running:
-                    stage.on_stop(now, "")
-                    # 结束一个指令的话
-                    more = kernel.shift_stage(now, "")
-                    if not more:
-                        self.finish_cmd_stack(kernel, "", True, now)
+                    # 命令是否已经结束.
+                    if not cmd_is_running:
+                        stage.on_stop(now, "")
+                        # 结束一个指令的话
+                        more = kernel.shift_stage(now, "")
+                        if not more:
+                            self.finish_cmd_stack(kernel, "", True, now)
+                except Exception as e:
+                    self._console(traceback.format_exception(e))
+                    self.finish_cmd_stack(kernel, "发生了系统异常", True, time.time())
+                    continue
                 self._sleep_frame()
         self.close()
 

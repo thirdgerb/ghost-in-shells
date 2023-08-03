@@ -158,8 +158,8 @@ class Spin(SpheroCommand):
 
 class LambdaSpeak(SpheroCommand):
     method = "lambda_speak"
-    lambda_content: str = Field(description="值是一个 python lambda 函数, 返回要说的话. 与 say 方法相比, 可以运行一些计算逻辑, "
-                                            "比如计算运行距离: `lambda: '我滚动了{l}单位距离'.format(l=速度*时间)` ")
+    lambda_content: str = Field(description="值是一个 python lambda 函数, 返回要说的话. 与 say 方法相比, 可以运行一些计算逻辑. "
+                                            "比如计算运行距离: `lambda: '我滚动了{length}单位距离'.format(length=速度*时间)` ")
 
     @classmethod
     def desc(cls) -> str:
@@ -169,7 +169,7 @@ class LambdaSpeak(SpheroCommand):
     def yaml_desc(cls) -> str:
         return """
     * lambda_say: 支持调用函数的说话能力.  
-        * lambda_content: str 类型的 python lambda 函数. 参数为空, 返回值是 str. 可以在说话过程中计算, 比如计算运行距离: `lambda: "我滚动了{l}单位距离".format(l=速度*时间)` 
+        * lambda_content: str 类型的 python lambda 函数. 参数为空, 返回值是 str. 可以在说话过程中计算,  比如计算运行距离: `lambda: "我滚动了{length}单位距离".format(length=速度*时间)` 
     """
 
     def runtime_info(self, duration: float, interrupt: str) -> str:

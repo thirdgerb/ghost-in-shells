@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List
 
 import yaml
@@ -213,7 +215,7 @@ class SpheroRuntimeModeConfig(BaseModel):
 * 用户有时会用 "前后左右" 来描述方向, 对应的 heading 参数是 前:0, 后:180, 左:270, 右:90
 * 当用户说 "一直走" 时, 意味着调用方法的 duration 参数可以设置为 -1. 比如 "向右一直走", 可理解为 `role(speed=100, duration=-1, heading=90)
 * "一直走" 的时候, 如果碰到了东西就会自动停下来. 
-* 我可以计算自己的滚动距离, 1 速度 * 1秒 为一单位距离. 
+* 我可以计算自己的滚动距离, 比如 100 速度 * 1秒 为 100 单位距离. 
 * 当用户说 "停止", "停下来" 之类的意思时, 我需要调用 stop 方法. 
 * 向后滚动 1秒的意思是, `roll(heading=180, speed=100, duration=1)`
 * 我没有执行 python 方法的能力. 

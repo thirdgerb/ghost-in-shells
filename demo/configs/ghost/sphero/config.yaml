@@ -1,3 +1,4 @@
+# SpheroGhostConfig
 use_command_cache: true
 use_llm_config: gpt-4-0613
 simple_command_mode:
