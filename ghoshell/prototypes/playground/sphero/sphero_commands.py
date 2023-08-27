@@ -450,11 +450,11 @@ defined_commands: [Type[SpheroCommand]] = {cmd.method: cmd for cmd in [
     Spin,
     Stop,
     Say,
-    Loop,
+    # Loop,
     LambdaSpeak,
-    RoundRoll,
-    LambdaRoll,
-    Ability,
+    # RoundRoll,
+    # LambdaRoll,
+    # Ability,
 ]}
 
 

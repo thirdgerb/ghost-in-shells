@@ -1,6 +1,6 @@
 # SpheroGhostConfig
 use_command_cache: true
-use_llm_config: gpt-4-0613
+use_llm_config: turbo-16k-0613
 simple_command_mode:
   name: "sphero/simple_command_mode"
   welcome: "进入单一命令模式, 请给我下达指令"
