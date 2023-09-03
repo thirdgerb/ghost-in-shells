@@ -176,8 +176,9 @@ class GhostKernel(Ghost, metaclass=ABCMeta):
         try:
             pipeline = self._build_pipeline()
             ctx = pipeline(ctx)
-
             return ctx.get_unsent_outputs()
+        except SystemError as e:
+            raise
         except ContextError as e:
             # todo
             return [self._failure_message(_input=ctx.input, err=e)]

@@ -8,12 +8,12 @@ import yaml
 
 from ghoshell.container import Container
 from ghoshell.framework.ghost import GhostConfig
-from ghoshell.ghost import Ghost
+from ghoshell.ghost import Ghost, URL
 from ghoshell.mocks.ghost_mock import MockGhost
 from ghoshell.prototypes.console import ConsoleShell
 
 
-def demo_ghost(root_path: str, root_container: Container) -> Ghost:
+def demo_ghost(root_path: str, root_container: Container, root_think: str) -> Ghost:
     """
     bootstrap demo ghost from local files in ./demo
     """
@@ -25,6 +25,8 @@ def demo_ghost(root_path: str, root_container: Container) -> Ghost:
     with open(config_file, 'r', encoding='utf-8') as f:
         config_data = yaml.safe_load(f)
     config = GhostConfig(**config_data)
+    if root_think:
+        config.root_url = URL.new(root_think)
 
     ghost = MockGhost(container, config, config_path, runtime_path)
     return ghost
@@ -51,6 +53,13 @@ def main() -> None:
         help="relative directory path that include config and runtime directories",
         type=str,
     )
+    parser.add_argument(
+        "--think", "-t",
+        nargs="?",
+        default="",
+        help="root think name",
+        type=str,
+    )
     parsed = parser.parse_args(sys.argv[1:])
     relative = str(parsed.path)
 
@@ -63,7 +72,12 @@ def main() -> None:
         logging_config = yaml.safe_load(f)
         dictConfig(logging_config)
 
-    ghost = demo_ghost(root_path, root_container)
+    root_think = str(parsed.think)
+    ghost = demo_ghost(root_path, root_container, root_think)
     ghost.boostrap()
     root_container.set(Ghost, ghost)
     run_console_shell(root_path, root_container)
+
+
+if __name__ == "__main__":
+    main()

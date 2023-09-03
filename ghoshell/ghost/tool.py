@@ -6,7 +6,7 @@ from typing import Optional, Dict, List, Tuple
 from pydantic import ValidationError
 
 from ghoshell.ghost.context import Context
-from ghoshell.ghost.error import MindNotImplementedError, CloneError
+from ghoshell.ghost.error import MindNotImplementedError, CloneError, GhostError
 from ghoshell.ghost.mindset import Intention, Attention
 from ghoshell.ghost.mindset import Think, Thought, Stage, Event
 from ghoshell.ghost.mindset.operator import Operator
@@ -243,7 +243,7 @@ class RuntimeTool:
         thought = cls.new_thought(ctx, task.url)
         try:
             thought = cls.merge_task_to_thought(task, thought)
-        except Exception as e:
+        except GhostError as e:
             # 忽视掉任何错误, 当作遗忘了记忆.
             ctx.error(e)
         return thought
@@ -312,6 +312,7 @@ class RuntimeTool:
             except ValidationError as e:
                 raise CloneError(str(e))
         thought = think.new_thought(ctx, url.args)
+        thought.url = url.copy_with()
         return thought
 
     @classmethod

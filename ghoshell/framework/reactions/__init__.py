@@ -10,7 +10,18 @@ instance_count_cmd = InstanceCountCmdReaction()
 thought_cmd = ThoughtCmdReaction()
 redirect_cmd = RedirectCmdReaction()
 
+system_cmds = {
+    "cancel": cancel_cmd,
+    "restart": restart_cmd,
+    "quit": quit_cmd,
+    "task": task_cmd,
+    "process": process_cmd,
+    "thought": thought_cmd,
+}
+
 __all__ = [
+    "system_cmds",
+
     "cancel_cmd", "restart_cmd", "quit_cmd", "task_cmd",
     "process_cmd", "instance_count_cmd", "thought_cmd", "redirect_cmd",
 

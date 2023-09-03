@@ -12,6 +12,7 @@ from ghoshell.mocks.providers import *
 from ghoshell.prototypes.playground.llm_test_ghost import GameUndercoverBootstrapper
 from ghoshell.prototypes.playground.llm_test_ghost import LLMConversationalThinkBootstrapper, \
     PromptUnitTestsBootstrapper
+from ghoshell.prototypes.playground.werewolf import WerewolfGameBootstrapper
 
 
 class MockGhost(GhostKernel):
@@ -35,6 +36,7 @@ class MockGhost(GhostKernel):
         PromptUnitTestsBootstrapper(),
         # 测试加入 undercover 游戏. deprecated
         GameUndercoverBootstrapper(think_name="game/undercover"),
+        WerewolfGameBootstrapper(),
     ]
 
     depending_contracts: ClassVar[List] = [

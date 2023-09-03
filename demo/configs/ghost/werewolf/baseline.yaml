@@ -1,0 +1,85 @@
+# 详细配置见 ghoshell.prototypes.playground.werewolf.configs.WerewolfGameConfig
+think: werewolf/baseline
+desc: 狼人杀游戏的基线测试用例.
+introduce: |
+  测试
+story: |
+  昏暗的油灯在地洞中点燃, 闪烁的光芒照亮了由树根参差交错编织出来的墙壁.
+  倒在地上的六个人挣扎着苏醒, 还没认清楚彼此, 却看到一名浑身笼罩在妖气中的鬼婆, 从地洞阴影中走出来.
+  
+  "贪婪的凡人们", 鬼婆用苍老而沙哑的声音说道.
+  "你们欠了我的债, 我现在将夺走你们的灵魂, 不过...呵呵呵呵" 鬼婆发出了骸骨摩擦般的笑声
+  
+  "我发现你们中居然有两个隐藏的狼人, 正好可以玩个游戏, 给我解解闷, 呵呵呵"
+  
+  "凡人们如果能找出狼人杀光, 就是你们凡人赢. 而狼人如果杀掉了所有的凡人, 就是狼人赢. 赢的一方灵魂将被我释放, 而输的一方将永远成为我的奴隶~"
+  
+  "我会给凡人一个机会, 在我主持下, 凡人们可以投票选出一人, 他将被我亲手杀死." 
+  
+  "随后我会把所有人关入被魔法隔绝一切感官的树洞, 只有狼人和他们选中的凡人在我面前决斗"
+  
+  "周而复始, 直到其中一方赢下游戏为止. 呵呵呵呵.... 不管你们听没听懂, 游戏已经开始了... 相互介绍一下吧~~"
+llm_config: gpt-4-0613
+debug: true
+speech: {}
+prompts: {}
+abilities:
+  - name: 狼人杀
+    description: 在夜晚将化身为狼人, 邪恶的本性复苏. 可以在选择一个活着的人, 用狼人的爪子和牙齿残忍地杀害.
+  - name: 预见
+    description: 可以选择一个活着的人, 查看他所属的阵营 (faction), 但不能知道他的角色或能力.
+  - name: 毒药
+    description: 可以使用毒药, 毒死一个活着的人. 注意, 只能使用一次.
+  - name: 解药
+    description: 可以使用解药, 复活一个已死的人. 注意, 只能用一次.
+roles:
+  - name: 狼人
+    faction: 狼人
+    description: 狼人
+    strategy: 狼人
+    abilities:
+      - 狼人杀
+  - name: 牧师
+    faction: 村民
+    description: 牧师
+    strategy: 牧师
+    abilities:
+      - 预见
+  - name: 巫师
+    faction: 村民
+    description: todo
+    strategy: todo
+    abilities:
+      - 毒药
+      - 解药
+  - name: 村名
+    faction: 村民
+    description: todo
+    strategy: todo
+    abilities: []
+game_roles:
+  狼人: 2
+  牧师: 1
+  巫师: 1
+  村民: 2
+players:
+  - name: "辛德瑞拉"
+    story: |
+      辛德瑞拉是一名 18岁的可爱女孩. 她母亲很早去世了, 父亲取了一名继母.
+      继母和辛德瑞拉的两位姐姐都为人刻薄, 时刻为难辛德瑞拉, 她像一名仆人负责了所有家务, 衣服弄得很脏, 被姐姐们嘲笑为 "灰姑娘".
+      为了能和心仪的贵族男孩见面, 辛德瑞拉将灵魂抵押给了鬼婆. 但她没有兑现承诺, 被鬼婆抓入了地洞.
+  - name: "皮诺曹"
+    story: |
+      皮诺曹 todo
+  - name: "爱丽儿"
+    story: |
+      爱丽儿 todo
+  - name: "吉安娜"
+    story: |
+      雪白 todo
+  - name: "迪奥"
+    story: |
+      纳温 todo
+  - name: "乔纳森"
+    story: |
+      乔纳森 todo

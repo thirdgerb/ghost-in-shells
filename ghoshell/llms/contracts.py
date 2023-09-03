@@ -25,3 +25,25 @@ class LLMTextEmbedding(metaclass=ABCMeta):
     @abstractmethod
     def text_embedding(self, text: str, config_name: str = "") -> List[float]:
         pass
+
+#
+# class Prompter(metaclass=ABCMeta):
+#     """
+#     对 chat completion 或 text completion 的封装.
+#     """
+#
+#     @abstractmethod
+#     def prompt(self, prompt: str, prompter_id: str = "") -> str:
+#         pass
+#
+#
+# class PromptTemp(BaseModel, metaclass=ABCMeta):
+#     prompter: ClassVar[str]
+#
+#     @abstractmethod
+#     def as_prompt(self) -> str:
+#         pass
+#
+#     def __call__(self, container: Container) -> str:
+#         prompter = container.force_fetch(Prompter)
+#         return prompter.prompt(self.as_prompt(), self.prompter)

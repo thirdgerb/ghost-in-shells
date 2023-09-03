@@ -149,6 +149,7 @@ class Task(BaseModel):
     # overdue < 0 : 表示不被遗忘的长期记忆.
     # overdue 0 : 表示不记忆, 完全跟随栈走. 栈被回收就清除. 也可能被一个 LRU 机制淘汰掉.
     # overdue > 1 : 则应该是一个具体的  unix_timestamp, 到时间点意味着应该被遗忘.
+
     overdue: int = 0
 
     # forwards: 是当前任务运行中积压的节点.

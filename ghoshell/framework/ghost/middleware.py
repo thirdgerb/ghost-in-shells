@@ -59,18 +59,18 @@ class ExceptionHandlerMiddleware(CtxMiddleware):
         def pipe(ctx: Context, after: CtxPipeline) -> Context:
             try:
                 return after(ctx)
-
+            except SystemError:
+                raise
             except BusyError as e:
                 ctx.logger.info(e)
                 ctx.send_at(None).text(config.on_busy)
-                return ctx
             except UnexpectedError as e:
                 ctx.logger.info(e)
                 ctx.send_at(None).err(config.on_unexpected)
             except ContextError as e:
                 ctx.logger.info(e)
                 ctx.send_at(None).err(e.message, e.CODE)
-                return ctx
+            return ctx
             # todo: 建立更好的 context 处理原则.
 
         return pipe

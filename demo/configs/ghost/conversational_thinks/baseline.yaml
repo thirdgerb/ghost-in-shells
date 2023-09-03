@@ -1,5 +1,6 @@
 # ghoshell.llms.thinks.conversational.ConversationalConfig
 name: chat/baseline
+llm_config: gpt-4-0613
 reactions:
   cancel: ghoshell.framework.reactions:cancel_cmd
   restart: ghoshell.framework.reactions:restart_cmd
